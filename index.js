@@ -58,7 +58,7 @@ async function startParseServer() {
   });
 
   // Cron job to run every 10 minutes
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     try {
       console.log("Running cloud function every 10 minutes...");
 
