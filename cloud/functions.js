@@ -559,6 +559,38 @@ Parse.Cloud.define("coinsCredit", async (request) => {
     }
 });
 
+Parse.Cloud.define("checkUserType", async (request) => {
+    const { email } = request.params;
+    try {
+        const query = new Parse.Query(Parse.User);
+        query.equalTo("email", email);
+        const user = await query.first({ useMasterKey: true });
+
+        if (!user) {
+            throw new Parse.Error(404, "User not found.");
+        }
+        // Return the userType
+        return { userType: user.get("userType") };
+    } catch (error) {
+        // Handle different error types
+        if (error instanceof Parse.Error) {
+            // Return the error if it's a Parse-specific error
+            return {
+                status: "error",
+                code: error.code,
+                message: error.message,
+            };
+        } else {
+            // Handle any unexpected errors
+            return {
+                status: "error",
+                code: 500,
+                message: "An unexpected error occurred.",
+            };
+        }
+    }
+});
+
 Parse.Cloud.beforeSave("Test", () => {
     throw new Parse.Error(9001, "Saving test objects is not available.");
 });
