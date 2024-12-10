@@ -1,5 +1,14 @@
 Parse.Cloud.define("createUser", async (request) => {
-    const { username, name, email, balance, password, userParentId, userParentName, roleName } = request.params;
+    const {
+        username,
+        name,
+        email,
+        balance,
+        password,
+        userParentId,
+        userParentName,
+        roleName,
+    } = request.params;
 
     if (!username || !email || !password) {
         throw new Parse.Error(
@@ -189,10 +198,29 @@ Parse.Cloud.define("getUserById", async (request) => {
 });
 
 Parse.Cloud.define("fetchAllUsers", async (request) => {
+    const { role, objectId } = request.params.identity;
+
+    if (!objectId) {
+        throw new Parse.Error(400, "Missing required parameter: userId");
+    }
+
     try {
         const userQuery = new Parse.Query(Parse.User);
-        userQuery.select("username", "name", "email", "lastLoginIp", "balance", "createdAt");
+        userQuery.select(
+            "username",
+            "name",
+            "email",
+            "lastLoginIp",
+            "balance",
+            "createdAt"
+        );
+
+        if (role === "Agent") {
+            userQuery.equalTo("userParentId", objectId);
+        }
+
         const allUsers = await userQuery.find({ useMasterKey: true });
+
         return allUsers.map((user) => ({
             id: user.id,
             username: user.get("username"),
@@ -296,7 +324,10 @@ Parse.Cloud.define("userTransaction", async (request) => {
                 // Update status to 1 on Axios success
                 transactionDetails.set("status", 1);
                 transactionDetails.set("referralLink", axiosResponse.data.redirect_url);
-                transactionDetails.set("transactionId", axiosResponse.data.transaction_id);
+                transactionDetails.set(
+                    "transactionId",
+                    axiosResponse.data.transaction_id
+                );
                 await transactionDetails.save(null, { useMasterKey: true });
 
                 return {
@@ -383,7 +414,6 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
                         (rec) => rec.id === record.objectId
                     );
 
-
                     if (recordObject) {
                         if (response.data.transaction.status === "completed") {
                             // Step 7: Update the Transaction status to 2
@@ -397,15 +427,18 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 
                             if (user) {
                                 // Step 9: Update the user's balance
-                                const currentBalance = user.get("balance")
-                                const updatedBalance = currentBalance + record.transactionAmount
+                                const currentBalance = user.get("balance");
+                                const updatedBalance =
+                                    currentBalance + record.transactionAmount;
 
                                 // const newBalance = user.get("balance") + record.transactionAmount;
                                 user.set("balance", updatedBalance);
 
                                 // Save the updated user record
                                 await user.save(null, { useMasterKey: true });
-                                console.log(`User balance updated successfully for playerId: ${record.userId}`);
+                                console.log(
+                                    `User balance updated successfully for playerId: ${record.userId}`
+                                );
                             }
                         }
                     }
@@ -452,22 +485,21 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     const { id, type, username, balance, transactionAmount, remark } =
         request.params;
 
-
     try {
         console.log("99999999999", request.params);
         let body = JSON.stringify({
             playerId: id,
-            amt: parseFloat(transactionAmount)
+            amt: parseFloat(transactionAmount),
         });
 
         let config = {
-            method: 'post',
+            method: "post",
             maxBodyLength: Infinity,
-            url: 'https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php',
+            url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
             headers: {
-                'Content-Type': 'application/json'
+                "Content-Type": "application/json",
             },
-            data: body
+            data: body,
         };
 
         // Make the API call using Axios
@@ -485,7 +517,10 @@ Parse.Cloud.define("redeemRedords", async (request) => {
             transactionDetails.set("transactionDate", new Date());
             // transactionDetails.set("beforeTransaction", balance);
             // transactionDetails.set("afterTransaction", finalAmount);
-            transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
+            transactionDetails.set(
+                "transactionAmount",
+                parseFloat(transactionAmount)
+            );
             transactionDetails.set("remark", remark);
             transactionDetails.set("status", 2);
             // Save the transaction
@@ -495,26 +530,24 @@ Parse.Cloud.define("redeemRedords", async (request) => {
             return {
                 status: "success",
                 message: "Redeem successful",
-                data: response.data
+                data: response.data,
             };
         } else {
             return {
                 status: "error",
-                message: response.data.message
+                message: response.data.message,
             };
         }
-
-
-
     } catch (error) {
         // Handle different error types
         if (error.response) {
             return {
                 status: "error",
                 code: error.response.status,
-                message: error.response.data.message
+                message: error.response.data.message,
             };
-        } if (error instanceof Parse.Error) {
+        }
+        if (error instanceof Parse.Error) {
             // Return the error if it's a Parse-specific error
             return {
                 status: "error",
@@ -632,9 +665,8 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
         return users.map((user) => ({
             id: user.id,
             name: user.get("name"),
-            role: roleName
+            role: roleName,
         }));
-
     } catch (error) {
         // Handle different error types
         if (error instanceof Parse.Error) {
