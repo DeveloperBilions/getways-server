@@ -58,18 +58,18 @@ async function startParseServer() {
   });
 
   // Cron job to run every 1 minutes
-  cron.schedule('*/1 * * * *', async () => {
-    try {
-      console.log("Running cloud function every 10 minutes...");
+  // cron.schedule('*/1 * * * *', async () => {
+  //   try {
+  //     console.log("Running cloud function every 10 minutes...");
 
-      // Call your cloud function
-      const response = await Parse.Cloud.run("checkTransactionStatus");
+  //     // Call your cloud function
+  //     const response = await Parse.Cloud.run("checkTransactionStatus");
 
-      console.log("Cloud function response:", response);
-    } catch (error) {
-      console.error("Error running cloud function:", error);
-    }
-  });
+  //     console.log("Cloud function response:", response);
+  //   } catch (error) {
+  //     console.error("Error running cloud function:", error);
+  //   }
+  // });
 }
 
 // Call the async function to start Parse Server

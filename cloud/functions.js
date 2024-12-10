@@ -1,5 +1,5 @@
 Parse.Cloud.define("createUser", async (request) => {
-    const { username, name, email, balance, password } = request.params;
+    const { username, name, email, balance, password, userParentId, userParentName, roleName } = request.params;
 
     if (!username || !email || !password) {
         throw new Parse.Error(
@@ -16,9 +16,25 @@ Parse.Cloud.define("createUser", async (request) => {
         user.set("email", email);
         user.set("balance", 0);
         user.set("password", password);
+        user.set("userParentId", userParentId);
+        user.set("userParentName", userParentName);
 
         // Save the user
         await user.signUp(null, { useMasterKey: true });
+
+        // Query the Role class to find the desired role
+        const query = new Parse.Query(Parse.Role);
+        query.equalTo("name", roleName);
+        const role = await query.first({ useMasterKey: true });
+
+        if (!role) {
+            throw new Parse.Error(404, "Role not found");
+        }
+
+        // Add the user to the role
+        const relation = role.relation("users");
+        relation.add(user);
+        await role.save(null, { useMasterKey: true });
 
         return { success: true, message: "User created successfully!" };
     } catch (error) {
@@ -571,6 +587,54 @@ Parse.Cloud.define("checkUserType", async (request) => {
         }
         // Return the userType
         return { userType: user.get("userType") };
+    } catch (error) {
+        // Handle different error types
+        if (error instanceof Parse.Error) {
+            // Return the error if it's a Parse-specific error
+            return {
+                status: "error",
+                code: error.code,
+                message: error.message,
+            };
+        } else {
+            // Handle any unexpected errors
+            return {
+                status: "error",
+                code: 500,
+                message: "An unexpected error occurred.",
+            };
+        }
+    }
+});
+
+Parse.Cloud.define("getUsersByRole", async (request) => {
+    const { roleName } = request.params;
+    if (!roleName) {
+        throw new Parse.Error(400, "Role name is required");
+    }
+
+    try {
+        // Query the Role class for the role with the specified name
+        const roleQuery = new Parse.Query(Parse.Role);
+        roleQuery.equalTo("name", roleName);
+        const role = await roleQuery.first({ useMasterKey: true });
+
+        if (!role) {
+            throw new Parse.Error(404, `Role '${roleName}' not found`);
+        }
+
+        // Fetch users related to the role
+        const userRelation = role.relation("users");
+        const usersQuery = userRelation.query();
+        const users = await usersQuery.find({ useMasterKey: true });
+
+        // Format and return the list of users
+        return users.map((user) => ({
+            id: user.id,
+            name: user.get("name"),
+            role: roleName
+        }));
+
     } catch (error) {
         // Handle different error types
         if (error instanceof Parse.Error) {
