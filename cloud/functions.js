@@ -204,7 +204,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     try {
         const userQuery = new Parse.Query(Parse.User);
         userQuery.select("username", "name", "email", "lastLoginIp", "balance", "createdAt", "roleName", "redeemService");
-        userQuery.doesNotExist("userReferralCode");
+        userQuery.equalTo("userReferralCode", null);
         const allUsers = await userQuery.find({ useMasterKey: true });
         return allUsers.map((user) => {
             return {
