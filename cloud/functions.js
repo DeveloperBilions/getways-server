@@ -199,39 +199,23 @@ Parse.Cloud.define("getUserById", async (request) => {
 });
 
 Parse.Cloud.define("fetchAllUsers", async (request) => {
-    const { role, objectId } = request.params.identity;
-
-    if (!objectId) {
-        throw new Parse.Error(400, "Missing required parameter: userId");
-    }
-
     try {
         const userQuery = new Parse.Query(Parse.User);
-        userQuery.select(
-            "username",
-            "name",
-            "email",
-            "lastLoginIp",
-            "balance",
-            "createdAt",
-            "userReferralCode"
-        );
-
-        if (role === "Agent") {
-            userQuery.equalTo("userParentId", objectId);
-        }
-
+        userQuery.select("username", "name", "email", "lastLoginIp", "balance", "createdAt", "roleName");
         const allUsers = await userQuery.find({ useMasterKey: true });
-
-        return allUsers.map((user) => ({
-            id: user.id,
-            username: user.get("username"),
-            name: user.get("name"),
-            email: user.get("email"),
-            lastLoginIp: user.get("lastLoginIp"),
-            balance: user.get("balance"),
-            createdAt: user.get("createdAt"),
-        }));
+        return allUsers.map((user) => {
+            return {
+                id: user.id,
+                username: user.get("username"),
+                name: user.get("name"),
+                email: user.get("email"),
+                lastLoginIp: user.get("lastLoginIp"),
+                balance: user.get("balance"),
+                createdAt: user.get("createdAt"),
+                roleName: user.get("roleName")
+            }
+        }
+        );
     } catch (error) {
         // Handle different error types
         if (error instanceof Parse.Error) {
