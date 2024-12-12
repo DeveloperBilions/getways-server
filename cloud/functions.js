@@ -212,7 +212,8 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
             "email",
             "lastLoginIp",
             "balance",
-            "createdAt"
+            "createdAt",
+            "userReferralCode"
         );
 
         if (role === "Agent") {
@@ -667,6 +668,69 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
             name: user.get("name"),
             role: roleName,
         }));
+    } catch (error) {
+        // Handle different error types
+        if (error instanceof Parse.Error) {
+            // Return the error if it's a Parse-specific error
+            return {
+                status: "error",
+                code: error.code,
+                message: error.message,
+            };
+        } else {
+            // Handle any unexpected errors
+            return {
+                status: "error",
+                code: 500,
+                message: "An unexpected error occurred.",
+            };
+        }
+    }
+});
+
+Parse.Cloud.define("referralUserUpdate", async (request) => {
+    const { userReferralCode, username, name, email, password } = request.params;
+
+    try {
+        // Check if userReferralCode is provided
+        if (!userReferralCode) {
+            console.log("in referral code");
+
+            throw new Parse.Error(400, "Missing parameter: userReferralCode");
+        }
+
+        // Query the User class for the matching referral code
+        const query = new Parse.Query(Parse.User);
+        query.equalTo("userReferralCode", userReferralCode);
+
+        // Execute the query
+        const user = await query.first({ useMasterKey: true });
+
+        if (!user) {
+            console.log("in user fetch");
+
+            return {
+                status: "error",
+                code: 404,
+                message: "Referral code Expired",
+            };
+        }
+
+        // Update the user fields
+        user.set("username", username);
+        user.set("name", name);
+        user.set("email", email);
+        user.setPassword(password);
+        user.set("userReferralCode", null);
+
+        // Save the updated user
+        await user.save(null, { useMasterKey: true });
+
+        return {
+            status: "success",
+            message: "User Created successfully.",
+            data: user,
+        };
     } catch (error) {
         // Handle different error types
         if (error instanceof Parse.Error) {
