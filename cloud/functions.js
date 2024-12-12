@@ -203,7 +203,7 @@ Parse.Cloud.define("getUserById", async (request) => {
 Parse.Cloud.define("fetchAllUsers", async (request) => {
     try {
         const userQuery = new Parse.Query(Parse.User);
-        userQuery.select("username", "name", "email", "lastLoginIp", "balance", "createdAt", "roleName");
+        userQuery.select("username", "name", "email", "lastLoginIp", "balance", "createdAt", "roleName", "redeemService");
         const allUsers = await userQuery.find({ useMasterKey: true });
         return allUsers.map((user) => {
             return {
@@ -214,7 +214,8 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
                 lastLoginIp: user.get("lastLoginIp"),
                 balance: user.get("balance"),
                 createdAt: user.get("createdAt"),
-                roleName: user.get("roleName")
+                roleName: user.get("roleName"),
+                redeemService: user.get("redeemService")
             }
         }
         );
@@ -470,14 +471,13 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 Parse.Cloud.define("redeemRedords", async (request) => {
     const axios = require("axios");
 
-    const { id, type, username, balance, transactionAmount, remark } =
+    const { id, type, username, balance, transactionAmount, remark, percentageAmount } =
         request.params;
 
     try {
-        console.log("99999999999", request.params);
         let body = JSON.stringify({
             playerId: id,
-            amt: parseFloat(transactionAmount),
+            amt: parseFloat(percentageAmount),
         });
 
         let config = {
@@ -718,6 +718,56 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
             message: "User Created successfully.",
             data: user,
         };
+    } catch (error) {
+        // Handle different error types
+        if (error instanceof Parse.Error) {
+            // Return the error if it's a Parse-specific error
+            return {
+                status: "error",
+                code: error.code,
+                message: error.message,
+            };
+        } else {
+            // Handle any unexpected errors
+            return {
+                status: "error",
+                code: 500,
+                message: "An unexpected error occurred.",
+            };
+        }
+    }
+});
+
+Parse.Cloud.define("redeemServiceFee", async (request) => {
+    const { userId, redeemService } = request.params;
+
+    if (!userId) {
+        throw new Parse.Error(400, "Missing required parameter: userId");
+    }
+
+    try {
+        // Step 1: Find the user by ID
+        const userQuery = new Parse.Query(Parse.User);
+        userQuery.equalTo("objectId", userId);
+        const user = await userQuery.first({ useMasterKey: true });
+
+        user.set("redeemService", redeemService);
+        await user.save(null, { useMasterKey: true });
+
+        // Step 2: Find the user by userParentId
+        const usersQuery = new Parse.Query(Parse.User);
+        usersQuery.equalTo("userParentId", userId);
+        const usersChild = await usersQuery.find({ useMasterKey: true });
+
+        // Step 3: Update redeemService for all users in usersChild array
+        for (const childUser of usersChild) {
+            childUser.set("redeemService", redeemService);
+        }
+
+        // Save all updated users in a batch
+        await Parse.Object.saveAll(usersChild, { useMasterKey: true });
+
+        return { success: true, message: "User Redeem Fees Updated successfully" };
     } catch (error) {
         // Handle different error types
         if (error instanceof Parse.Error) {
