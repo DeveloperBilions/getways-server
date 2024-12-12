@@ -510,7 +510,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
                 parseFloat(transactionAmount)
             );
             transactionDetails.set("remark", remark);
-            transactionDetails.set("status", 2);
+            transactionDetails.set("status", 4);
             // Save the transaction
             await transactionDetails.save(null, { useMasterKey: true });
 
@@ -521,6 +521,27 @@ Parse.Cloud.define("redeemRedords", async (request) => {
                 data: response.data,
             };
         } else {
+            // set the transaction field
+            const TransactionDetails = Parse.Object.extend("TransactionRecords");
+            const transactionDetails = new TransactionDetails();
+
+            transactionDetails.set("type", type);
+            transactionDetails.set("gameId", "786");
+            transactionDetails.set("username", username);
+            transactionDetails.set("userId", id);
+            transactionDetails.set("transactionDate", new Date());
+            // transactionDetails.set("beforeTransaction", balance);
+            // transactionDetails.set("afterTransaction", finalAmount);
+            transactionDetails.set(
+                "transactionAmount",
+                parseFloat(transactionAmount)
+            );
+            transactionDetails.set("remark", remark);
+            transactionDetails.set("status", 5);
+            transactionDetails.set("responseMessage", response.data.message);
+            // Save the transaction
+            await transactionDetails.save(null, { useMasterKey: true });
+
             return {
                 status: "error",
                 message: response.data.message,
