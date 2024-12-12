@@ -8,6 +8,7 @@ Parse.Cloud.define("createUser", async (request) => {
         userParentId,
         userParentName,
         roleName,
+        userReferralCode
     } = request.params;
 
     if (!username || !email || !password) {
@@ -28,6 +29,7 @@ Parse.Cloud.define("createUser", async (request) => {
         user.set("userParentId", userParentId);
         user.set("userParentName", userParentName);
         user.set("roleName", roleName);
+        user.set("userReferralCode", userReferralCode);
 
         // Save the user
         await user.signUp(null, { useMasterKey: true });
