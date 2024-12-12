@@ -27,6 +27,7 @@ Parse.Cloud.define("createUser", async (request) => {
         user.set("password", password);
         user.set("userParentId", userParentId);
         user.set("userParentName", userParentName);
+        user.set("roleName", roleName);
 
         // Save the user
         await user.signUp(null, { useMasterKey: true });
