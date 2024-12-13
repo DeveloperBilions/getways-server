@@ -618,6 +618,31 @@ Parse.Cloud.define("coinsCredit", async (request) => {
     }
 });
 
+Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
+    const { email, password } = request.params;
+  
+    if (!email || !password) {
+      throw new Error("Email and password are required.");
+    }
+  
+    // Search for the user with a case-insensitive email
+    const query = new Parse.Query(Parse.User);
+    query.matches("email", `^${email}$`, "i");
+  
+    try {
+      const user = await query.first({ useMasterKey: true }); // Use master key for secure operations
+      if (!user) {
+        throw new Error("Invalid email or password.");
+      }
+  
+      // Perform the login using the found username
+      const loggedInUser = await Parse.User.logIn(user.get("username"), password);
+      return loggedInUser;
+    } catch (error) {
+      throw new Error(`Login failed: ${error.message}`);
+    }
+  });
+
 Parse.Cloud.define("checkUserType", async (request) => {
     const { email } = request.params;
     try {
