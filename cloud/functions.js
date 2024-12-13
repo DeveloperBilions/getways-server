@@ -624,7 +624,7 @@ Parse.Cloud.define("checkUserType", async (request) => {
         const query = new Parse.Query(Parse.User);
         //query.equalTo("email", email);
         // Use a case-insensitive regular expression
-        query.matches("email", /^email$/i);
+        query.matches("email", `^${email}$`, "i");
         const user = await query.first({ useMasterKey: true });
 
         if (!user) {
