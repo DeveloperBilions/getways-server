@@ -630,14 +630,22 @@ Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
     query.matches("email", `^${email}$`, "i");
   
     try {
-      const user = await query.first({ useMasterKey: true }); // Use master key for secure operations
-      if (!user) {
-        throw new Error("Invalid email or password.");
-      }
-  
-      // Perform the login using the found username
-      const loggedInUser = await Parse.User.logIn(user.get("username"), password);
-      return loggedInUser;
+        const user = await query.first({ useMasterKey: true }); // Use master key for secure operations
+        if (!user) {
+            throw new Error("Invalid email or password.");
+        }
+    
+        // Perform the login using the found username
+        const loggedInUser = await Parse.User.logIn(user.get("username"), password);
+        
+        // Fetch the session token for the logged-in user
+        const sessionToken = loggedInUser.getSessionToken();
+
+        // Return the user object and session token to the client
+        return {
+            sessionToken,
+            user: loggedInUser,
+        };
     } catch (error) {
       throw new Error(`Login failed: ${error.message}`);
     }
