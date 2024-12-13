@@ -634,6 +634,7 @@ Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
         if (!user) {
             throw new Error("Invalid email or password.");
         }
+        
     
         // Perform the login using the found username
         const loggedInUser = await Parse.User.logIn(user.get("username"), password);
