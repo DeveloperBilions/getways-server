@@ -1,9 +1,9 @@
 const express = require("express");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const { ParseServer } = require("parse-server");
 const ParseDashboard = require("parse-dashboard");
 const cors = require("cors");
-const cron = require('node-cron');
+const cron = require("node-cron");
 require("dotenv").config();
 const app = express();
 
@@ -59,41 +59,42 @@ async function startParseServer() {
     );
   });
 
-  //auth flow for AOG API 
-app.post('/requestToken', (req, res) => {
-  const user = { id: req.body.userid}
+  //auth flow for AOG API
+  app.post("/requestToken", (req, res) => {
+    const user = { id: req.body.userid };
 
-  const ACCESS_TOKEN_SECRET='e11c6aa82db982f9fa9215e244a43a4f3e436ef4b4576766845976ab526accfed74e21ceb19265f88635c04a0222593eaca3b696ed2be5a38854f1869bfdad8e';
+    const ACCESS_TOKEN_SECRET =
+      "e11c6aa82db982f9fa9215e244a43a4f3e436ef4b4576766845976ab526accfed74e21ceb19265f88635c04a0222593eaca3b696ed2be5a38854f1869bfdad8e";
 
-  const accessToken = jwt.sign(user, ACCESS_TOKEN_SECRET);
-  res.json({accessToken: accessToken});    
-});
+    const accessToken = jwt.sign(user, ACCESS_TOKEN_SECRET);
+    res.json({ accessToken: accessToken });
+  });
 
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (token == null) return res.sendStatus(401);
+  function authenticateToken(req, res, next) {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (token == null) return res.sendStatus(401);
 
-  const ACCESS_TOKEN_SECRET='e11c6aa82db982f9fa9215e244a43a4f3e436ef4b4576766845976ab526accfed74e21ceb19265f88635c04a0222593eaca3b696ed2be5a38854f1869bfdad8e';
+    const ACCESS_TOKEN_SECRET =
+      "e11c6aa82db982f9fa9215e244a43a4f3e436ef4b4576766845976ab526accfed74e21ceb19265f88635c04a0222593eaca3b696ed2be5a38854f1869bfdad8e";
 
-  jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  })
+    jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
+      if (err) return res.sendStatus(403);
+      req.user = user;
+      next();
+    });
+  }
 
-}
-
-app.get('/posts', authenticateToken, (req, res) => {
-  const posts = [
-    { userid: "Em0FNBjBHc", title: "Post 1" }
-    , { userid: "Fm0FNBjBHc", title: "Post 2" }
-  ];
-  res.json(posts);
-});
+  app.get("/posts", authenticateToken, (req, res) => {
+    const posts = [
+      { userid: "Em0FNBjBHc", title: "Post 1" },
+      { userid: "Fm0FNBjBHc", title: "Post 2" },
+    ];
+    res.json(posts);
+  });
 
   // Cron job to run every 1 minutes
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule("*/1 * * * *", async () => {
     try {
       console.log("Running cloud function every 10 minutes...");
 
