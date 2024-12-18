@@ -597,7 +597,7 @@ Parse.Cloud.define("coinsCredit", async (request) => {
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
-    query.equalTo("objectId", transactionId);
+    query.equalTo("transactionId", transactionId);
 
     // Fetch the record
     const transaction = await query.first();
