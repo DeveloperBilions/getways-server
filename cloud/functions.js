@@ -30,7 +30,6 @@ Parse.Cloud.define("createUser", async (request) => {
     user.set("userParentName", userParentName);
     user.set("roleName", roleName);
     user.set("userReferralCode", userReferralCode);
-    user.set("redeemService", 0);
 
     // Save the user
     await user.signUp(null, { useMasterKey: true });
@@ -870,49 +869,20 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
     user.set("redeemService", redeemService);
     await user.save(null, { useMasterKey: true });
 
+    // Step 2: Find the user by userParentId
+    const usersQuery = new Parse.Query(Parse.User);
+    usersQuery.equalTo("userParentId", userId);
+    const usersChild = await usersQuery.find({ useMasterKey: true });
+
+    // Step 3: Update redeemService for all users in usersChild array
+    for (const childUser of usersChild) {
+      childUser.set("redeemService", redeemService);
+    }
+
+    // Save all updated users in a batch
+    await Parse.Object.saveAll(usersChild, { useMasterKey: true });
+
     return { success: true, message: "User Redeem Fees Updated successfully" };
-  } catch (error) {
-    // Handle different error types
-    if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      // Handle any unexpected errors
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
-  }
-});
-
-Parse.Cloud.define("redeemParentServiceFee", async (request) => {
-  const { userId } = request.params;
-  if (!userId) {
-    throw new Parse.Error(400, "Missing required parameter: userId");
-  }
-
-  try {
-    const query = new Parse.Query(Parse.User);
-    query.select("redeemService");
-    query.equalTo("objectId", userId);
-
-    const user = await query.first({ useMasterKey: true });
-
-    if (!user) {
-      throw new Parse.Error(404, `User with ID ${userId} not found`);
-    }
-
-    // Return user data
-    return {
-      id: user.id,
-      redeemService: user.get("redeemService"),
-    };
   } catch (error) {
     // Handle different error types
     if (error instanceof Parse.Error) {
