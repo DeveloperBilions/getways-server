@@ -379,8 +379,21 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 
     // Step: 1 Filter by status=1
     query.equalTo("status", 1);
+    // Get the current time and subtract 10 minutes
+    const now = new Date();
+    //const tenMinutesAgo = new Date(now.getTime() - 70 * 60 * 1000);
 
+    // Add a condition to fetch records updated within the last 10 minutes
+    //query.greaterThan('updatedAt', tenMinutesAgo);
+
+    // Sort the results in ascending order of updatedAt
+    query.descending('updatedAt'); 
     const results = await query.find();
+
+    if(results != null && results.length > 0) {
+      console.log("Total Pending records "+results.length);
+    }
+    
 
     // Step 2: Map results to JSON for readability
     const data = results.map((record) => record.toJSON());
