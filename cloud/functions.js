@@ -387,13 +387,12 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
     //query.greaterThan('updatedAt', tenMinutesAgo);
 
     // Sort the results in ascending order of updatedAt
-    query.descending('updatedAt'); 
+    query.descending("updatedAt");
     const results = await query.find();
 
-    if(results != null && results.length > 0) {
-      console.log("Total Pending records "+results.length);
+    if (results != null && results.length > 0) {
+      console.log("Total Pending records " + results.length);
     }
-    
 
     // Step 2: Map results to JSON for readability
     const data = results.map((record) => record.toJSON());
@@ -523,6 +522,8 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     // Make the API call using Axios
     const response = await axios.request(config);
 
+    console.log("&&&&&", response?.data);
+
     if (response?.data.success) {
       // set the transaction field
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
@@ -551,6 +552,8 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         data: response.data,
       };
     } else {
+      console.log("@@@@@ in else");
+
       // set the transaction field
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
       const transactionDetails = new TransactionDetails();
@@ -586,6 +589,92 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         message: error.response.data.message,
       };
     }
+    if (error instanceof Parse.Error) {
+      // Return the error if it's a Parse-specific error
+      return {
+        status: "error",
+        code: error.code,
+        message: error.message,
+      };
+    } else {
+      // Handle any unexpected errors
+      return {
+        status: "error",
+        code: 500,
+        message: "An unexpected error occurred.",
+      };
+    }
+  }
+});
+
+Parse.Cloud.define("playerRedeemRedords", async (request) => {
+  const { id, type, username, transactionAmount, remark } = request.params;
+
+  try {
+    // set the transaction field
+    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    const transactionDetails = new TransactionDetails();
+
+    transactionDetails.set("type", type);
+    transactionDetails.set("gameId", "786");
+    transactionDetails.set("username", username);
+    transactionDetails.set("userId", id);
+    transactionDetails.set("transactionDate", new Date());
+    transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
+    transactionDetails.set("remark", remark);
+    transactionDetails.set("status", 6);
+    // Save the transaction
+    await transactionDetails.save(null, { useMasterKey: true });
+
+    // You can process the response here and return a response if needed
+    return {
+      status: "success",
+      message: "Redeem successful",
+    };
+  } catch (error) {
+    // Handle different error types
+    if (error instanceof Parse.Error) {
+      // Return the error if it's a Parse-specific error
+      return {
+        status: "error",
+        code: error.code,
+        message: error.message,
+      };
+    } else {
+      // Handle any unexpected errors
+      return {
+        status: "error",
+        code: 500,
+        message: "An unexpected error occurred.",
+      };
+    }
+  }
+});
+
+Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
+  const { userId } = request.params;
+  try {
+    // Create a query to find the Transaction record by transactionId
+    const TransactionRecords = Parse.Object.extend("TransactionRecords");
+    const query = new Parse.Query(TransactionRecords);
+    query.equalTo("objectId", userId);
+
+    // Fetch the record
+    const transaction = await query.first();
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    // Set the status to "Coins Credited" (status: 3)
+    transaction.set("status", 7);
+
+    // Save the updated record
+    await transaction.save();
+
+    return { success: true, message: "Status updated to Reject Redeem" };
+  } catch (error) {
+    // Handle different error types
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
       return {
@@ -677,40 +766,6 @@ Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
     };
   } catch (error) {
     throw new Error(`Login failed: ${error.message}`);
-  }
-});
-
-Parse.Cloud.define("checkUserType", async (request) => {
-  const { email } = request.params;
-  try {
-    const query = new Parse.Query(Parse.User);
-    //query.equalTo("email", email);
-    // Use a case-insensitive regular expression
-    query.matches("email", `^${email}$`, "i");
-    const user = await query.first({ useMasterKey: true });
-
-    if (!user) {
-      throw new Parse.Error(404, "User not found.");
-    }
-    // Return the userType
-    return { userType: user.get("userType") };
-  } catch (error) {
-    // Handle different error types
-    if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      // Handle any unexpected errors
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
   }
 });
 
