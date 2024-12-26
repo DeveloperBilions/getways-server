@@ -522,8 +522,6 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     // Make the API call using Axios
     const response = await axios.request(config);
 
-    console.log("&&&&&", response?.data);
-
     if (response?.data.success) {
       // set the transaction field
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
@@ -552,8 +550,6 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         data: response.data,
       };
     } else {
-      console.log("@@@@@ in else");
-
       // set the transaction field
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
       const transactionDetails = new TransactionDetails();
@@ -652,12 +648,12 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
-  const { userId } = request.params;
+  const { orderId } = request.params;
   try {
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
-    query.equalTo("objectId", userId);
+    query.equalTo("objectId", orderId);
 
     // Fetch the record
     const transaction = await query.first();
@@ -675,6 +671,84 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
     return { success: true, message: "Status updated to Reject Redeem" };
   } catch (error) {
     // Handle different error types
+    if (error instanceof Parse.Error) {
+      // Return the error if it's a Parse-specific error
+      return {
+        status: "error",
+        code: error.code,
+        message: error.message,
+      };
+    } else {
+      // Handle any unexpected errors
+      return {
+        status: "error",
+        code: 500,
+        message: "An unexpected error occurred.",
+      };
+    }
+  }
+});
+
+Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
+  const axios = require("axios");
+
+  const {
+    id,
+    orderId,
+    type,
+    username,
+    balance,
+    transactionAmount,
+    remark,
+    percentageAmount,
+  } = request.params;
+
+  try {
+    console.log("@@@@@", request.params);
+
+    let body = JSON.stringify({
+      playerId: id,
+      amt: parseFloat(percentageAmount),
+    });
+
+    let config = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      data: body,
+    };
+
+    // Make the API call using Axios
+    const response = await axios.request(config);
+
+    // Create a query to find the Transaction record by transactionId
+    const TransactionRecords = Parse.Object.extend("TransactionRecords");
+    const query = new Parse.Query(TransactionRecords);
+    query.equalTo("objectId", id);
+    let transaction = await query.first({ useMasterKey: true });
+
+    if (response?.data.success) {
+      transaction.set("status", 4);
+
+      return {
+        status: "success",
+        message: "Redeem successful",
+        data: response.data,
+      };
+    } else {
+      transaction.set("status", 5);
+      transaction.set("responseMessage", response.data.message);
+      // Save the transaction
+      await transaction.save(null, { useMasterKey: true });
+      return {
+        status: "error",
+        message: response.data.message,
+      };
+    }
+  } catch (error) {
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
       return {
