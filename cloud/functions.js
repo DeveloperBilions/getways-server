@@ -694,11 +694,11 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
   const axios = require("axios");
 
-  const { id, orderId, percentageAmount } = request.params;
+  const { id, userId, orderId, percentageAmount } = request.params;
 
   try {
     let body = JSON.stringify({
-      playerId: id,
+      playerId: userId,
       amt: parseFloat(percentageAmount),
     });
 
@@ -720,8 +720,6 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     const query = new Parse.Query(TransactionRecords);
     query.equalTo("objectId", orderId);
     let transaction = await query.first({ useMasterKey: true });
-
-    console.log("*****", response?.data);
 
     if (response?.data.success) {
       transaction.set("status", 4);
