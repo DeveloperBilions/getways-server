@@ -501,6 +501,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     transactionAmount,
     remark,
     percentageAmount,
+    redeemServiceFee,
   } = request.params;
 
   try {
@@ -532,14 +533,13 @@ Parse.Cloud.define("redeemRedords", async (request) => {
       transactionDetails.set("username", username);
       transactionDetails.set("userId", id);
       transactionDetails.set("transactionDate", new Date());
-      // transactionDetails.set("beforeTransaction", balance);
-      // transactionDetails.set("afterTransaction", finalAmount);
       transactionDetails.set(
         "transactionAmount",
         parseFloat(transactionAmount)
       );
       transactionDetails.set("remark", remark);
       transactionDetails.set("status", 4);
+      transactionDetails.set("redeemServiceFee", redeemServiceFee);
       // Save the transaction
       await transactionDetails.save(null, { useMasterKey: true });
 
@@ -559,14 +559,13 @@ Parse.Cloud.define("redeemRedords", async (request) => {
       transactionDetails.set("username", username);
       transactionDetails.set("userId", id);
       transactionDetails.set("transactionDate", new Date());
-      // transactionDetails.set("beforeTransaction", balance);
-      // transactionDetails.set("afterTransaction", finalAmount);
       transactionDetails.set(
         "transactionAmount",
         parseFloat(transactionAmount)
       );
       transactionDetails.set("remark", remark);
       transactionDetails.set("status", 5);
+      transactionDetails.set("redeemServiceFee", redeemServiceFee);
       transactionDetails.set("responseMessage", response.data.message);
       // Save the transaction
       await transactionDetails.save(null, { useMasterKey: true });
@@ -604,7 +603,8 @@ Parse.Cloud.define("redeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("playerRedeemRedords", async (request) => {
-  const { id, type, username, transactionAmount, remark } = request.params;
+  const { id, type, username, transactionAmount, redeemServiceFee, remark } =
+    request.params;
 
   try {
     // set the transaction field
@@ -619,6 +619,8 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
     transactionDetails.set("remark", remark);
     transactionDetails.set("status", 6);
+    transactionDetails.set("redeemServiceFee", redeemServiceFee);
+
     // Save the transaction
     await transactionDetails.save(null, { useMasterKey: true });
 
@@ -692,20 +694,9 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
   const axios = require("axios");
 
-  const {
-    id,
-    orderId,
-    type,
-    username,
-    balance,
-    transactionAmount,
-    remark,
-    percentageAmount,
-  } = request.params;
+  const { id, orderId, percentageAmount } = request.params;
 
   try {
-    console.log("@@@@@", request.params);
-
     let body = JSON.stringify({
       playerId: id,
       amt: parseFloat(percentageAmount),
@@ -727,12 +718,15 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
-    query.equalTo("objectId", id);
+    query.equalTo("objectId", orderId);
     let transaction = await query.first({ useMasterKey: true });
+
+    console.log("*****", response?.data);
 
     if (response?.data.success) {
       transaction.set("status", 4);
-
+      // Save the transaction
+      await transaction.save(null, { useMasterKey: true });
       return {
         status: "success",
         message: "Redeem successful",
