@@ -803,18 +803,18 @@ Parse.Cloud.define("coinsCredit", async (request) => {
 });
 
 Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
-  const { emailPhone, password } = request.params;
+  const { email, password } = request.params;
 
-  if (!emailPhone) {
+  if (!email) {
     throw new Error("Email/Phone and password are required.");
   }
 
   // Create individual queries for email and phone
   const emailQuery = new Parse.Query(Parse.User);
-  emailQuery.matches("email", `^${emailPhone}$`, "i");
+  emailQuery.matches("email", `^${email}$`, "i");
 
   const phoneQuery = new Parse.Query(Parse.User);
-  phoneQuery.matches("phoneNumber", `^${emailPhone}$`, "i");
+  phoneQuery.matches("phoneNumber", `^${email}$`, "i");
 
   // Combine email and phone queries using Parse.Query.or
   const combinedQuery = Parse.Query.or(emailQuery, phoneQuery);
