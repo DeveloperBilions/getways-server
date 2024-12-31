@@ -803,22 +803,29 @@ Parse.Cloud.define("coinsCredit", async (request) => {
 });
 
 Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
-  const { email, password } = request.params;
+  const { emailPhone, password } = request.params;
 
-  if (!email || !password) {
-    throw new Error("Email and password are required.");
+  if (!emailPhone) {
+    throw new Error("Email/Phone and password are required.");
   }
 
-  // Search for the user with a case-insensitive email
-  const query = new Parse.Query(Parse.User);
-  query.matches("email", `^${email}$`, "i");
+  // Create individual queries for email and phone
+  const emailQuery = new Parse.Query(Parse.User);
+  emailQuery.matches("email", `^${emailPhone}$`, "i");
+
+  const phoneQuery = new Parse.Query(Parse.User);
+  phoneQuery.matches("phoneNumber", `^${emailPhone}$`, "i");
+
+  // Combine email and phone queries using Parse.Query.or
+  const combinedQuery = Parse.Query.or(emailQuery, phoneQuery);
 
   try {
-    const user = await query.first({ useMasterKey: true }); // Use master key for secure operations
-    if (!user) {
-      throw new Error("Invalid email or password.");
-    }
+    // Find the user
+    const user = await combinedQuery.first({ useMasterKey: true });
 
+    if (!user) {
+      throw new Error("User does not exist!");
+    }
     // Perform the login using the found username
     const loggedInUser = await Parse.User.logIn(user.get("username"), password);
 
@@ -832,6 +839,74 @@ Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
     };
   } catch (error) {
     throw new Error(`Login failed: ${error.message}`);
+  }
+});
+
+Parse.Cloud.define("checkpresence", async (request) => {
+  const { emailPhone } = request.params;
+  try {
+    // Create individual queries for email and phone
+    const emailQuery = new Parse.Query(Parse.User);
+    emailQuery.matches("email", `^${emailPhone}$`, "i");
+
+    const phoneQuery = new Parse.Query(Parse.User);
+    phoneQuery.matches("phoneNumber", `^${emailPhone}$`, "i");
+
+    // Combine email and phone queries using Parse.Query.or
+    const combinedQuery = Parse.Query.or(emailQuery, phoneQuery);
+
+    // Find the user
+    const user = await combinedQuery.first({ useMasterKey: true });
+
+    if (!user) {
+      throw new Error("User does not exist!");
+    }
+
+    // Return the user details (you can adjust this as needed)
+    return {
+      fromAgentExcel: user.get("fromAgentExcel"),
+      username: user.get("username"),
+      name: user.get("name"),
+    };
+  } catch (error) {
+    throw new Error(error.message);
+  }
+});
+
+Parse.Cloud.define("excelUserUpdate", async (request) => {
+  const { emailPhone, password } = request.params;
+  try {
+    // Create individual queries for email and phone
+    const emailQuery = new Parse.Query(Parse.User);
+    emailQuery.matches("email", `^${emailPhone}$`, "i");
+
+    const phoneQuery = new Parse.Query(Parse.User);
+    phoneQuery.matches("phoneNumber", `^${emailPhone}$`, "i");
+
+    // Combine email and phone queries using Parse.Query.or
+    const combinedQuery = Parse.Query.or(emailQuery, phoneQuery);
+
+    // Find the user
+    const user = await combinedQuery.first({ useMasterKey: true });
+
+    if (!user) {
+      throw new Error("User does not exist!");
+    }
+
+    // Update the user fields
+    user.set("fromAgentExcel", false);
+    user.setPassword(password);
+
+    // Save the user
+    await user.save(null, { useMasterKey: true });
+
+    return {
+      success: true,
+      message: "User updated successfully",
+      data: user.get("email"),
+    };
+  } catch (error) {
+    throw new Error(`User Checking failed: ${error.message}`);
   }
 });
 
@@ -1065,6 +1140,214 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       };
     }
   }
+});
+
+Parse.Cloud.define("summaryFilter", async (request) => {
+  const { userId, roleName, startDate, endDate } = request.params;
+
+  try {
+    const query = new Parse.Query(Parse.User);
+
+    if (roleName === "Super-User") {
+      // Total Users and Agents Count
+      const userCount = await query.count({ useMasterKey: true });
+      query.equalTo("roleName", "Agent");
+      const agentCount = await query.count({ useMasterKey: true });
+
+      // Parse date strings into Date objects (if provided)
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      // Total Recharge Amount (status: 2 or status: 3)
+      const rechargeQuery = new Parse.Query("TransactionRecords");
+      rechargeQuery.containedIn("status", [2, 3]);
+      if (start) rechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) rechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const rechargeTransactions = await rechargeQuery.find();
+      const totalRechargeAmount = rechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Redeem Amount (status: 4)
+      const redeemQuery = new Parse.Query("TransactionRecords");
+      redeemQuery.equalTo("status", 4);
+      if (start) redeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) redeemQuery.lessThanOrEqualTo("createdAt", end);
+      const redeemTransactions = await redeemQuery.find();
+      const totalRedeemAmount = redeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Pending Recharge Amount (status: 1)
+      const pendingRechargeQuery = new Parse.Query("TransactionRecords");
+      pendingRechargeQuery.equalTo("status", 1);
+      if (start) pendingRechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) pendingRechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const pendingRechargeTransactions = await pendingRechargeQuery.find();
+      const totalPendingRechargeAmount = pendingRechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Failed Redeem Amount (status: 5)
+      const failedRedeemQuery = new Parse.Query("TransactionRecords");
+      failedRedeemQuery.equalTo("status", 5);
+      if (start) failedRedeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) failedRedeemQuery.lessThanOrEqualTo("createdAt", end);
+      const failedRedeemTransactions = await failedRedeemQuery.find();
+      const totalFailRedeemAmount = failedRedeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      return {
+        status: "success",
+        data: {
+          totalUsersCount: userCount,
+          totalAgentCount: agentCount,
+          totalRechargeAmount: totalRechargeAmount,
+          totalRedeemAmount: totalRedeemAmount,
+          totalPendingRechargeAmount: totalPendingRechargeAmount,
+          totalFailRedeemAmount: totalFailRedeemAmount,
+        },
+      };
+    } else if (roleName === "Agent") {
+      // Total Users and Agents Count
+      query.equalTo("userParentId", userId);
+      const userCount = await query.count({ useMasterKey: true });
+      const users = await query.find({ useMasterKey: true });
+      const userIds = users.map((user) => user?.id);
+
+      // Parse date strings into Date objects (if provided)
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      // Total Recharge Amount (status: 2 or status: 3)
+      const rechargeQuery = new Parse.Query("TransactionRecords");
+      rechargeQuery.containedIn("userId", userIds);
+      rechargeQuery.containedIn("status", [2, 3]);
+      if (start) rechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) rechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const rechargeTransactions = await rechargeQuery.find();
+      const totalRechargeAmount = rechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Redeem Amount (status: 4)
+      const redeemQuery = new Parse.Query("TransactionRecords");
+      redeemQuery.containedIn("userId", userIds);
+      redeemQuery.equalTo("status", 4);
+      if (start) redeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) redeemQuery.lessThanOrEqualTo("createdAt", end);
+      const redeemTransactions = await redeemQuery.find();
+      const totalRedeemAmount = redeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Pending Recharge Amount (status: 1)
+      const pendingRechargeQuery = new Parse.Query("TransactionRecords");
+      pendingRechargeQuery.containedIn("userId", userIds);
+      pendingRechargeQuery.equalTo("status", 1);
+      if (start) pendingRechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) pendingRechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const pendingRechargeTransactions = await pendingRechargeQuery.find();
+      const totalPendingRechargeAmount = pendingRechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Failed Redeem Amount (status: 5)
+      const failedRedeemQuery = new Parse.Query("TransactionRecords");
+      failedRedeemQuery.containedIn("userId", userIds);
+      failedRedeemQuery.equalTo("status", 5);
+      if (start) failedRedeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) failedRedeemQuery.lessThanOrEqualTo("createdAt", end);
+      const failedRedeemTransactions = await failedRedeemQuery.find();
+      const totalFailRedeemAmount = failedRedeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      return {
+        status: "success",
+        data: {
+          totalUsersCount: userCount,
+          totalAgentCount: 1,
+          totalRechargeAmount: totalRechargeAmount,
+          totalRedeemAmount: totalRedeemAmount,
+          totalPendingRechargeAmount: totalPendingRechargeAmount,
+          totalFailRedeemAmount: totalFailRedeemAmount,
+        },
+      };
+    } else if (roleName === "Player") {
+      // Parse date strings into Date objects (if provided)
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      // Total Recharge Amount (status: 2 or status: 3)
+      const rechargeQuery = new Parse.Query("TransactionRecords");
+      rechargeQuery.equalTo("userId", userId);
+      rechargeQuery.containedIn("status", [2, 3]);
+      if (start) rechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) rechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const rechargeTransactions = await rechargeQuery.find();
+      const totalRechargeAmount = rechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Redeem Amount (status: 4)
+      const redeemQuery = new Parse.Query("TransactionRecords");
+      redeemQuery.equalTo("userId", userId);
+      redeemQuery.equalTo("status", 4);
+      if (start) redeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) redeemQuery.lessThanOrEqualTo("createdAt", end);
+      const redeemTransactions = await redeemQuery.find();
+      const totalRedeemAmount = redeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Pending Recharge Amount (status: 1)
+      const pendingRechargeQuery = new Parse.Query("TransactionRecords");
+      pendingRechargeQuery.equalTo("userId", userId);
+      pendingRechargeQuery.equalTo("status", 1);
+      if (start) pendingRechargeQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) pendingRechargeQuery.lessThanOrEqualTo("createdAt", end);
+      const pendingRechargeTransactions = await pendingRechargeQuery.find();
+      const totalPendingRechargeAmount = pendingRechargeTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+
+      // Total Failed Redeem Amount (status: 5)
+      const failedRedeemQuery = new Parse.Query("TransactionRecords");
+      failedRedeemQuery.equalTo("userId", userId);
+      failedRedeemQuery.equalTo("status", 5);
+      if (start) failedRedeemQuery.greaterThanOrEqualTo("createdAt", start);
+      if (end) failedRedeemQuery.lessThanOrEqualTo("createdAt", end);
+      const failedRedeemTransactions = await failedRedeemQuery.find();
+      const totalFailRedeemAmount = failedRedeemTransactions.reduce(
+        (sum, transaction) => sum + (transaction.get("transactionAmount") || 0),
+        0
+      );
+      return {
+        status: "success",
+        data: {
+          totalUsersCount: 1,
+          totalAgentCount: 0,
+          totalRechargeAmount: totalRechargeAmount,
+          totalRedeemAmount: totalRedeemAmount,
+          totalPendingRechargeAmount: totalPendingRechargeAmount,
+          totalFailRedeemAmount: totalFailRedeemAmount,
+        },
+      };
+    }
+  } catch (error) {}
 });
 
 Parse.Cloud.beforeSave("Test", () => {
