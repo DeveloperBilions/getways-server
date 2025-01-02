@@ -1421,6 +1421,151 @@ Parse.Cloud.define("summaryFilter", async (request) => {
   } catch (error) {}
 });
 
+Parse.Cloud.define("readExcelFile", async (request) => {
+  const XLSX = require("xlsx");
+  const fs = require("fs");
+
+  const BATCH_SIZE = 100; // Number of records per batch
+  const RETRY_LIMIT = 3; // Number of retry attempts in case of failure
+  const RETRY_DELAY = 2000; // Delay between retries in milliseconds
+
+  try {
+    // Define the path to your local .xlsx file
+    const filePath = "./downloads/userdata.xlsx";
+
+    // Check if the file exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File does not exist");
+    }
+
+    function generateRandomString(length) {
+      const characters =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      let result = "";
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(
+          Math.floor(Math.random() * characters.length)
+        );
+      }
+      return result;
+    }
+
+    const rawData = {
+      userParentId: "bBc5XtgDQF",
+      userParentName: "Dhyan",
+      fromAgentExcel: true,
+      password: "123456",
+      roleName: "Player",
+    };
+
+    // Read the file
+    const workbook = XLSX.readFile(filePath);
+
+    // Get the first sheet name
+    const sheetName = workbook.SheetNames[0];
+
+    // Get the data from the first sheet
+    const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    const mergedData = sheetData.map((item) => ({
+      ...item,
+      ...rawData,
+      phoneNumber: String(item.phoneNumber),
+      username: generateRandomString(6),
+    }));
+
+    // Create Parse Objects for each merged entry
+    const parseObjects = mergedData.map((data) => {
+      const user = new Parse.User();
+
+      // Set the fields on the Parse object
+      user.set("userParentId", data.userParentId);
+      user.set("userParentName", data.userParentName);
+      user.set("fromAgentExcel", data.fromAgentExcel);
+      user.setPassword("password", data.password);
+      user.set("phoneNumber", data.phoneNumber);
+      user.set("username", data.username);
+      user.set("roleName", data.roleName);
+
+      return user;
+    });
+
+    // Function to perform batch insertion with retry logic
+    async function saveInBatches(objects, batchSize, retryLimit) {
+      let startIndex = 0;
+      const totalObjects = objects.length;
+
+      while (startIndex < totalObjects) {
+        const batch = objects.slice(startIndex, startIndex + batchSize);
+        let attempt = 0;
+        let success = false;
+
+        while (attempt < retryLimit && !success) {
+          try {
+            // Save all users in the batch
+            const savedUsers = await Parse.Object.saveAll(batch);
+
+            // After saving users, get the role and add the users to the role
+            const roleQuery = new Parse.Query(Parse.Role);
+            roleQuery.equalTo("name", "Player");
+            const role = await roleQuery.first({ useMasterKey: true });
+
+            if (!role) {
+              throw new Error("Role not found");
+            }
+
+            // Create a relation between the users and the role
+            const relation = role.relation("users");
+            savedUsers.forEach((user) => {
+              relation.add(user);
+            });
+
+            // Save the updated role with the relation to the users
+            await role.save(null, { useMasterKey: true });
+
+            console.log(
+              `Batch from ${startIndex + 1} to ${
+                startIndex + batch.length
+              } inserted successfully and users added to the 'agent' role.`
+            );
+            success = true;
+          } catch (error) {
+            console.error(
+              `Error inserting batch from ${startIndex + 1} to ${
+                startIndex + batch.length
+              }: ${error.message}`
+            );
+            attempt++;
+
+            if (attempt < retryLimit) {
+              // If retrying, wait before the next attempt
+              console.log(`Retrying batch in ${RETRY_DELAY / 1000} seconds...`);
+              await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+            } else {
+              throw new Error(
+                `Failed to insert batch after ${retryLimit} attempts.`
+              );
+            }
+          }
+        }
+
+        startIndex += batchSize;
+      }
+    }
+
+    // Save the data in batches
+    await saveInBatches(parseObjects, BATCH_SIZE, RETRY_LIMIT);
+
+    // Return success
+    return {
+      success: true,
+      message: `${parseObjects.length} records inserted successfully`,
+    };
+  } catch (error) {
+    throw new Parse.Error(500, `Error reading Excel file: ${error.message}`);
+  }
+});
+
 Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");
 });

@@ -93,6 +93,22 @@ async function startParseServer() {
     res.json(posts);
   });
 
+  async function callReadExcelFile() {
+    try {
+      console.log("Calling readExcelFile cloud function...");
+
+      // Call the cloud function directly
+      const response = await Parse.Cloud.run("readExcelFile");
+
+      console.log("Cloud function response:", response);
+    } catch (error) {
+      console.error("Error calling cloud function:", error.message);
+    }
+  }
+
+  // Call the function
+  callReadExcelFile();
+
   // Cron job to run every 1 minutes
   cron.schedule("*/1 * * * *", async () => {
     try {
