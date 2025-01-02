@@ -876,7 +876,7 @@ Parse.Cloud.define("checkpresence", async (request) => {
 });
 
 Parse.Cloud.define("excelUserUpdate", async (request) => {
-  const { emailPhone, password } = request.params;
+  const { emailPhone, email, username, name, password } = request.params;
   try {
     // Create individual queries for email and phone
     const emailQuery = new Parse.Query(Parse.User);
@@ -895,7 +895,40 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
       throw new Error("User does not exist!");
     }
 
+    // Check if the new email is already taken by another user
+    if (email) {
+      const uniqueEmailQuery = new Parse.Query(Parse.User);
+      uniqueEmailQuery.equalTo("email", email);
+      // Exclude the current user
+      uniqueEmailQuery.notEqualTo("objectId", user.id);
+
+      const existingUserWithEmail = await uniqueEmailQuery.first({
+        useMasterKey: true,
+      });
+      if (existingUserWithEmail) {
+        throw new Error("Email already exist!");
+      }
+    }
+
+    // Check if the new username is already taken by another user
+    if (username) {
+      const uniqueUsernameQuery = new Parse.Query(Parse.User);
+      uniqueUsernameQuery.equalTo("username", username);
+      // Exclude the current user
+      uniqueUsernameQuery.notEqualTo("objectId", user.id);
+
+      const existingUserWithUsername = await uniqueUsernameQuery.first({
+        useMasterKey: true,
+      });
+      if (existingUserWithUsername) {
+        throw new Error("Username already exist!");
+      }
+    }
+
     // Update the user fields
+    user.set("email", email);
+    user.set("username", username);
+    user.set("name", name);
     user.set("fromAgentExcel", false);
     user.setPassword(password);
 
@@ -908,7 +941,7 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
       data: user.get("email"),
     };
   } catch (error) {
-    throw new Error(`User Checking failed: ${error.message}`);
+    throw new Error(`${error.message}`);
   }
 });
 
@@ -1022,8 +1055,6 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
     const user = await query.first({ useMasterKey: true });
 
     if (!user) {
-      console.log("in user fetch");
-
       return {
         status: "error",
         code: 404,
@@ -1031,13 +1062,56 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
       };
     }
 
+    // Check if the new email is already taken by another user
+    if (email) {
+      const uniqueEmailQuery = new Parse.Query(Parse.User);
+      uniqueEmailQuery.equalTo("email", email);
+      // Exclude the current user
+      uniqueEmailQuery.notEqualTo("objectId", user.id);
+
+      const existingUserWithEmail = await uniqueEmailQuery.first({
+        useMasterKey: true,
+      });
+      if (existingUserWithEmail) {
+        throw new Error("Email already exist!");
+      }
+    }
+
+    // Check if the new username is already taken by another user
+    if (username) {
+      const uniqueUsernameQuery = new Parse.Query(Parse.User);
+      uniqueUsernameQuery.equalTo("username", username);
+      // Exclude the current user
+      uniqueUsernameQuery.notEqualTo("objectId", user.id);
+
+      const existingUserWithUsername = await uniqueUsernameQuery.first({
+        useMasterKey: true,
+      });
+      if (existingUserWithUsername) {
+        throw new Error("Username already exist!");
+      }
+    }
+
+    // Check if the new phone number is already taken by another user
+    if (phoneNumber) {
+      const uniquePhoneQuery = new Parse.Query(Parse.User);
+      uniquePhoneQuery.equalTo("phoneNumber", phoneNumber);
+      uniquePhoneQuery.notEqualTo("objectId", user.id); // Exclude the current user
+
+      const existingUserWithPhone = await uniquePhoneQuery.first({
+        useMasterKey: true,
+      });
+      if (existingUserWithPhone) {
+        throw new Error("Phone number already exist!");
+      }
+    }
     // Update the user fields
     user.set("username", username);
     user.set("name", name);
     user.set("phoneNumber", phoneNumber);
     user.set("email", email);
     user.setPassword(password);
-    user.set("userReferralCode", null);
+    user.set("userReferralCode", "");
 
     // Save the updated user
     await user.save(null, { useMasterKey: true });
@@ -1048,22 +1122,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
       data: user,
     };
   } catch (error) {
-    // Handle different error types
-    if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      // Handle any unexpected errors
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
+    throw new Error(`${error.message}`);
   }
 });
 
@@ -1147,10 +1206,18 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
 });
 
 Parse.Cloud.define("summaryFilter", async (request) => {
-  const { userId, roleName, startDate, endDate } = request.params;
+  const { userId, startDate, endDate } = request.params;
 
   try {
+    const roleQuery = new Parse.Query(Parse.User);
+    roleQuery.select("roleName");
+    roleQuery.equalTo("objectId", userId);
+
+    const role = await roleQuery.first({ useMasterKey: true });
+    const roleName = role.get("roleName");
+
     const query = new Parse.Query(Parse.User);
+    query.equalTo("userReferralCode", "");
 
     if (roleName === "Super-User") {
       // Total Users and Agents Count
