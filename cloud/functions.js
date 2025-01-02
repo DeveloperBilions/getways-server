@@ -4,6 +4,7 @@ Parse.Cloud.define("createUser", async (request) => {
     name,
     email,
     balance,
+    phoneNumber,
     password,
     userParentId,
     userParentName,
@@ -23,6 +24,7 @@ Parse.Cloud.define("createUser", async (request) => {
     const user = new Parse.User();
     user.set("username", username);
     user.set("name", name);
+    user.set("phoneNumber", phoneNumber);
     user.set("email", email);
     user.set("balance", 0);
     user.set("password", password);
@@ -1001,7 +1003,8 @@ Parse.Cloud.define("referralUserCheck", async (request) => {
 });
 
 Parse.Cloud.define("referralUserUpdate", async (request) => {
-  const { userReferralCode, username, name, email, password } = request.params;
+  const { userReferralCode, username, name, phoneNumber, email, password } =
+    request.params;
 
   try {
     // Check if userReferralCode is provided
@@ -1031,6 +1034,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
     // Update the user fields
     user.set("username", username);
     user.set("name", name);
+    user.set("phoneNumber", phoneNumber);
     user.set("email", email);
     user.setPassword(password);
     user.set("userReferralCode", null);
