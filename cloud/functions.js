@@ -605,13 +605,13 @@ Parse.Cloud.define("redeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("coinsCredit", async (request) => {
-  const { transactionId } = request.params;
+  const { transactionIdFromStripe } = request.params;
 
   try {
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
-    query.equalTo("transactionId", transactionId);
+    query.equalTo("transactionIdFromStripe", transactionIdFromStripe);
 
     // Fetch the record
     const transaction = await query.first();
