@@ -107,7 +107,7 @@ async function startParseServer() {
   }
 
   // Call the function
-  callReadExcelFile();
+  // callReadExcelFile();
 
   // Cron job to run every 1 minutes
   cron.schedule("*/1 * * * *", async () => {
