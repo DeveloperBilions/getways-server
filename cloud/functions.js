@@ -605,7 +605,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("playerRedeemRedords", async (request) => {
-  const { id, type, username, transactionAmount, redeemServiceFee, remark } =
+  const { id, type, username, transactionAmount, redeemServiceFee, remark, cashAppId } =
     request.params;
 
   try {
@@ -622,6 +622,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("remark", remark);
     transactionDetails.set("status", 6);
     transactionDetails.set("redeemServiceFee", redeemServiceFee);
+    transactionDetails.set("cashAppId", cashAppId);
 
     // Save the transaction
     await transactionDetails.save(null, { useMasterKey: true });
@@ -704,18 +705,18 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
       amt: parseFloat(percentageAmount),
     });
 
-    let config = {
-      method: "post",
-      maxBodyLength: Infinity,
-      url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      data: body,
-    };
+    // let config = {
+    //   method: "post",
+    //   maxBodyLength: Infinity,
+    //   url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //   },
+    //   data: body,
+    // };
 
     // Make the API call using Axios
-    const response = await axios.request(config);
+    //onst response = await axios.request(config);
 
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
@@ -723,25 +724,33 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     query.equalTo("objectId", orderId);
     let transaction = await query.first({ useMasterKey: true });
 
-    if (response?.data.success) {
-      transaction.set("status", 4);
-      // Save the transaction
-      await transaction.save(null, { useMasterKey: true });
-      return {
-        status: "success",
-        message: "Redeem successful",
-        data: response.data,
-      };
-    } else {
-      transaction.set("status", 5);
-      transaction.set("responseMessage", response.data.message);
-      // Save the transaction
-      await transaction.save(null, { useMasterKey: true });
-      return {
-        status: "error",
-        message: response.data.message,
-      };
-    }
+    transaction.set("status", 8);
+    // Save the transaction
+    await transaction.save(null, { useMasterKey: true });
+    return {
+      status: "success",
+      message: "Redeem Request Under Review",
+      data: transaction,
+    };
+    // if (response?.data.success) {
+    //   transaction.set("status", 4);
+    //   // Save the transaction
+    //   await transaction.save(null, { useMasterKey: true });
+    //   return {
+    //     status: "success",
+    //     message: "Redeem successful",
+    //     data: response.data,
+    //   };
+    // } else {
+    //   transaction.set("status", 5);
+    //   transaction.set("responseMessage", response.data.message);
+    //   // Save the transaction
+    //   await transaction.save(null, { useMasterKey: true });
+    //   return {
+    //     status: "error",
+    //     message: response.data.message,
+    //   };
+    // }
   } catch (error) {
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
