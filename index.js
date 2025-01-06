@@ -114,10 +114,7 @@ async function startParseServer() {
     try {
       console.log("Running cloud function every 10 minutes...");
 
-      // Call your cloud function
-      const response = await Parse.Cloud.run("checkTransactionStatus");
-
-      console.log("Cloud function response:", response);
+       await Parse.Cloud.run("checkTransactionStatusStripe");
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
