@@ -109,16 +109,15 @@ async function startParseServer() {
   // Call the function
   // callReadExcelFile();
 
-  // Cron job to run every 1 minutes
-  cron.schedule("*/1 * * * *", async () => {
+  setInterval(async () => {
     try {
       console.log("Running cloud function every 10 minutes...");
 
-       await Parse.Cloud.run("checkTransactionStatusStripe");
+      await Parse.Cloud.run("checkTransactionStatusStripe");
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
-  });
+  }, 30000); // Stop just before the minute ends
 }
 
 // Call the async function to start Parse Server
