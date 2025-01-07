@@ -119,7 +119,7 @@ async function startParseServer() {
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
-  }, 30000);// 30 seconds interval.
+  }, process.env.checkTransactionStatusStripe);// 30 seconds interval.
 
 // Runs every 10 minutes to handle potentially expired transactions:
   setInterval(async () => {
@@ -130,7 +130,7 @@ async function startParseServer() {
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
-  }, 100000); // 10 minutes interval.
+  }, process.env.expiredTransactionStripe); // 10 minutes interval.
 
 // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
   setTimeout(async () => {
