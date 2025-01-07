@@ -111,14 +111,41 @@ async function startParseServer() {
 
   setInterval(async () => {
     try {
-      console.log("Running cloud function every 10 minutes...");
+      console.log("Running cloud function every 30 seconds...");
 
       await Parse.Cloud.run("checkTransactionStatusStripe");
+      await Parse.Cloud.run("updateTransactionStatusForBlankData")
+      await Parse.Cloud.run("expiredTransactionStripe")
+
+      //await Parse.Cloud.run("updateTransactionStatusForBlankData")
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
   }, 30000); // Stop just before the minute ends
+
+
+  setInterval(async () => {
+    try {
+      console.log("Running cloud function every 10 minutes...");
+
+      await Parse.Cloud.run("expiredTransactionStripe")
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, 100000); 
+
+
+  setTimeout(async () => {
+    try {
+      console.log("Update The Status of blank or 0 status to 1...");
+
+      await Parse.Cloud.run("updateTransactionStatusForBlankData")
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, 5000); 
 }
+
 
 // Call the async function to start Parse Server
 startParseServer().catch((err) =>
