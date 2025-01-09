@@ -109,16 +109,41 @@ async function startParseServer() {
   // Call the function
   // callReadExcelFile();
 
+// Runs every 30 seconds to perform rapid checks and updates on transactions:
+  setInterval(async () => {
+    try {
+      console.log("Running cloud function every 30 seconds...");
+
+      await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
+
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, process.env.checkTransactionStatusStripe);// 30 seconds interval.
+
+// Runs every 10 minutes to handle potentially expired transactions:
   setInterval(async () => {
     try {
       console.log("Running cloud function every 10 minutes...");
 
-      await Parse.Cloud.run("checkTransactionStatusStripe");
+      await Parse.Cloud.run("expiredTransactionStripe") // Re-checks for expired transactions periodically.
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
-  }, 30000); // Stop just before the minute ends
+  }, process.env.expiredTransactionStripe); // 10 minutes interval.
+
+// Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
+  setTimeout(async () => {
+    try {
+      console.log("Update The Status of blank or 0 status to 1...");
+
+      await Parse.Cloud.run("updateTransactionStatusForBlankData") // Updates or removes transactions with incomplete data.
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, 5000); // 5 seconds after initialization.
 }
+
 
 // Call the async function to start Parse Server
 startParseServer().catch((err) =>
