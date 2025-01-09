@@ -132,8 +132,12 @@ Parse.Cloud.define("deleteUser", async (request) => {
       throw new Error("User not found.");
     }
 
+    // Soft delete the user by setting isDeleted or deletedAt
+    user.set("isDeleted", true);
+    await user.save(null, { useMasterKey: true });
+
     // Delete the user
-    await user.destroy({ useMasterKey: true });
+    // await user.destroy({ useMasterKey: true });
 
     // Fetch remaining users
     const remainingUsersQuery = new Parse.Query(Parse.User);
@@ -605,8 +609,15 @@ Parse.Cloud.define("redeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("playerRedeemRedords", async (request) => {
-  const { id, type, username, transactionAmount, redeemServiceFee, remark, cashAppId } =
-    request.params;
+  const {
+    id,
+    type,
+    username,
+    transactionAmount,
+    redeemServiceFee,
+    remark,
+    cashAppId,
+  } = request.params;
 
   try {
     // set the transaction field
@@ -1467,6 +1478,12 @@ Parse.Cloud.define("readExcelFile", async (request) => {
       roleName: "Player",
     };
 
+    // Function to check if the phone number is valid (10 digits)
+    function isValidPhoneNumber(phoneNumber) {
+      const regex = /^\d{10}$/; // Matches exactly 10 digits
+      return regex.test(phoneNumber);
+    }
+
     // Read the file
     const workbook = XLSX.readFile(filePath);
 
@@ -1476,7 +1493,13 @@ Parse.Cloud.define("readExcelFile", async (request) => {
     // Get the data from the first sheet
     const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-    const mergedData = sheetData.map((item) => ({
+    // Filter the data to include only records with valid 10-digit phone numbers
+    const validData = sheetData.filter((item) =>
+      isValidPhoneNumber(item.phoneNumber)
+    );
+
+    // Merge rawData with valid data
+    const mergedData = validData.map((item) => ({
       ...item,
       ...rawData,
       phoneNumber: String(item.phoneNumber),
