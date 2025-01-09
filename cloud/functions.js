@@ -605,8 +605,18 @@ Parse.Cloud.define("redeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("playerRedeemRedords", async (request) => {
-  const { id, type, username, transactionAmount, redeemServiceFee, remark, cashAppId } =
-    request.params;
+  const {
+    id,
+    type,
+    username,
+    transactionAmount,
+    redeemServiceFee,
+    remark,
+    paymentMode,
+    paymentMethodType,
+    isCashOut,
+    walletId
+  } = request.params;
 
   try {
     // set the transaction field
@@ -620,9 +630,31 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
     transactionDetails.set("remark", remark);
-    transactionDetails.set("status", 6);
+    if(isCashOut){
+      transactionDetails.set("status", 11); // Cashout Request status
+      transactionDetails.set("isCashOut", true);
+    }else{
+      transactionDetails.set("status", 6);
+    }
     transactionDetails.set("redeemServiceFee", redeemServiceFee);
-    transactionDetails.set("cashAppId", cashAppId);
+    transactionDetails.set("paymentMode", paymentMode);
+    transactionDetails.set("paymentMethodType", paymentMethodType);
+    transactionDetails.set("walletId", walletId);
+
+    if(isCashOut){
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    walletQuery.equalTo("objectId", walletId);
+    const wallet = await walletQuery.first();
+      console.log(wallet,"wallet  ")
+    if (wallet) {
+      const currentBalance = wallet.get("balance") || 0;
+      wallet.set("balance", currentBalance - transactionAmount);
+      await wallet.save(null);
+    } else {
+      console.log(`Wallet not found for userId ${walletId}.`);
+    }
+  }
 
     // Save the transaction
     await transactionDetails.save(null, { useMasterKey: true });
@@ -633,6 +665,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       message: "Redeem successful",
     };
   } catch (error) {
+    console.log(error,"error")
     // Handle different error types
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
@@ -697,7 +730,8 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
   const axios = require("axios");
 
-  const { id, userId, orderId, percentageAmount } = request.params;
+  const { id, userId, orderId, percentageAmount, transactionAmount ,redeemFees } =
+    request.params;
 
   try {
     let body = JSON.stringify({
@@ -725,6 +759,26 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     let transaction = await query.first({ useMasterKey: true });
 
     transaction.set("status", 8);
+    transaction.set("percentageAmount", percentageAmount);
+    transaction.set("percentageFees", redeemFees);
+
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    walletQuery.equalTo("userID", userId);
+    const wallet = await walletQuery.first();
+
+    if (wallet) {
+      const currentBalance = wallet.get("balance") || 0;
+      wallet.set("balance", currentBalance + percentageAmount);
+      await wallet.save(null);
+      console.log(
+        `Wallet updated for userId ${userId} with balance ${
+          currentBalance + percentageAmount
+        }`
+      );
+    } else {
+      console.log(`Wallet not found for userId ${userId}.`);
+    }
     // Save the transaction
     await transaction.save(null, { useMasterKey: true });
     return {
