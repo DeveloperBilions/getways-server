@@ -497,8 +497,6 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 });
 
 Parse.Cloud.define("redeemRedords", async (request) => {
-  const axios = require("axios");
-
   const {
     id,
     type,
@@ -511,76 +509,51 @@ Parse.Cloud.define("redeemRedords", async (request) => {
   } = request.params;
 
   try {
-    let body = JSON.stringify({
-      playerId: id,
-      amt: parseFloat(percentageAmount),
-    });
+    console.log(transactionAmount,percentageAmount,redeemServiceFee,"djshjwhej")
+    // Step 1: Fetch the user's wallet
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    walletQuery.equalTo("userID", id);
 
-    let config = {
-      method: "post",
-      maxBodyLength: Infinity,
-      url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      data: body,
-    };
+    const wallet = await walletQuery.first();
 
-    // Make the API call using Axios
-    const response = await axios.request(config);
-
-    if (response?.data.success) {
-      // set the transaction field
-      const TransactionDetails = Parse.Object.extend("TransactionRecords");
-      const transactionDetails = new TransactionDetails();
-
-      transactionDetails.set("type", type);
-      transactionDetails.set("gameId", "786");
-      transactionDetails.set("username", username);
-      transactionDetails.set("userId", id);
-      transactionDetails.set("transactionDate", new Date());
-      transactionDetails.set(
-        "transactionAmount",
-        parseFloat(transactionAmount)
-      );
-      transactionDetails.set("remark", remark);
-      transactionDetails.set("status", 4);
-      transactionDetails.set("redeemServiceFee", redeemServiceFee);
-      // Save the transaction
-      await transactionDetails.save(null, { useMasterKey: true });
-
-      // You can process the response here and return a response if needed
-      return {
-        status: "success",
-        message: "Redeem successful",
-        data: response.data,
-      };
-    } else {
-      // set the transaction field
-      const TransactionDetails = Parse.Object.extend("TransactionRecords");
-      const transactionDetails = new TransactionDetails();
-
-      transactionDetails.set("type", type);
-      transactionDetails.set("gameId", "786");
-      transactionDetails.set("username", username);
-      transactionDetails.set("userId", id);
-      transactionDetails.set("transactionDate", new Date());
-      transactionDetails.set(
-        "transactionAmount",
-        parseFloat(transactionAmount)
-      );
-      transactionDetails.set("remark", remark);
-      transactionDetails.set("status", 5);
-      transactionDetails.set("redeemServiceFee", redeemServiceFee);
-      transactionDetails.set("responseMessage", response.data.message);
-      // Save the transaction
-      await transactionDetails.save(null, { useMasterKey: true });
-
-      return {
-        status: "error",
-        message: response.data.message,
-      };
+    if (!wallet) {
+      throw new Error(`Wallet not found for user ID: ${id}`);
     }
+
+    const currentBalance = wallet.get("balance");
+    const updatedBalance = Math.floor(parseFloat(currentBalance) + parseFloat(percentageAmount));
+
+    wallet.set("balance", updatedBalance);
+    await wallet.save(null);
+
+    // Step 4: Save the transaction record
+    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    const transactionDetails = new TransactionDetails();
+
+    transactionDetails.set("type", type);
+    transactionDetails.set("gameId", "786");
+    transactionDetails.set("username", username);
+    transactionDetails.set("userId", id);
+    transactionDetails.set("transactionDate", new Date());
+    transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
+    transactionDetails.set("remark", remark);
+    transactionDetails.set("status", 4);
+    transactionDetails.set("redeemServiceFee", parseFloat(redeemServiceFee));
+    transactionDetails.set("percentageAmount", parseFloat(percentageAmount));
+    transactionDetails.set("percentageFees", parseFloat(redeemServiceFee));
+    
+    await transactionDetails.save(null);
+
+    // Step 5: Return success response
+    return {
+      status: "success",
+      message: "Redeem successful",
+      data: {
+        transactionId: transactionDetails.id,
+        updatedBalance
+      },
+    };
   } catch (error) {
     // Handle different error types
     if (error.response) {
@@ -602,7 +575,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
       return {
         status: "error",
         code: 500,
-        message: "An unexpected error occurred.",
+        message: error.message || "An unexpected error occurred.",
       };
     }
   }
@@ -732,29 +705,11 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
-  const axios = require("axios");
 
-  const { id, userId, orderId, percentageAmount, transactionAmount ,redeemFees } =
+  const { id, userId, orderId, percentageAmount, transactionAmount ,redeemFees,redeemServiceFee,redeemRemarks } =
     request.params;
 
   try {
-    let body = JSON.stringify({
-      playerId: userId,
-      amt: parseFloat(percentageAmount),
-    });
-
-    // let config = {
-    //   method: "post",
-    //   maxBodyLength: Infinity,
-    //   url: "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //   },
-    //   data: body,
-    // };
-
-    // Make the API call using Axios
-    //onst response = await axios.request(config);
 
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
@@ -763,9 +718,14 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     let transaction = await query.first({ useMasterKey: true });
 
     transaction.set("status", 8);
-    transaction.set("percentageAmount", percentageAmount);
-    transaction.set("percentageFees", redeemFees);
-
+    transaction.set("percentageAmount", parseFloat(percentageAmount));
+    transaction.set("percentageFees", parseFloat(redeemFees));
+    if(redeemServiceFee){
+      transaction.set("redeemServiceFee", parseFloat(redeemServiceFee));
+    }
+    if(redeemRemarks){
+      transaction.set("redeemServiceFee", parseFloat(redeemRemarks));
+    }
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
     walletQuery.equalTo("userID", userId);
@@ -773,7 +733,8 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
 
     if (wallet) {
       const currentBalance = wallet.get("balance") || 0;
-      wallet.set("balance", currentBalance + percentageAmount);
+      const netAmount = Math.floor(parseFloat(currentBalance) + parseFloat(percentageAmount));
+      wallet.set("balance", netAmount);
       await wallet.save(null);
       console.log(
         `Wallet updated for userId ${userId} with balance ${
@@ -790,26 +751,8 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
       message: "Redeem Request Under Review",
       data: transaction,
     };
-    // if (response?.data.success) {
-    //   transaction.set("status", 4);
-    //   // Save the transaction
-    //   await transaction.save(null, { useMasterKey: true });
-    //   return {
-    //     status: "success",
-    //     message: "Redeem successful",
-    //     data: response.data,
-    //   };
-    // } else {
-    //   transaction.set("status", 5);
-    //   transaction.set("responseMessage", response.data.message);
-    //   // Save the transaction
-    //   await transaction.save(null, { useMasterKey: true });
-    //   return {
-    //     status: "error",
-    //     message: response.data.message,
-    //   };
-    // }
   } catch (error) {
+    console.log(error,"error from")
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
       return {
