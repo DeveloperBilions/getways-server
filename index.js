@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const { ParseServer } = require("parse-server");
 const ParseDashboard = require("parse-dashboard");
 const cors = require("cors");
-const cron = require("node-cron");
+const { CronJob } = require("cron");
 require("dotenv").config();
 const app = express();
 
@@ -135,13 +135,64 @@ async function startParseServer() {
 // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
   setTimeout(async () => {
     try {
-      console.log("Update The Status of blank or 0 status to 1...");
-
-      await Parse.Cloud.run("updateTransactionStatusForBlankData") // Updates or removes transactions with incomplete data.
+      //console.log("Update The Status of blank or 0 status to 1...");
+      await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+      //await Parse.Cloud.run("updateTransactionStatusForBlankData") // Updates or removes transactions with incomplete data.
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
   }, 5000); // 5 seconds after initialization.
+
+  // Helper function to get the current time in a specific timezone
+  function getCurrentTimeInTimezone(timezone) {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    return formatter.format(now);
+  }
+  
+  // Schedule the cron task
+  function scheduleTask() {
+    const timezone = "America/New_York"; // Set your desired timezone
+    const cronTime = "0 6 * * *"; // Run every day at 6:00 AM
+  
+    const job = new CronJob(
+      cronTime,
+      async () => {
+        const currentTime = getCurrentTimeInTimezone(timezone);
+        console.log(`Task started at ${currentTime} (${timezone})`);
+  
+        try {
+          // Trigger the Parse Cloud function
+          await Parse.Cloud.run("exportAndEmailPreviousDayTransactions");
+  
+          const completedTime = getCurrentTimeInTimezone(timezone);
+          console.log(`Task completed successfully at ${completedTime} (${timezone})`);
+        } catch (error) {
+          console.error(`Task failed: ${error.message}`);
+        }
+      },
+      null, // No onComplete function
+      false, // Do not start immediately
+      timezone // Specify the timezone
+    );
+  
+    // Start the job
+    job.start();
+  
+    console.log(`Cron job scheduled to run daily at 6:00 AM (${timezone}).`);
+  }
+  
+  // Call the function to schedule the cron task
+  scheduleTask();
+  
 }
 
 

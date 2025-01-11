@@ -72,7 +72,6 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     }
   }
 });
-
 Parse.Cloud.define("expiredTransactionStripe", async (request) => {  
     try {
       const query = new Parse.Query("TransactionRecords");
@@ -129,9 +128,7 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
         };
       }
     }
-  });
-  
-
+});
 Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
   
     try {
