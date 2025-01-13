@@ -4,6 +4,7 @@ const { ParseServer } = require("parse-server");
 const ParseDashboard = require("parse-dashboard");
 const cors = require("cors");
 const { CronJob } = require("cron");
+const cron = require("node-cron");
 require("dotenv").config();
 const app = express();
 
@@ -136,7 +137,7 @@ async function startParseServer() {
     try {
       //console.log("Update The Status of blank or 0 status to 1...");
       // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
-      await Parse.Cloud.run("updateTransactionStatusForBlankData") // Updates or removes transactions with incomplete data.
+      await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
@@ -156,24 +157,26 @@ async function startParseServer() {
     });
     return formatter.format(now);
   }
-  
+
   // Schedule the cron task
   function scheduleTask() {
     const timezone = "America/New_York"; // Set your desired timezone
     const cronTime = "0 6 * * *"; // Run every day at 6:00 AM
-  
+
     const job = new CronJob(
       cronTime,
       async () => {
         const currentTime = getCurrentTimeInTimezone(timezone);
         console.log(`Task started at ${currentTime} (${timezone})`);
-  
+
         try {
           // Trigger the Parse Cloud function
           await Parse.Cloud.run("exportAndEmailPreviousDayTransactions");
-  
+
           const completedTime = getCurrentTimeInTimezone(timezone);
-          console.log(`Task completed successfully at ${completedTime} (${timezone})`);
+          console.log(
+            `Task completed successfully at ${completedTime} (${timezone})`
+          );
         } catch (error) {
           console.error(`Task failed: ${error.message}`);
         }
@@ -182,33 +185,32 @@ async function startParseServer() {
       false, // Do not start immediately
       timezone // Specify the timezone
     );
-  
+
     // Start the job
     job.start();
-  
+
     console.log(`Cron job scheduled to run daily at 6:00 AM (${timezone}).`);
   }
-  
+
   // Call the function to schedule the cron task
   scheduleTask();
-  
+
+  cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
+    try {
+      await Parse.Cloud.run("cleanupReferralLink");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  });
+
+  cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
+    try {
+      await Parse.Cloud.run("expireRedeemRequest");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  });
 }
-
-cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
-  try {
-    await Parse.Cloud.run("cleanupReferralLink");
-  } catch (error) {
-    console.error("Error executing cloud function:", error);
-  }
-});
-
-cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
-  try {
-    await Parse.Cloud.run("expireRedeemRequest");
-  } catch (error) {
-    console.error("Error executing cloud function:", error);
-  }
-});
 
 // Call the async function to start Parse Server
 startParseServer().catch((err) =>
