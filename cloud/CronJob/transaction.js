@@ -71,76 +71,63 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     }
   }
 });
+Parse.Cloud.define("expiredTransactionStripe", async (request) => {  
+    try {
+      const query = new Parse.Query("TransactionRecords");
+      query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
+      query.descending("updatedAt");
+      query.limit(10000);
 
-Parse.Cloud.define("expiredTransactionStripe", async (request) => {
-  try {
-    const query = new Parse.Query("TransactionRecords");
-    query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
-    query.descending("updatedAt");
-    query.limit(10000);
-
-    const results = await query.find();
-    console.log(`${results.length} transactions found to check with Stripe.`);
-
-    for (const record of results) {
-      const transactionId = record.get("transactionIdFromStripe");
-
-      if (transactionId) {
-        try {
-          const session = await stripe.checkout.sessions.retrieve(
-            transactionId
-          );
-
-          if (session && session.status) {
-            let newStatus;
-            if (session.status === "complete") {
-              newStatus = 2; // Assuming 2 represents 'completed'
-            } else if (
-              session.status === "pending" ||
-              session.status === "open"
-            ) {
-              newStatus = 1; // Pending
-            } else if (session.status === "expired") {
-              newStatus = 9; // Expired
-            } else {
-              newStatus = 10; // Failed or canceled
+      const results = await query.find();
+      console.log(`${results.length} transactions found to check with Stripe.`);
+  
+      for (const record of results) {
+        const transactionId = record.get("transactionIdFromStripe");
+  
+        if (transactionId) {
+          try {
+            const session = await stripe.checkout.sessions.retrieve(transactionId);
+  
+            if (session && session.status) {
+              let newStatus;
+              if (session.status === "complete") {
+                newStatus = 2; // Assuming 2 represents 'completed'
+              } else if (session.status === "pending" || session.status === "open") {
+                newStatus = 1; // Pending
+              } else if (session.status === "expired") {
+                newStatus = 9; // Expired
+              } else {
+                newStatus = 10; // Failed or canceled
+              }
+              record.set("status", newStatus);
+              await record.save();
+              console.log(`Updated transaction record ${record.id} to status ${newStatus}`);
             }
-            record.set("status", newStatus);
-            await record.save();
-            console.log(
-              `Updated transaction record ${record.id} to status ${newStatus}`
-            );
+          } catch (stripeError) {
+            console.error(`Error retrieving Stripe session for transactionId ${transactionId}: ${stripeError.message}`);
           }
-        } catch (stripeError) {
-          console.error(
-            `Error retrieving Stripe session for transactionId ${transactionId}: ${stripeError.message}`
-          );
+        } else {
+          console.log(`No transaction ID found for record ${record.id}, unable to check with Stripe.`);
         }
+      }
+    } catch (error) {
+      if (error instanceof Parse.Error) {
+        console.log(`Parse-specific error: ${error.code} - ${error.message}`);
+        return {
+          status: "error",
+          code: error.code,
+          message: error.message,
+        };
       } else {
-        console.log(
-          `No transaction ID found for record ${record.id}, unable to check with Stripe.`
-        );
+        console.log(`An unexpected error occurred: ${error.message}`);
+        return {
+          status: "error",
+          code: 500,
+          message: "An unexpected error occurred.",
+        };
       }
     }
-  } catch (error) {
-    if (error instanceof Parse.Error) {
-      console.log(`Parse-specific error: ${error.code} - ${error.message}`);
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      console.log(`An unexpected error occurred: ${error.message}`);
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
-  }
 });
-
 Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
