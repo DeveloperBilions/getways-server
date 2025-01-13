@@ -509,7 +509,12 @@ Parse.Cloud.define("redeemRedords", async (request) => {
   } = request.params;
 
   try {
-    console.log(transactionAmount,percentageAmount,redeemServiceFee,"djshjwhej")
+    console.log(
+      transactionAmount,
+      percentageAmount,
+      redeemServiceFee,
+      "djshjwhej"
+    );
     // Step 1: Fetch the user's wallet
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
@@ -522,7 +527,9 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     }
 
     const currentBalance = wallet.get("balance");
-    const updatedBalance = Math.floor(parseFloat(currentBalance) + parseFloat(percentageAmount));
+    const updatedBalance = Math.floor(
+      parseFloat(currentBalance) + parseFloat(percentageAmount)
+    );
 
     wallet.set("balance", updatedBalance);
     await wallet.save(null);
@@ -542,7 +549,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     transactionDetails.set("redeemServiceFee", parseFloat(redeemServiceFee));
     transactionDetails.set("percentageAmount", parseFloat(percentageAmount));
     transactionDetails.set("percentageFees", parseFloat(redeemServiceFee));
-    
+
     await transactionDetails.save(null);
 
     // Step 5: Return success response
@@ -551,7 +558,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
       message: "Redeem successful",
       data: {
         transactionId: transactionDetails.id,
-        updatedBalance
+        updatedBalance,
       },
     };
   } catch (error) {
@@ -592,7 +599,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     paymentMode,
     paymentMethodType,
     isCashOut,
-    walletId
+    walletId,
   } = request.params;
 
   try {
@@ -607,10 +614,10 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parseFloat(transactionAmount));
     transactionDetails.set("remark", remark);
-    if(isCashOut){
+    if (isCashOut) {
       transactionDetails.set("status", 11); // Cashout Request status
       transactionDetails.set("isCashOut", true);
-    }else{
+    } else {
       transactionDetails.set("status", 6);
     }
     transactionDetails.set("redeemServiceFee", redeemServiceFee);
@@ -618,20 +625,20 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("paymentMethodType", paymentMethodType);
     transactionDetails.set("walletId", walletId);
 
-    if(isCashOut){
-    const Wallet = Parse.Object.extend("Wallet");
-    const walletQuery = new Parse.Query(Wallet);
-    walletQuery.equalTo("objectId", walletId);
-    const wallet = await walletQuery.first();
-      console.log(wallet,"wallet  ")
-    if (wallet) {
-      const currentBalance = wallet.get("balance") || 0;
-      wallet.set("balance", currentBalance - transactionAmount);
-      await wallet.save(null);
-    } else {
-      console.log(`Wallet not found for userId ${walletId}.`);
+    if (isCashOut) {
+      const Wallet = Parse.Object.extend("Wallet");
+      const walletQuery = new Parse.Query(Wallet);
+      walletQuery.equalTo("objectId", walletId);
+      const wallet = await walletQuery.first();
+      console.log(wallet, "wallet  ");
+      if (wallet) {
+        const currentBalance = wallet.get("balance") || 0;
+        wallet.set("balance", currentBalance - transactionAmount);
+        await wallet.save(null);
+      } else {
+        console.log(`Wallet not found for userId ${walletId}.`);
+      }
     }
-  }
 
     // Save the transaction
     await transactionDetails.save(null, { useMasterKey: true });
@@ -642,7 +649,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       message: "Redeem successful",
     };
   } catch (error) {
-    console.log(error,"error")
+    console.log(error, "error");
     // Handle different error types
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
@@ -705,12 +712,18 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 });
 
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
-
-  const { id, userId, orderId, percentageAmount, transactionAmount ,redeemFees,redeemServiceFee,redeemRemarks } =
-    request.params;
+  const {
+    id,
+    userId,
+    orderId,
+    percentageAmount,
+    transactionAmount,
+    redeemFees,
+    redeemServiceFee,
+    redeemRemarks,
+  } = request.params;
 
   try {
-
     // Create a query to find the Transaction record by transactionId
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
@@ -720,10 +733,10 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     transaction.set("status", 8);
     transaction.set("percentageAmount", parseFloat(percentageAmount));
     transaction.set("percentageFees", parseFloat(redeemFees));
-    if(redeemServiceFee){
+    if (redeemServiceFee) {
       transaction.set("redeemServiceFee", parseFloat(redeemServiceFee));
     }
-    if(redeemRemarks){
+    if (redeemRemarks) {
       transaction.set("redeemServiceFee", parseFloat(redeemRemarks));
     }
     const Wallet = Parse.Object.extend("Wallet");
@@ -733,7 +746,9 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
 
     if (wallet) {
       const currentBalance = wallet.get("balance") || 0;
-      const netAmount = Math.floor(parseFloat(currentBalance) + parseFloat(percentageAmount));
+      const netAmount = Math.floor(
+        parseFloat(currentBalance) + parseFloat(percentageAmount)
+      );
       wallet.set("balance", netAmount);
       await wallet.save(null);
       console.log(
@@ -752,7 +767,7 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
       data: transaction,
     };
   } catch (error) {
-    console.log(error,"error from")
+    console.log(error, "error from");
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
       return {
@@ -1586,6 +1601,36 @@ Parse.Cloud.define("readExcelFile", async (request) => {
   } catch (error) {
     throw new Parse.Error(500, `Error reading Excel file: ${error.message}`);
   }
+});
+
+Parse.Cloud.define("cleanupReferralLink", async (request) => {
+  try {
+    const query = new Parse.Query(Parse.User);
+    // Add a constraint to fetch users with a referral value
+    query.exists("userReferralCode");
+
+    // Calculate the timestamp for 24 hours ago
+    const now = new Date();
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    query.greaterThanOrEqualTo("createdAt", last24Hours);
+
+    query.descending("createdAt");
+
+    const user = await query.find({ useMasterKey: true });
+
+    if (!user) {
+      throw new Error("User not found.");
+    }
+
+    // Iterate through users and delete each one
+    for (const users of user) {
+      console.log("Deleting User:", users.get("username"));
+      await users.destroy({ useMasterKey: true });
+    }
+
+    console.log("Users deleted successfully.");
+    return { message: `${user.length} users deleted.` };
+  } catch (error) {}
 });
 
 Parse.Cloud.beforeSave("Test", () => {
