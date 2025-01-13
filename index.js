@@ -151,6 +151,14 @@ cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
   }
 });
 
+cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
+  try {
+    await Parse.Cloud.run("expireRedeemRequest");
+  } catch (error) {
+    console.error("Error executing cloud function:", error);
+  }
+});
+
 // Call the async function to start Parse Server
 startParseServer().catch((err) =>
   console.error("Error starting Parse Server:", err)
