@@ -16,6 +16,7 @@ Parse.Cloud.define("createUser", async (request) => {
     userParentName,
     roleName,
     userReferralCode,
+    redeemService
   } = request.params;
 
   if (!username || !email || !password) {
@@ -38,8 +39,12 @@ Parse.Cloud.define("createUser", async (request) => {
     user.set("userParentName", userParentName);
     user.set("roleName", roleName);
     user.set("userReferralCode", userReferralCode);
-    user.set("redeemService", 0);
-
+    if(redeemService){
+      user.set("redeemService", redeemService);
+    }
+    else{
+      user.set("redeemService", 0);
+    }
     // Save the user
     await user.signUp(null, { useMasterKey: true });
 
@@ -1159,7 +1164,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("redeemServiceFee", async (request) => {
-  const { userId, redeemService } = request.params;
+  const { userId, redeemService , redeemServiceEnabled } = request.params;
 
   if (!userId) {
     throw new Parse.Error(400, "Missing required parameter: userId");
@@ -1172,6 +1177,8 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
     const user = await userQuery.first({ useMasterKey: true });
 
     user.set("redeemService", redeemService);
+    user.set("redeemServiceEnabled", redeemServiceEnabled);
+
     await user.save(null, { useMasterKey: true });
 
     return { success: true, message: "User Redeem Fees Updated successfully" };
@@ -1204,6 +1211,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
   try {
     const query = new Parse.Query(Parse.User);
     query.select("redeemService");
+    query.select("redeemServiceEnabled");
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1211,11 +1219,11 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     if (!user) {
       throw new Parse.Error(404, `User with ID ${userId} not found`);
     }
-
     // Return user data
     return {
       id: user.id,
       redeemService: user.get("redeemService"),
+      redeemServiceEnabled:user.get("redeemServiceEnabled")
     };
   } catch (error) {
     // Handle different error types

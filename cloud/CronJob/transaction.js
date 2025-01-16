@@ -214,3 +214,126 @@ Parse.Cloud.define("expireRedeemRequest", async (request) => {
     }
   }
 });
+
+Parse.Cloud.define("migration", async (request) => {
+  try {
+    const TransactionRecords = Parse.Object.extend("TransactionRecords");
+    const Wallet = Parse.Object.extend("Wallet");
+
+    // Step 1: Query transactions with type = redeem and status = 8
+    const query = new Parse.Query(TransactionRecords);
+    query.equalTo("type", "redeem");
+    query.equalTo("status", 8);
+    query.ascending("transactionDate"); // Process oldest transactions first
+
+    const transactions = await query.find();
+    console.log(`Found ${transactions.length} transactions to migrate.`);
+
+    const now = new Date();
+
+    for (const transaction of transactions) {
+      const userId = transaction.get("userId");
+      const transactionAmount = transaction.get("transactionAmount");
+      const redeemServiceFee = transaction.get("redeemServiceFee") || 0; // Redeem service fee percentage
+
+      // Calculate the net amount after deducting the service fee
+      const netAmount =
+        Math.floor(transactionAmount - transactionAmount * (redeemServiceFee / 100));
+
+      // Query the user's wallet
+      const walletQuery = new Parse.Query(Wallet);
+      walletQuery.equalTo("userID", userId);
+      let wallet = await walletQuery.first();
+
+      // If the wallet doesn't exist, create a new one
+      if (!wallet) {
+        wallet = new Wallet();
+        wallet.set("userID", userId);
+        wallet.set("balance", 0);
+        console.log(`Creating new wallet for user ${userId}`);
+      }
+
+      // Update the wallet's balance
+      const currentBalance = wallet.get("balance") || 0;
+      wallet.set("balance", currentBalance + netAmount);
+
+      // Fetch the latest transaction for the user to update cashAppId
+      const latestTransactionQuery = new Parse.Query(TransactionRecords);
+      latestTransactionQuery.equalTo("userId", userId);
+      latestTransactionQuery.descending("createdAt"); // Most recent transaction first
+      const latestTransaction = await latestTransactionQuery.first();
+
+      if (latestTransaction && latestTransaction.get("cashAppId")) {
+        wallet.set("cashAppId", latestTransaction.get("cashAppId"));
+      }
+
+      // Save the wallet
+      await wallet.save(null, { useMasterKey: true });
+
+      // Update the transaction status to 6
+      transaction.set("status", 6);
+      await transaction.save(null, { useMasterKey: true });
+
+      console.log(
+        `Processed transaction ${transaction.id} for user ${userId}. Added net amount: ${netAmount}. New wallet balance: ${wallet.get(
+          "balance"
+        )}`
+      );
+    }
+
+    // Step 2: Update transactions with status = 6 older than 24 hours
+    const status6Query = new Parse.Query(TransactionRecords);
+    status6Query.equalTo("status", 6);
+
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const oldTransactions = await status6Query.find();
+    console.log(
+      `Found ${oldTransactions.length} transactions with status = 6 to check.`
+    );
+
+    for (const transaction of oldTransactions) {
+      const transactionDate = transaction.get("transactionDate");
+
+      if (transactionDate < twentyFourHoursAgo) {
+        transaction.set("status", 9);
+        await transaction.save(null, { useMasterKey: true });
+        console.log(`Updated transaction ${transaction.id} status to 9.`);
+      } else {
+        const userId = transaction.get("userId");
+
+        // Check for the user's wallet
+        const walletQuery = new Parse.Query(Wallet);
+        walletQuery.equalTo("userID", userId);
+        let wallet = await walletQuery.first();
+
+        // Create the wallet if it doesn't exist
+        if (!wallet) {
+          wallet = new Wallet();
+          wallet.set("userID", userId);
+
+          // Fetch the latest transaction for the user to set cashAppId
+          const latestTransactionQuery = new Parse.Query(TransactionRecords);
+          latestTransactionQuery.equalTo("userId", userId);
+          latestTransactionQuery.descending("createdAt"); // Most recent transaction first
+          const latestTransaction = await latestTransactionQuery.first();
+
+          if (latestTransaction && latestTransaction.get("cashAppId")) {
+            wallet.set("cashAppId", latestTransaction.get("cashAppId"));
+          }
+
+          wallet.set("balance", 0); // Initialize balance
+          await wallet.save(null, { useMasterKey: true });
+
+          console.log(`Created wallet for user ${userId}`);
+        }
+      }
+    }
+
+    console.log("Migration completed successfully.");
+  } catch (error) {
+    console.error("Error during migration:", error.message);
+  }
+});
+
+
