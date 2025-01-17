@@ -16,7 +16,7 @@ Parse.Cloud.define("createUser", async (request) => {
     userParentName,
     roleName,
     userReferralCode,
-    redeemService
+    redeemService,
   } = request.params;
 
   if (!username || !email || !password) {
@@ -39,10 +39,9 @@ Parse.Cloud.define("createUser", async (request) => {
     user.set("userParentName", userParentName);
     user.set("roleName", roleName);
     user.set("userReferralCode", userReferralCode);
-    if(redeemService){
+    if (redeemService) {
       user.set("redeemService", redeemService);
-    }
-    else{
+    } else {
       user.set("redeemService", 0);
     }
     // Save the user
@@ -1164,7 +1163,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("redeemServiceFee", async (request) => {
-  const { userId, redeemService , redeemServiceEnabled } = request.params;
+  const { userId, redeemService, redeemServiceEnabled } = request.params;
 
   if (!userId) {
     throw new Parse.Error(400, "Missing required parameter: userId");
@@ -1223,7 +1222,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     return {
       id: user.id,
       redeemService: user.get("redeemService"),
-      redeemServiceEnabled:user.get("redeemServiceEnabled")
+      redeemServiceEnabled: user.get("redeemServiceEnabled"),
     };
   } catch (error) {
     // Handle different error types
@@ -1498,10 +1497,9 @@ Parse.Cloud.define("readExcelFile", async (request) => {
       roleName: "Player",
     };
 
-    // Function to check if the phone number is valid (10 digits)
-    function isValidPhoneNumber(phoneNumber) {
-      const regex = /^\d{10}$/; // Matches exactly 10 digits
-      return regex.test(phoneNumber);
+    // Function to clean the phone number and remove non-numeric characters
+    function cleanPhoneNumber(phoneNumber) {
+      return String(phoneNumber).replace(/[^\d]/g, ""); // Remove all non-digit characters
     }
 
     // Read the file
@@ -1513,21 +1511,41 @@ Parse.Cloud.define("readExcelFile", async (request) => {
     // Get the data from the first sheet
     const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-    // Filter the data to include only records with valid 10-digit phone numbers
-    const validData = sheetData.filter((item) =>
-      isValidPhoneNumber(item.phoneNumber)
-    );
+    // Convert phone numbers to the cleaned format and filter for 10 digits
+    const validPhoneNumbers = sheetData
+      .map((item) => ({
+        phoneNumber: cleanPhoneNumber(item.phoneNumber),
+      })) // Clean phone numbers
+      .filter((item) => item.phoneNumber.length === 10); // Only keep 10-digit numbers
 
     // Merge rawData with valid data
-    const mergedData = validData.map((item) => ({
+    const mergedData = validPhoneNumbers.map((item) => ({
       ...item,
       ...rawData,
       phoneNumber: String(item.phoneNumber),
       username: generateRandomString(6),
     }));
 
+    // Query the database for existing phone numbers
+    const existingPhoneNumbersQuery = new Parse.Query(Parse.User);
+    existingPhoneNumbersQuery.exists("phoneNumber");
+    existingPhoneNumbersQuery.limit(10000);
+    const existingUsers = await existingPhoneNumbersQuery.find({
+      useMasterKey: true,
+    });
+
+    // Extract the phone numbers from the existing users
+    const existingPhoneNumbers = existingUsers.map((user) =>
+      user.get("phoneNumber")
+    );
+
+    // Filter out records with duplicate phone numbers
+    const filteredData = mergedData.filter(
+      (item) => !existingPhoneNumbers.includes(item.phoneNumber)
+    );
+
     // Create Parse Objects for each merged entry
-    const parseObjects = mergedData.map((data) => {
+    const parseObjects = filteredData.map((data) => {
       const user = new Parse.User();
 
       // Set the fields on the Parse object
