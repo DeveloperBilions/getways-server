@@ -966,6 +966,7 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
     user.set("username", username);
     user.set("name", name);
     user.set("fromAgentExcel", false);
+    user.set("userReferralCode", "");
     user.setPassword(password);
 
     // Save the user
@@ -1524,6 +1525,7 @@ Parse.Cloud.define("readExcelFile", async (request) => {
       ...rawData,
       phoneNumber: String(item.phoneNumber),
       username: generateRandomString(6),
+      userReferralCode: generateRandomString(6),
     }));
 
     // Query the database for existing phone numbers
@@ -1556,6 +1558,7 @@ Parse.Cloud.define("readExcelFile", async (request) => {
       user.set("phoneNumber", data.phoneNumber);
       user.set("username", data.username);
       user.set("roleName", data.roleName);
+      user.set("userReferralCode", data.userReferralCode);
 
       return user;
     });
