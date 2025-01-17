@@ -271,8 +271,8 @@ Parse.Cloud.define("migration", async (request) => {
       await wallet.save(null, { useMasterKey: true });
 
       // Update the transaction status to 6
-      transaction.set("status", 6);
-      await transaction.save(null, { useMasterKey: true });
+     // transaction.set("status", 6);
+     // await transaction.save(null, { useMasterKey: true });
 
       console.log(
         `Processed transaction ${transaction.id} for user ${userId}. Added net amount: ${netAmount}. New wallet balance: ${wallet.get(
