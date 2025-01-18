@@ -533,7 +533,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     const wallet = await walletQuery.first();
 
     if (!wallet) {
-      throw new Error(`Wallet not found for user ID: ${id}`);
+      throw new Error(`Wallet not found for user: ${username}`);
     }
 
     const currentBalance = wallet.get("balance");
@@ -613,6 +613,12 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
   } = request.params;
 
   try {
+    if(!username || !id){
+      return {
+        status: "error",
+        message: "User Information are not correct",
+      };
+    }
     // set the transaction field
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const transactionDetails = new TransactionDetails();
@@ -630,7 +636,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     } else {
       transactionDetails.set("status", 6);
     }
-    transactionDetails.set("redeemServiceFee", redeemServiceFee);
+    transactionDetails.set("redeemServiceFee", parseFloat(redeemServiceFee));
     transactionDetails.set("paymentMode", paymentMode);
     transactionDetails.set("paymentMethodType", paymentMethodType);
     transactionDetails.set("walletId", walletId);
@@ -643,10 +649,10 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       console.log(wallet, "wallet  ");
       if (wallet) {
         const currentBalance = wallet.get("balance") || 0;
-        wallet.set("balance", currentBalance - transactionAmount);
+        wallet.set("balance", Math.floor(currentBalance - transactionAmount));
         await wallet.save(null);
       } else {
-        console.log(`Wallet not found for userId ${walletId}.`);
+        throw new Error(`Wallet not found for user: ${username}`);
       }
       await sendEmailNotification(username, transactionAmount);
     }
