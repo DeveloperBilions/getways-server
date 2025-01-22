@@ -619,6 +619,33 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
         message: "User Information are not correct",
       };
     }
+     // Check if the user has exceeded the redeem request limit for the day
+     if (!isCashOut) {
+      const TransactionDetails = Parse.Object.extend("TransactionRecords");
+      const query = new Parse.Query(TransactionDetails);
+
+      // Filter for today’s date and the user
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0); // Start of the day
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999); // End of the day
+
+      query.equalTo("userId", id);
+      query.greaterThanOrEqualTo("transactionDate", startOfDay);
+      query.lessThanOrEqualTo("transactionDate", endOfDay);
+      query.equalTo("type", "redeem"); // Only consider redeem transactions
+      query.notEqualTo("isCashOut", true); // Exclude cashout transactions
+
+      const redeemCount = await query.count();
+
+      // Check if the limit is exceeded
+      if (redeemCount >= 10) {
+        return {
+          status: "error",
+          message: "You have exceeded the maximum of 10 redeem requests for today.",
+        };
+      }
+    }
     // set the transaction field
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const transactionDetails = new TransactionDetails();
