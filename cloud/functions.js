@@ -83,7 +83,7 @@ Parse.Cloud.define("createUser", async (request) => {
 });
 
 Parse.Cloud.define("updateUser", async (request) => {
-  const { userId, username, name, email, balance } = request.params;
+  const { userId, username, name, email, balance , password } = request.params;
 
   try {
     // Find the user by ID
@@ -99,6 +99,9 @@ Parse.Cloud.define("updateUser", async (request) => {
     user.set("username", username);
     user.set("name", name);
     user.set("email", email);
+    if(password){
+      user.set("password", password);
+    }
     // user.set("balance", parseFloat(balance));
 
     // Save the user
