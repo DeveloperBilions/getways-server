@@ -684,7 +684,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       } else {
         throw new Error(`Wallet not found for user: ${username}`);
       }
-      await sendEmailNotification(username, transactionAmount);
+      //await sendEmailNotification(username, transactionAmount);
     }
 
     // Save the transaction
