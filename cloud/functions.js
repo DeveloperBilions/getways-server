@@ -19,10 +19,10 @@ Parse.Cloud.define("createUser", async (request) => {
     redeemService,
   } = request.params;
 
-  if (!username || !email || !password) {
+  if (!username || !email || !password || !userParentId || !userParentName) {
     throw new Parse.Error(
       400,
-      "Missing required fields: username, email, or password"
+      "Missing required fields: username, email, password, userParentId, userParentName"
     );
   }
 
