@@ -522,12 +522,13 @@ Parse.Cloud.define("redeemRedords", async (request) => {
   } = request.params;
 
   try {
-    console.log(
-      transactionAmount,
-      percentageAmount,
-      redeemServiceFee,
-      "djshjwhej"
-    );
+  
+    if(!username || !id){
+      return {
+        status: "error",
+        message: "User Information are not correct",
+      };
+    }
     // Step 1: Fetch the user's wallet
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
