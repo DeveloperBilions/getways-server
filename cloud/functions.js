@@ -1021,42 +1021,55 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
 
 Parse.Cloud.define("getUsersByRole", async (request) => {
   const { roleName } = request.params;
-  if (!roleName) {
-    throw new Parse.Error(400, "Role name is required");
+
+  if (!Array.isArray(roleName) || roleName.length === 0) {
+    throw new Parse.Error(400, "Role names array is required and must not be empty");
   }
 
   try {
-    // Query the Role class for the role with the specified name
+    // Query the Role class for roles with the specified names
     const roleQuery = new Parse.Query(Parse.Role);
-    roleQuery.equalTo("name", roleName);
-    const role = await roleQuery.first({ useMasterKey: true });
+    roleQuery.containedIn("name", roleName);
+    const roles = await roleQuery.find({ useMasterKey: true });
 
-    if (!role) {
-      throw new Parse.Error(404, `Role '${roleName}' not found`);
+    if (roles.length === 0) {
+      throw new Parse.Error(404, "No matching roles found");
     }
 
-    // Fetch users related to the role
-    const userRelation = role.relation("users");
-    const usersQuery = userRelation.query();
-    const users = await usersQuery.find({ useMasterKey: true });
+    let usersMap = new Map(); // To store unique users across multiple roles
 
-    // Format and return the list of users
-    return users.map((user) => ({
-      id: user.id,
-      name: user.get("name"),
-      role: roleName,
-    }));
+    // Fetch users related to each role
+    for (const role of roles) {
+      const roleName = role.get("name");
+      const userRelation = role.relation("users");
+      const usersQuery = userRelation.query();
+      const users = await usersQuery.find({ useMasterKey: true });
+
+      // Store users in a map to avoid duplicates
+      users.forEach((user) => {
+        if (!usersMap.has(user.id)) {
+          usersMap.set(user.id, {
+            id: user.id,
+            name: user.get("name"),
+            role: roleName, // Store roles as an array
+          });
+        } else {
+          usersMap.get(user.id).roles.push(roleName);
+        }
+      });
+    }
+
+    // Convert map values to an array
+    return Array.from(usersMap.values());
   } catch (error) {
-    // Handle different error types
+    // Handle errors
     if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
       return {
         status: "error",
         code: error.code,
         message: error.message,
       };
     } else {
-      // Handle any unexpected errors
       return {
         status: "error",
         code: 500,
@@ -1065,6 +1078,7 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
     }
   }
 });
+
 
 Parse.Cloud.define("referralUserCheck", async (request) => {
   const { userReferralCode } = request.params;
@@ -1201,7 +1215,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("redeemServiceFee", async (request) => {
-  const { userId, redeemService, redeemServiceEnabled } = request.params;
+  const { userId, redeemService, redeemServiceEnabled, redeemServiceZeroAllowed } = request.params;
 
   if (!userId) {
     throw new Parse.Error(400, "Missing required parameter: userId");
@@ -1215,6 +1229,7 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
 
     user.set("redeemService", redeemService);
     user.set("redeemServiceEnabled", redeemServiceEnabled);
+    user.set("isReedeemZeroAllowed", redeemServiceZeroAllowed);
 
     await user.save(null, { useMasterKey: true });
 
@@ -1250,6 +1265,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("redeemService");
     query.select("redeemServiceEnabled");
     query.select("rechargeLimit")
+    query.select("isReedeemZeroAllowed")
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1263,6 +1279,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemService: user.get("redeemService"),
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
+      isReedeemZeroAllowed:user.get("isReedeemZeroAllowed")
     };
   } catch (error) {
     // Handle different error types
