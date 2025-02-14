@@ -186,7 +186,7 @@ Parse.Cloud.define("expireRedeemRequest", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 6);
-    query.greaterThanOrEqualTo("createdAt", twentyFourHoursAgo);
+    query.lessThanOrEqualTo("createdAt", twentyFourHoursAgo);
 
     const expiredRequests = await query.find();
 
