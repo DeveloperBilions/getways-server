@@ -211,6 +211,17 @@ async function startParseServer() {
       console.error("Error executing cloud function:", error);
     }
   });
+  cron.schedule("59 23 * * *", async () => {
+    try {
+      await Parse.Cloud.run("sendDailyTransactionEmail");
+      console.log("Daily transaction email sent successfully.");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  }, {
+    timezone: "UTC" // Ensure it runs in UTC timezone
+});
+
 }
 
 // Call the async function to start Parse Server

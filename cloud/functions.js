@@ -149,6 +149,14 @@ Parse.Cloud.define("deleteUser", async (request) => {
     user.set("isDeleted", true);
     await user.save(null, { useMasterKey: true });
 
+      // Force logout by deleting all sessions for this user
+      const sessionQuery = new Parse.Query("_Session");
+      sessionQuery.equalTo("user", user);
+      const sessions = await sessionQuery.find({ useMasterKey: true });
+  
+      if (sessions.length > 0) {
+        await Parse.Object.destroyAll(sessions, { useMasterKey: true });
+      }
     // Delete the user
     // await user.destroy({ useMasterKey: true });
 
@@ -936,7 +944,9 @@ Parse.Cloud.define("checkpresence", async (request) => {
     if (!user) {
       throw new Error("User does not exist!");
     }
-
+    if (user.get("isDeleted", true)) {
+      throw new Error("This user account has been deleted.");
+    }
     // Return the user details (you can adjust this as needed)
     return {
       fromAgentExcel: user.get("fromAgentExcel"),

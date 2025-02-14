@@ -1,4 +1,5 @@
 const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
+const nodemailer = require('nodemailer');
 
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
@@ -335,5 +336,263 @@ Parse.Cloud.define("migration", async (request) => {
     console.error("Error during migration:", error.message);
   }
 });
+Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
 
+  const queryPipeline = [
+    { $match: {      transactionDate: { $gte: today, $lt: tomorrow } } },
+    { $limit: 10000 },
+    {
+      $facet: {
+        totalRechargeAmount: [
+          { $match: { status: { $in: [2, 3] } } },
+          {
+            $group: { _id: null, total: { $sum: "$transactionAmount" } },
+          },
+        ],
+        totalRedeemAmount: [
+          {
+            $match: {
+              type: "redeem",
+              status: { $in: [4, 8] },
+              transactionAmount: { $gt: 0, $type: "number" },
+            },
+          },
+          {
+            $group: { _id: null, total: { $sum: "$transactionAmount" } },
+          },
+        ],
+        totalPendingRechargeAmount: [
+          { $match: { status: 1 } },
+          {
+            $group: { _id: null, total: { $sum: "$transactionAmount" } },
+          },
+        ],
+        totalCashoutRedeemsSuccess: [
+          { $match: { status: 12 } },
+          {
+            $group: { _id: null, total: { $sum: "$transactionAmount" } },
+          },
+        ],
+        totalCashoutRedeemsInProgress: [
+          {
+            $match: {
+              status: 11,
+              transactionAmount: { $gt: 0, $type: "number" },
+            },
+          },
+          {
+            $group: { _id: null, total: { $sum: "$transactionAmount" } },
+          },
+        ],
+        totalRecords: [{ $count: "total" }],
+        totalAmt: [
+          {
+            $group: { _id: null, total: { $sum: { $ifNull: ["$transactionAmount", 0] } } },
+          },
+        ],
+        totalFeesCharged: [
+          {
+            $match: {
+              type: "redeem",
+              status: { $in: [4, 8] },
+              transactionAmount: { $gt: 0, $type: "number" },
+              redeemServiceFee: { $gt: 0, $type: "number" },
+            },
+          },
+          {
+            $project: {
+              calculatedFee: {
+                $floor: {
+                  $multiply: [
+                    { $divide: ["$redeemServiceFee", 100] },
+                    "$transactionAmount",
+                  ],
+                },
+              },
+            },
+          },
+          {
+            $group: { _id: null, total: { $sum: "$calculatedFee" } },
+          },
+        ],
+        totalRedeemSuccessful: [
+          { $match: { status: 8 } },
+          { $count: "count" },
+        ],
+        totalRechargeByType: [
+          { $match: { type: "recharge", status: { $in: [2, 3] } } },
+          {
+            $group: {
+              _id: { wallet: { $ifNull: ["$useWallet", false] } },
+              totalAmount: { $sum: { $ifNull: ["$transactionAmount", 0] } },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              wallet: { $cond: [{ $eq: ["$_id.wallet", true] }, "wallet", "others"] },
+              totalAmount: 1,
+            },
+          },
+        ],
+        totalRedeemByTypeData: [
+          { $match: { type: "redeem", status: { $in: [4, 8, 12] } } },
+          {
+            $project: {
+              transactionId: "$id",
+              amount: { $ifNull: ["$transactionAmount", 0] },
+              status: 1,
+              paymentType: { $cond: [{ $eq: ["$status", 12] }, "cashout", "redeem"] },
+              transactionIdFromStripe: 1,
+              transactionDate: 1,
+              redeemServiceFee: 1,
+            },
+          },
+        ],
+        totalRechargeByTypeData: [
+          { $match: { type: "recharge", status: { $in: [2, 3] } } },
+          {
+            $project: {
+              transactionId: "$id",
+              amount: { $ifNull: ["$transactionAmount", 0] },
+              date: "$date",
+              status: 1,
+              paymentType: {
+                $cond: [{ $eq: ["$useWallet", true] }, "wallet", "others"] },
+              transactionIdFromStripe: 1,
+              transactionDate: 1,
+            },
+          },
+        ],
+      },
+    },
+  ];  
 
+  try {
+    const results = await new Parse.Query("TransactionRecords").aggregate(queryPipeline, { useMasterKey: true });
+    const summary = results[0] || {};
+    const formattedDate = today.toLocaleDateString("en-US", { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+    const emailContent = `<!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                margin: 0;
+                padding: 20px;
+            }
+            .container {
+                max-width: 600px;
+                background: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                margin: auto;
+            }
+            .header {
+                background: #ff6600;
+                color: white;
+                text-align: center;
+                padding: 15px;
+                font-size: 20px;
+                border-radius: 8px 8px 0 0;
+            }
+            .table-container {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+            }
+            .table-container th, .table-container td {
+                border: 1px solid #ddd;
+                padding: 10px;
+                text-align: left;
+            }
+            .table-container th {
+                background: #ff6600;
+                color: white;
+            }
+            .highlight {
+                font-weight: bold;
+                color: #ff6600;
+            }
+            .footer {
+                text-align: center;
+                margin-top: 20px;
+                font-size: 14px;
+                color: #666;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">📊 Daily Transaction Summary</div>
+            <p>Here is the latest transaction summary: 📅 ${formattedDate}</p>
+            <table class="table-container">
+                <tr>
+                    <th>Transaction Type</th>
+                    <th>Amount</th>
+                </tr>
+                <tr>
+                    <td>Total Recharge Amount</td>
+                    <td class="highlight">${summary.totalRechargeAmount?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Redeem Amount</td>
+                    <td class="highlight">${summary.totalRedeemAmount?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Pending Recharge</td>
+                    <td>${summary.totalPendingRechargeAmount?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Cashout Redeems Success</td>
+                    <td>${summary.totalCashoutRedeemsSuccess?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Cashout Redeems In Progress</td>
+                    <td>${summary.totalCashoutRedeemsInProgress?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Transactions</td>
+                    <td>${summary.totalRecords?.[0]?.total || 0}</td>
+                </tr>
+                <tr>
+                    <td>Total Fees Charged</td>
+                    <td>${summary.totalFeesCharged?.[0]?.total || 0}</td>
+                </tr>
+            </table>
+            <p>For a detailed breakdown, please refer to the attached report.</p>
+            <div class="footer">&copy; 2025 The Bilions. All rights reserved.</div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to:  ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
+      subject: "Daily Transaction Summary",
+      html: emailContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully");
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+});
