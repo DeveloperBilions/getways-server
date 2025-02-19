@@ -27,6 +27,30 @@ Parse.Cloud.define("createUser", async (request) => {
   }
 
   try {
+    const existingUsername = await new Parse.Query(Parse.User)
+      .equalTo("username", username)
+      .first({ useMasterKey: true });
+
+    if (existingUsername) {
+      throw new Parse.Error(400, "Username is already taken.");
+    }
+    const existingEmail = await new Parse.Query(Parse.User)
+      .equalTo("email", email)
+      .first({ useMasterKey: true });
+
+    if (existingEmail) {
+      throw new Parse.Error(400, "Email is already registered.");
+    }
+
+    if (phoneNumber) {
+      const existingPhone = await new Parse.Query(Parse.User)
+        .equalTo("phoneNumber", phoneNumber)
+        .first({ useMasterKey: true });
+
+      if (existingPhone) {
+        throw new Parse.Error(400, "Phone number is already in use.");
+      }
+    }
     // Create a new Parse User
     const user = new Parse.User();
     user.set("username", username);
@@ -61,7 +85,7 @@ Parse.Cloud.define("createUser", async (request) => {
     relation.add(user);
     await role.save(null, { useMasterKey: true });
 
-    return { success: true, message: "User created successfully!" };
+    return { code:200,success: true, message: "User created successfully!" };
   } catch (error) {
     // Handle different error types
     if (error instanceof Parse.Error) {
@@ -83,7 +107,7 @@ Parse.Cloud.define("createUser", async (request) => {
 });
 
 Parse.Cloud.define("updateUser", async (request) => {
-  const { userId, username, name, email, balance , password } = request.params;
+  const { userId, username, name, email, balance, password } = request.params;
 
   try {
     // Find the user by ID
@@ -99,7 +123,7 @@ Parse.Cloud.define("updateUser", async (request) => {
     user.set("username", username);
     user.set("name", name);
     user.set("email", email);
-    if(password){
+    if (password) {
       user.set("password", password);
     }
     // user.set("balance", parseFloat(balance));
@@ -149,14 +173,14 @@ Parse.Cloud.define("deleteUser", async (request) => {
     user.set("isDeleted", true);
     await user.save(null, { useMasterKey: true });
 
-      // Force logout by deleting all sessions for this user
-      const sessionQuery = new Parse.Query("_Session");
-      sessionQuery.equalTo("user", user);
-      const sessions = await sessionQuery.find({ useMasterKey: true });
-  
-      if (sessions.length > 0) {
-        await Parse.Object.destroyAll(sessions, { useMasterKey: true });
-      }
+    // Force logout by deleting all sessions for this user
+    const sessionQuery = new Parse.Query("_Session");
+    sessionQuery.equalTo("user", user);
+    const sessions = await sessionQuery.find({ useMasterKey: true });
+
+    if (sessions.length > 0) {
+      await Parse.Object.destroyAll(sessions, { useMasterKey: true });
+    }
     // Delete the user
     // await user.destroy({ useMasterKey: true });
 
@@ -530,8 +554,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
   } = request.params;
 
   try {
-  
-    if(!username || !id){
+    if (!username || !id) {
       return {
         status: "error",
         message: "User Information are not correct",
@@ -625,14 +648,14 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
   } = request.params;
 
   try {
-    if(!username || !id){
+    if (!username || !id) {
       return {
         status: "error",
         message: "User Information are not correct",
       };
     }
-     // Check if the user has exceeded the redeem request limit for the day
-     if (!isCashOut) {
+    // Check if the user has exceeded the redeem request limit for the day
+    if (!isCashOut) {
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
       const query = new Parse.Query(TransactionDetails);
 
@@ -654,7 +677,8 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       if (redeemCount >= 10) {
         return {
           status: "error",
-          message: "You have exceeded the maximum of 10 redeem requests for today.",
+          message:
+            "You have exceeded the maximum of 10 redeem requests for today.",
         };
       }
     }
@@ -1033,7 +1057,10 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
   const { roleName } = request.params;
 
   if (!Array.isArray(roleName) || roleName.length === 0) {
-    throw new Parse.Error(400, "Role names array is required and must not be empty");
+    throw new Parse.Error(
+      400,
+      "Role names array is required and must not be empty"
+    );
   }
 
   try {
@@ -1088,7 +1115,6 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
     }
   }
 });
-
 
 Parse.Cloud.define("referralUserCheck", async (request) => {
   const { userReferralCode } = request.params;
@@ -1225,7 +1251,13 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("redeemServiceFee", async (request) => {
-  const { userId, redeemService, redeemServiceEnabled, redeemServiceZeroAllowed } = request.params;
+  const {
+    userId,
+    redeemService,
+    redeemServiceEnabled,
+    redeemServiceZeroAllowed,
+    changeAllAgentOnly,
+  } = request.params;
 
   if (!userId) {
     throw new Parse.Error(400, "Missing required parameter: userId");
@@ -1236,11 +1268,31 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", userId);
     const user = await userQuery.first({ useMasterKey: true });
+    const isMasterAgent = user.get("roleName") === "Master-Agent"; // Check if roleName is "Master-Agent"
 
-    user.set("redeemService", redeemService);
-    user.set("redeemServiceEnabled", redeemServiceEnabled);
-    user.set("isReedeemZeroAllowed", redeemServiceZeroAllowed);
+    // Step 3: Update user or child users based on role check and `redeemServiceZeroAllowed`
+    if (isMasterAgent) {
+      // Find users whose `userParentId` is the current user's objectId
+      const childUserQuery = new Parse.Query(Parse.User);
+      childUserQuery.equalTo("userParentId", user.id);
+      childUserQuery.equalTo("roleName", "Agent");
+      const childUsers = await childUserQuery.find({ useMasterKey: true });
 
+      // Update child users' data
+      for (const childUser of childUsers) {
+        childUser.set("redeemService", redeemService);
+        childUser.set("redeemServiceEnabled", redeemServiceEnabled);
+        childUser.set("isReedeemZeroAllowed", redeemServiceZeroAllowed);
+        await childUser.save(null, { useMasterKey: true });
+      }
+      user.set("redeemService", redeemService);
+      user.set("redeemServiceEnabled", redeemServiceEnabled);
+      user.set("isReedeemZeroAllowed", redeemServiceZeroAllowed);
+    } else {
+      user.set("redeemService", redeemService);
+      user.set("redeemServiceEnabled", redeemServiceEnabled);
+      user.set("isReedeemZeroAllowed", redeemServiceZeroAllowed);
+    }
     await user.save(null, { useMasterKey: true });
 
     return { success: true, message: "User Redeem Fees Updated successfully" };
@@ -1264,6 +1316,55 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
   }
 });
 
+Parse.Cloud.define("redeemServiceFeeAgentAll", async (request) => {
+  const { userId, redeemService } = request.params;
+
+  if (!userId) {
+    throw new Parse.Error(400, "Missing required parameter: userId");
+  }
+
+  try {
+    // Step 1: Find the user by ID
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.equalTo("objectId", userId);
+    const user = await userQuery.first({ useMasterKey: true });
+    const isMasterAgent = user.get("roleName") === "Master-Agent"; // Check if roleName is "Master-Agent"
+
+    // Step 3: Update user or child users based on role check and `redeemServiceZeroAllowed`
+    if (isMasterAgent) {
+      // Find users whose `userParentId` is the current user's objectId
+      const childUserQuery = new Parse.Query(Parse.User);
+      childUserQuery.equalTo("userParentId", user.id);
+      childUserQuery.equalTo("roleName", "Agent");
+      const childUsers = await childUserQuery.find({ useMasterKey: true });
+
+      // Update child users' data
+      for (const childUser of childUsers) {
+        childUser.set("redeemService", redeemService);
+        await childUser.save(null, { useMasterKey: true });
+      }
+    }
+
+    return { success: true, message: "User Redeem Fees Updated successfully" };
+  } catch (error) {
+    // Handle different error types
+    if (error instanceof Parse.Error) {
+      // Return the error if it's a Parse-specific error
+      return {
+        status: "error",
+        code: error.code,
+        message: error.message,
+      };
+    } else {
+      // Handle any unexpected errors
+      return {
+        status: "error",
+        code: 500,
+        message: "An unexpected error occurred.",
+      };
+    }
+  }
+});
 Parse.Cloud.define("redeemParentServiceFee", async (request) => {
   const { userId } = request.params;
   if (!userId) {
@@ -1274,8 +1375,8 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     const query = new Parse.Query(Parse.User);
     query.select("redeemService");
     query.select("redeemServiceEnabled");
-    query.select("rechargeLimit")
-    query.select("isReedeemZeroAllowed")
+    query.select("rechargeLimit");
+    query.select("isReedeemZeroAllowed");
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1289,7 +1390,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemService: user.get("redeemService"),
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
-      isReedeemZeroAllowed:user.get("isReedeemZeroAllowed")
+      isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
     };
   } catch (error) {
     // Handle different error types
