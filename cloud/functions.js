@@ -2,6 +2,7 @@ const XLSX = require("xlsx");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
+const { validateCreateUser } = require("./validators/user.validator");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 
 Parse.Cloud.define("createUser", async (request) => {
@@ -27,6 +28,19 @@ Parse.Cloud.define("createUser", async (request) => {
   }
 
   try {
+    if (!userReferralCode) {
+      const validatorData = {
+        username,
+        name,
+        email,
+        phoneNumber,
+        password,
+      };
+      const validatorResponse = validateCreateUser(validatorData);
+      if (!validatorResponse.isValid) {
+        throw new Parse.Error(400, validatorResponse.errors);
+      }
+    }
     const existingUsername = await new Parse.Query(Parse.User)
       .equalTo("username", username)
       .first({ useMasterKey: true });
@@ -110,6 +124,17 @@ Parse.Cloud.define("updateUser", async (request) => {
   const { userId, username, name, email, balance, password } = request.params;
 
   try {
+    const validatorData = {
+      username,
+      name,
+      email,
+      password,
+    };
+  
+    const validatorResponse = validateUpdateUser(validatorData);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
     // Find the user by ID
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", userId);
@@ -553,7 +578,12 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     redeemServiceFee,
   } = request.params;
 
+  
   try {
+    const validatorResponse = validatePositiveNumber(transactionAmount);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
     if (!username || !id) {
       return {
         status: "error",
@@ -648,6 +678,11 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
   } = request.params;
 
   try {
+    const validatorResponse = validatePositiveNumber(transactionAmount);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
+
     if (!username || !id) {
       return {
         status: "error",
@@ -717,7 +752,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       } else {
         throw new Error(`Wallet not found for user: ${username}`);
       }
-      await sendEmailNotification(username, transactionAmount);
+      // await sendEmailNotification(username, transactionAmount);
     }
 
     // Save the transaction
@@ -1163,7 +1198,20 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
   const { userReferralCode, username, name, phoneNumber, email, password } =
     request.params;
 
-  try {
+    
+    try {
+    const validatorData = {
+      username,
+      name,
+      phoneNumber,
+      email,
+      password,
+    };
+  
+    const validatorResponse = validateCreateUser(validatorData);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
     // Check if userReferralCode is provided
     if (!userReferralCode) {
       console.log("in referral code");
@@ -1416,6 +1464,12 @@ Parse.Cloud.define("summaryFilter", async (request) => {
   const { userId, startDate, endDate } = request.params;
 
   try {
+    if (startDate && endDate) {
+      const validatorResponse = validateDates(startDate, endDate);
+      if (!validatorResponse.isValid) {
+        throw new Parse.Error(400, validatorResponse.errors);
+      }
+    }
     const roleQuery = new Parse.Query(Parse.User);
     roleQuery.select("roleName");
     roleQuery.equalTo("objectId", userId);
