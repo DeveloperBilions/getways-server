@@ -5,6 +5,7 @@ const ParseDashboard = require("parse-dashboard");
 const cors = require("cors");
 const { CronJob } = require("cron");
 const cron = require("node-cron");
+const { checkPayoutStatus } = require("./cloud/CronJob/paypal");
 require("dotenv").config();
 const app = express();
 
@@ -224,6 +225,17 @@ async function startParseServer() {
     timezone: "UTC" // Ensure it runs in UTC timezone
 });
 
+cron.schedule("*/5 * * * *", async () =>{
+  try {
+    await Parse.Cloud.run("checkPayoutStatus");
+    console.log("checkPayoutStatus,completety run");
+  } catch (error) {
+    console.error("Error executing cloud function:", error);
+  }
+}, {
+  scheduled: true,
+  timezone: "UTC",
+});
 }
 
 // Call the async function to start Parse Server
