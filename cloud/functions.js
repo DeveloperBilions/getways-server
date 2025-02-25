@@ -2,7 +2,8 @@ const XLSX = require("xlsx");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
-const { validateCreateUser } = require("./validators/user.validator");
+const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
+const { validatePositiveNumber } = require("./validators/number.validator");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 
 Parse.Cloud.define("createUser", async (request) => {
@@ -752,7 +753,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       } else {
         throw new Error(`Wallet not found for user: ${username}`);
       }
-      // await sendEmailNotification(username, transactionAmount);
+      await sendEmailNotification(username, transactionAmount);
     }
 
     // Save the transaction
