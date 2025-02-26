@@ -1,5 +1,6 @@
 const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 const nodemailer = require('nodemailer');
+const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
@@ -14,7 +15,6 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     query.descending("updatedAt");
 
     const results = await query.find();
-    console.log(results.length, "results");
 
     if (results != null && results.length > 0) {
       console.log("Total Pending records " + results.length);
@@ -46,6 +46,10 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
           console.log(
             `Stripe transaction updated for orderId ${record.objectId} with status ${record.status}`
           );
+          if (record.status === 2) {
+            const parentUserId = await getParentUserId(record.userId)
+            await updatePotBalance(parentUserId, record.transactionAmount,"recharge");
+          }
         }
       } catch (error) {
         console.error(
@@ -594,5 +598,83 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
     console.log("Email sent successfully");
   } catch (error) {
     console.error("Error sending email:", error);
+  }
+});
+Parse.Cloud.define("updateTransactionBalances", async (request) => {
+  try {
+    // Step 1: Fetch Master-Agent and Agent users
+    const fetchMasterAgentsAndAgents = async () => {
+      const userQuery = new Parse.Query(Parse.User);
+      userQuery.containedIn("roleName", ["Master-Agent", "Agent"]);
+      userQuery.limit(10000);
+      userQuery.select("objectId", "roleName", "name", "balance", "potBalance");
+
+      return await userQuery.find({ useMasterKey: true });
+    };
+
+    const masterAgentsAndAgents = await fetchMasterAgentsAndAgents();
+
+    for (const masterAgentOrAgent of masterAgentsAndAgents) {
+      const userId = masterAgentOrAgent.id;
+      const role = masterAgentOrAgent.get("roleName");
+
+      // Step 2: Fetch players under this Master-Agent or Agent
+      const fetchPlayers = async (parentId) => {
+        const playerQuery = new Parse.Query(Parse.User);
+        playerQuery.equalTo("userParentId", parentId);
+        playerQuery.limit(10000);
+        playerQuery.select("objectId");
+
+        const results = await playerQuery.find({ useMasterKey: true });
+        return results.map((player) => player.id);
+      };
+
+      const playerIds = await fetchPlayers(userId);
+      if (playerIds.length === 0) continue; // Skip if no players found
+
+      // Step 3: Fetch total recharge amount for all players
+      const fetchTotalRecharge = async () => {
+        const rechargeQuery = new Parse.Query("TransactionRecords");
+        rechargeQuery.containedIn("userId", playerIds);
+        rechargeQuery.containedIn("status", [2, 3]);
+        rechargeQuery.select("transactionAmount");
+
+        const results = await rechargeQuery.find({ useMasterKey: true });
+        return results.reduce((sum, trx) => sum + (trx.get("transactionAmount") || 0), 0);
+      };
+
+      const totalRechargeAmount = await fetchTotalRecharge();
+
+      // Step 4: Fetch total redeem amount for all players
+      const fetchTotalRedeem = async () => {
+        const redeemQuery = new Parse.Query("TransactionRecords");
+        redeemQuery.containedIn("userId", playerIds);
+        redeemQuery.equalTo("type", "redeem");
+        redeemQuery.containedIn("status", [4, 8]);
+        redeemQuery.greaterThan("transactionAmount", 0);
+        redeemQuery.select("transactionAmount");
+
+        const results = await redeemQuery.find({ useMasterKey: true });
+        return results.reduce((sum, trx) => sum + (trx.get("transactionAmount") || 0), 0);
+      };
+
+      const totalRedeemAmount = await fetchTotalRedeem();
+
+      // Step 5: Deduct 15% from total recharges for pot balance (floor value)
+      const potBalance = Math.floor(totalRechargeAmount * 0.15);
+
+      // Step 6: Calculate balance for the Master-Agent or Agent (floor value)
+      const balance = Math.floor((totalRechargeAmount - potBalance) - totalRedeemAmount);
+
+      // Step 7: Update balance & potBalance in User table
+      masterAgentOrAgent.set("potBalance", potBalance);
+      await masterAgentOrAgent.save(null, { useMasterKey: true });
+
+      console.log(`Updated balance for ${role} (User ID: ${userId}): ${balance}, Pot Balance: ${potBalance}`);
+    }
+
+    return `Updated balances & pot balances for ${masterAgentsAndAgents.length} users in TransactionRecords and User table`;
+  } catch (error) {
+    throw `Error updating transaction records and user balances: ${error.message || error}`;
   }
 });

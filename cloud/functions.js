@@ -2,6 +2,7 @@ const XLSX = require("xlsx");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
+const { getParentUserId, updatePotBalance } = require("./utility/utlis");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 
 Parse.Cloud.define("createUser", async (request) => {
@@ -579,6 +580,11 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     wallet.set("balance", updatedBalance);
     await wallet.save(null);
 
+    const parentUserId = await getParentUserId(id);
+
+    if (parentUserId) {
+      await updatePotBalance(parentUserId, transactionAmount,"redeem");
+    }
     // Step 4: Save the transaction record
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const transactionDetails = new TransactionDetails();
@@ -819,6 +825,12 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     if (redeemRemarks) {
       transaction.set("redeemRemarks", redeemRemarks);
     }
+
+    const parentUserId = await getParentUserId(userId);
+
+    if (parentUserId) {
+      await updatePotBalance(parentUserId, transactionAmount,"redeem");
+    }
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
     walletQuery.equalTo("userID", userId);
@@ -869,14 +881,18 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
 Parse.Cloud.define("coinsCredit", async (request) => {
   const { id } = request.params;
 
+  if (!id) {
+    throw new Error("Transaction ID is required.");
+  }
+
   try {
-    // Create a query to find the Transaction record by transactionId
+    // Step 1: Fetch the transaction record
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
     query.equalTo("objectId", id);
+    query.include("userId"); // Include the user relation
 
-    // Fetch the record
-    const transaction = await query.first();
+    const transaction = await query.first({ useMasterKey: true });
 
     if (!transaction) {
       throw new Error("Transaction not found");
@@ -908,6 +924,7 @@ Parse.Cloud.define("coinsCredit", async (request) => {
     }
   }
 });
+
 
 Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
   const { email, password } = request.params;
