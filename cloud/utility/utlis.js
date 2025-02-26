@@ -41,9 +41,9 @@ async function updatePotBalance(userId, amount, type) {
   
       let newPotBalance;
       if (type === "redeem") {
-        newPotBalance = Math.max(0, currentPotBalance - amount - potChangeAmount); // Prevent negative balance
+        newPotBalance = Math.max(0, currentPotBalance - amount); // Prevent negative balance
       } else if (type === "recharge") {
-        newPotBalance = currentPotBalance + amount + potChangeAmount;
+        newPotBalance = currentPotBalance + (amount - potChangeAmount);
       } else {
         throw new Error(`Invalid transaction type: ${type}`);
       }
