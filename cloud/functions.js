@@ -1987,6 +1987,65 @@ Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");
 });
 
+Parse.Cloud.define("fetchTransactionsofAgent", async (request) => {
+  try {
+    const { sortOrder = "desc", startDate, endDate, status = [2, 3] } = request.params;
+
+    // Step 1: Fetch User-Agent Mapping
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.select("objectId", "userParentName");
+    userQuery.limit(100000); // Adjust limit as needed
+    const users = await userQuery.find({ useMasterKey: true });
+
+    // Create a mapping of userId -> agentName
+    const userAgentMap = {};
+    for (const user of users) {
+      userAgentMap[user.id] = user.get("userParentName");
+    }
+
+    const userIds = Object.keys(userAgentMap);
+    if (userIds.length === 0) {
+      return { status: "success", data: [] };
+    }
+
+    // Step 2: Use Aggregation Pipeline on Transactions
+    const pipeline = [
+      { $match: { 
+          userId: { $in: userIds },
+          status: { $in: status },
+          ...(startDate && { createdAt: { $gte: new Date(startDate) } }),
+          ...(endDate && { createdAt: { $lte: new Date(endDate) } })
+      }},
+      { $group: {
+          _id: "$userId",
+          totalAmount: { $sum: "$transactionAmount" }
+      }},
+    ];
+
+    const transactions = await new Parse.Query("TransactionRecords").aggregate(pipeline, { useMasterKey: true });
+
+    // Step 3: Map Transactions to Agents
+    const agentTransactionMap = {};
+    for (const transaction of transactions) {
+      const userId = transaction.objectId;
+      const agentName = userAgentMap[userId];
+
+      if (agentName) {
+        agentTransactionMap[agentName] = (agentTransactionMap[agentName] || 0) + transaction.totalAmount;
+      }
+    }
+    // Step 4: Sort the result at JavaScript level (since MongoDB doesn’t sort Maps)
+    const sortedData = Object.entries(agentTransactionMap)
+      .sort((a, b) => sortOrder === "asc" ? a[1] - b[1] : b[1] - a[1])
+      .map(([agentName, totalAmount]) => ({ agentName, totalAmount }));
+
+    return { status: "success", data: sortedData };
+  } catch (error) {
+    console.error("Error fetching transactions:", error.message);
+    return { status: "error", code: 500, message: error.message };
+  }
+});
+
 async function sendEmailNotification(username, transactionAmount) {
   try {
     // Create transporter
