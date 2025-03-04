@@ -600,6 +600,10 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     transactionDetails.set("redeemServiceFee", parseFloat(redeemServiceFee));
     transactionDetails.set("percentageAmount", parseFloat(percentageAmount));
     transactionDetails.set("percentageFees", parseFloat(redeemServiceFee));
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.equalTo("objectId", id);
+    const user = await userQuery.first({ useMasterKey: true });
+    transactionDetails.set("userParentId", user.get("userParentId")); // Store whether wallet was used
 
     await transactionDetails.save(null);
 
@@ -709,6 +713,12 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("paymentMode", paymentMode);
     transactionDetails.set("paymentMethodType", paymentMethodType);
     transactionDetails.set("walletId", walletId);
+
+
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.equalTo("objectId", id);
+    const user = await userQuery.first({ useMasterKey: true });
+    transactionDetails.set("userParentId", user.get("userParentId")); // Store whether wallet was used
 
     if (isCashOut) {
       const Wallet = Parse.Object.extend("Wallet");
