@@ -592,6 +592,12 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         message: "User Information are not correct",
       };
     }
+    if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
+      return {
+        status: "error",
+        message: "Amount should be a positive number greater than 0",
+      };
+    }    
     // Step 1: Fetch the user's wallet
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
@@ -698,6 +704,12 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       return {
         status: "error",
         message: "User Information are not correct",
+      };
+    }
+     if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
+      return {
+        status: "error",
+        message: "Amount should be a positive number greater than 0",
       };
     }
     // Check if the user has exceeded the redeem request limit for the day
@@ -1453,6 +1465,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("redeemServiceEnabled");
     query.select("rechargeLimit");
     query.select("isReedeemZeroAllowed");
+    query.select("potBalance");
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1467,6 +1480,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
+      potBalance:user.get("potBalance")
     };
   } catch (error) {
     // Handle different error types
