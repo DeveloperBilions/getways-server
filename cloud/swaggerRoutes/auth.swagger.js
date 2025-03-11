@@ -158,3 +158,90 @@
  *                   type: string
  *                   example: "An unexpected error occurred."
  */
+
+/**
+ * @swagger
+ * /checkpresence:
+ *   post:
+ *     summary: Checks if a user exists based on email or phone number.
+ *     description: Searches for a user using a case-insensitive email or phone number and returns basic user details if found.
+ *     tags: [Authentication]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: X-Parse-Application-Id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The Application Id of the authenticated user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailPhone
+ *             properties:
+ *               emailPhone:
+ *                 type: string
+ *                 example: "user@example.com"
+ *                 description: The email or phone number of the user.
+ *     responses:
+ *       200:
+ *         description: User found successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 fromAgentExcel:
+ *                   type: boolean
+ *                   example: false
+ *                 username:
+ *                   type: string
+ *                   example: "alpha"
+ *                 name:
+ *                   type: string
+ *                   example: "Alpha"
+ *       400:
+ *         description: Invalid request parameters.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: number
+ *                   example: 141
+ *                 message:
+ *                   type: string
+ *                   example: "User does not exist!"
+ *       403:
+ *         description: Forbidden. The user does not have permission to update this user.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "unauthorized"
+ *       500:
+ *         description: Unexpected server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "error"
+ *                 code:
+ *                   type: number
+ *                   example: 500
+ *                 message:
+ *                   type: string
+ *                   example: "An unexpected error occurred."
+ */

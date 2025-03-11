@@ -791,3 +791,73 @@
  *                   example: "An unexpected error occurred."
  */
 
+/**
+ * @swagger
+ * /exportAndEmailPreviousDayTransactions:
+ *   post:
+ *     summary: Export and email previous day's transactions
+ *     description: Retrieves recharge transactions from the previous day, fetches Stripe session data, generates an Excel report, and emails it to the specified recipients.
+ *     tags: [Transactions]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: X-Parse-Application-Id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The Application ID for authentication.
+ *     responses:
+ *       200:
+ *         description: Successfully exported and emailed the transaction report.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "success"
+ *                 message:
+ *                   type: string
+ *                   example: "Previous day's transactions exported and emailed successfully."
+ *       204:
+ *         description: No transactions found for the previous day.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "success"
+ *                 message:
+ *                   type: string
+ *                   example: "No transactions found for the previous day."
+ *       403:
+ *         description: Forbidden. The user does not have permission to update this user.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "unauthorized"
+ *       500:
+ *         description: Unexpected server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "error"
+ *                 code:
+ *                   type: number
+ *                   example: 500
+ *                 message:
+ *                   type: string
+ *                   example: "Error exporting and emailing transactions: <error_message>"
+ */
