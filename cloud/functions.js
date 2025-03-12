@@ -1129,13 +1129,10 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("getUsersByRole", async (request) => {
-  const { roleName } = request.params;
+  const { roleName, currentusr } = request.params;
 
   if (!Array.isArray(roleName) || roleName.length === 0) {
-    throw new Parse.Error(
-      400,
-      "Role names array is required and must not be empty"
-    );
+    throw new Parse.Error(400, "Role names array is required and must not be empty");
   }
 
   try {
@@ -1155,6 +1152,12 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
       const roleName = role.get("name");
       const userRelation = role.relation("users");
       const usersQuery = userRelation.query();
+
+      // If currentusr is provided, filter users by userParentId
+      if (currentusr) {
+        usersQuery.equalTo("userParentId", currentusr);
+      }
+
       const users = await usersQuery.find({ useMasterKey: true });
 
       // Store users in a map to avoid duplicates
@@ -1190,6 +1193,7 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
     }
   }
 });
+
 
 Parse.Cloud.define("referralUserCheck", async (request) => {
   const { userReferralCode } = request.params;
