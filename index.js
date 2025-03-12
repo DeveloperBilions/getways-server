@@ -7,11 +7,13 @@ const { CronJob } = require("cron");
 const cron = require("node-cron");
 require("dotenv").config();
 const app = express();
+const setupSwagger = require("./cloud/swagger");
 
 // Add CORS middleware
 app.use(cors());
 app.use(express.json());
 
+setupSwagger(app);
 // Parse Server initialization
 async function startParseServer() {
   const parseServer = new ParseServer({

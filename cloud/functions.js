@@ -67,6 +67,16 @@ Parse.Cloud.define("createUser", async (request) => {
         throw new Parse.Error(400, "Phone number is already in use.");
       }
     }
+
+    // Query the Role class to find the desired role
+    const query = new Parse.Query(Parse.Role);
+    query.equalTo("name", roleName);
+    const role = await query.first({ useMasterKey: true });
+
+    if (!role) {
+      throw new Parse.Error(404, "Role not found");
+    }
+    
     // Create a new Parse User
     const user = new Parse.User();
     user.set("username", username);
@@ -86,15 +96,6 @@ Parse.Cloud.define("createUser", async (request) => {
     }
     // Save the user
     await user.signUp(null, { useMasterKey: true });
-
-    // Query the Role class to find the desired role
-    const query = new Parse.Query(Parse.Role);
-    query.equalTo("name", roleName);
-    const role = await query.first({ useMasterKey: true });
-
-    if (!role) {
-      throw new Parse.Error(404, "Role not found");
-    }
 
     // Add the user to the role
     const relation = role.relation("users");
