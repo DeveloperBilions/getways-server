@@ -777,6 +777,12 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       console.log(wallet, "wallet  ");
       if (wallet) {
         const currentBalance = wallet.get("balance") || 0;
+        if(currentBalance < transactionAmount){
+          return {
+            status: "error",
+            message: "Insufficient balance in wallet",
+          };
+        }
         wallet.set("balance", Math.floor(currentBalance - transactionAmount));
         await wallet.save(null);
       } else {
