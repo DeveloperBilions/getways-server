@@ -2123,3 +2123,44 @@ async function sendEmailNotification(username, transactionAmount) {
     console.error("Error sending email:", error);
   }
 }
+
+const crypto = require('crypto');
+const axios = require('axios');
+
+const generateSignature = (method, path, body = '') => {
+  const dataToHash = `${method}${path}${process.env.XREMIT_API_SECRET}${body}`;
+  return crypto.createHash('sha256').update(dataToHash).digest('hex');
+};
+
+Parse.Cloud.define("fetchGiftCards", async (request) => {
+  const method = "GET";
+  const path = "/brands/country/USA?currentPage=1";
+  const signature = generateSignature(method, path);
+
+  const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
+  const headers = {
+    "API-Key": process.env.REACT_APP_Xremit_API_SECRET,
+    signature: signature,
+  };
+
+  console.log("Request URL:", apiUrl);
+  console.log("Request Headers:", headers);
+
+  try {
+    const response = await axios.get(apiUrl, { headers });
+
+    console.log("Response Headers:", response.headers);
+    console.log("Response Data:", JSON.stringify(response.data, null, 2));
+
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Response Status:", error.response.status);
+      console.error("Response Headers:", error.response.headers);
+      console.error("Response Data:", error.response.data);
+    } else {
+      console.error("Request Error:", error.message);
+    }
+    throw new Parse.Error(500, "Failed to load gift cards.");
+  }
+});
