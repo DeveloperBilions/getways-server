@@ -2134,29 +2134,25 @@ const crypto = require('crypto');
 const axios = require('axios');
 
 const generateSignature = (method, path, body = '') => {
-  const dataToHash = `${method}${path}${process.env.XREMIT_API_SECRET}${body}`;
+  const dataToHash = `${method}${path}${process.env.REACT_APP_Xremit_API_SECRET}${body}`;
   return crypto.createHash('sha256').update(dataToHash).digest('hex');
 };
 
 Parse.Cloud.define("fetchGiftCards", async (request) => {
+  const searchTerm = request.params.searchTerm || "";
+
   const method = "GET";
-  const path = "/brands/country/USA?currentPage=1";
+  const path = `/brands/country/USA?currentPage=1&textSearch=${encodeURIComponent(searchTerm)}`;
   const signature = generateSignature(method, path);
 
   const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
   const headers = {
-    "API-Key": process.env.REACT_APP_Xremit_API_SECRET,
+    "API-Key": process.env.REACT_APP_Xremit_API,
     signature: signature,
   };
 
-  console.log("Request URL:", apiUrl);
-  console.log("Request Headers:", headers);
-
   try {
     const response = await axios.get(apiUrl, { headers });
-
-    console.log("Response Headers:", response.headers);
-    console.log("Response Data:", JSON.stringify(response.data, null, 2));
 
     return response.data;
   } catch (error) {
@@ -2170,3 +2166,56 @@ Parse.Cloud.define("fetchGiftCards", async (request) => {
     throw new Parse.Error(500, "Failed to load gift cards.");
   }
 });
+
+Parse.Cloud.define("purchaseGiftCard", async (request) => {
+  const {
+    orderId,
+    price,
+    productId,
+    externalUserId,
+    externalUserFirstName,
+    externalUserLastName,
+    externalUserEmail,
+  } = request.params;
+
+  const method = "POST";
+  const path = `/purchase`;
+  const bodyData = JSON.stringify({
+    orderId,
+    price,
+    productId,
+    externalUserId,
+    externalUserFirstName,
+    externalUserLastName,
+    externalUserEmail,
+  });
+
+  const signature = generateSignature(method, path, bodyData);
+
+  const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
+  const headers = {
+    "API-Key": process.env.REACT_APP_Xremit_API,
+    signature: signature,
+  };
+
+  try {
+    const response = await axios.post(apiUrl, bodyData, { headers });
+    if (response.data && response.data.status === "success") {
+      const GiftCard = Parse.Object.extend("GiftCardHistory");
+      const giftCardEntry = new GiftCard();
+
+      giftCardEntry.set("userId", externalUserId);
+      giftCardEntry.set("productId", productId);
+      giftCardEntry.set("price", price);
+      giftCardEntry.set("orderId", orderId);
+      giftCardEntry.set("apiResponse", response.data); // store full API response if needed
+
+      await giftCardEntry.save(null, { useMasterKey: true });
+    }
+    return response.data;
+  } catch (error) {
+    console.error("Request Error:", error.response);
+
+    throw new Parse.Error(500, "Failed to complete purchase.");
+  }
+})
