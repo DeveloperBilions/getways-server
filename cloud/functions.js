@@ -2140,9 +2140,11 @@ const generateSignature = (method, path, body = '') => {
 
 Parse.Cloud.define("fetchGiftCards", async (request) => {
   const searchTerm = request.params.searchTerm || "";
+  const currentPage = request.params.currentPage || 1;
+  const perPage = request.params.perPage || 50; // Default if not passed
 
   const method = "GET";
-  const path = `/brands/country/USA?currentPage=1&textSearch=${encodeURIComponent(searchTerm)}`;
+  const path = `/brands/country/USA?currentPage=${currentPage}&perPage=${perPage}&textSearch=${encodeURIComponent(searchTerm)}`;
   const signature = generateSignature(method, path);
 
   const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
@@ -2219,3 +2221,26 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
     throw new Parse.Error(500, "Failed to complete purchase.");
   }
 })
+
+Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {
+  const callbackData = request.params; // This contains the POST data sent by xRemit
+
+  try {
+    const GiftCardHistory = Parse.Object.extend("GiftCardHistory");
+    const giftCardEntry = new GiftCardHistory();
+
+    giftCardEntry.set("orderId", callbackData.orderId);
+    giftCardEntry.set("userId", callbackData.externalUserId);
+    giftCardEntry.set("productId", callbackData.productId);
+    giftCardEntry.set("productName", callbackData.productName);
+    giftCardEntry.set("price", callbackData.faceValue);
+    giftCardEntry.set("apiResponse", callbackData);
+
+    await giftCardEntry.save(null, { useMasterKey: true });
+
+    return { status: "success" };
+  } catch (error) {
+    console.error("Error saving callback data:", error);
+    throw new Parse.Error(500, "Failed to save callback gift card data.");
+  }
+});
