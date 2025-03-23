@@ -40,10 +40,13 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
             },
           }
         );
+        const paymentData = paymentCheck.data?.data?.[0];
+        const paymentStatus = paymentData?.payment_status;
+        const actuallyPaid = paymentData?.actually_paid;
+        //const paymentStatus = paymentCheck.data?.data?.[0]?.payment_status;
+        console.log(paymentStatus,"paymentStatus",actuallyPaid)
 
-        const paymentStatus = paymentCheck.data?.data?.[0]?.payment_status;
-
-        let newStatus = 10; // Default failed
+        let newStatus = 1
         if (paymentStatus === "waiting" || paymentStatus === "confirming") {
           newStatus = 1; // Still pending
         } else if (
@@ -62,6 +65,16 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
         const recordObject = results.find((rec) => rec.id === record.objectId);
         if (recordObject) {
           recordObject.set("status", newStatus);
+          if (newStatus === 2 && actuallyPaid && record.transactionAmount != actuallyPaid) {
+            console.log(
+              `Updating transactionAmount from ${record.transactionAmount} to ${actuallyPaid}`
+            );
+            recordObject.set("actualTransactionAmount", record.transactionAmount);
+
+            recordObject.set("transactionAmount", actuallyPaid);
+
+          }
+
           await recordObject.save();
 
           console.log(
