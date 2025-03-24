@@ -1477,6 +1477,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("rechargeLimit");
     query.select("isReedeemZeroAllowed");
     query.select("potBalance");
+    query.select("rechargeDisabled")
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1491,7 +1492,8 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
-      potBalance:user.get("potBalance")
+      potBalance:user.get("potBalance"),
+      rechargeDisabled:user.get("rechargeDisabled")
     };
   } catch (error) {
     // Handle different error types
