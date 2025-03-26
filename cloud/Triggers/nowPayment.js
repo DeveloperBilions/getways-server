@@ -102,3 +102,81 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
     };
   }
 });
+
+Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
+  try {
+    const username = process.env.TRANSFI_USERNAME;
+    const password = process.env.TRANSFI_PASSWORD;
+    const basicAuthHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+    const query = new Parse.Query("TransactionRecords");
+    query.equalTo("status", 1); // Only pending
+    query.limit(1000);
+    const now = new Date();
+    const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000);
+    query.greaterThanOrEqualTo("updatedAt", halfHourAgo);
+    query.descending("updatedAt");
+
+    const results = await query.find();
+
+    if (!results || results.length === 0) {
+      console.log("No pending TransFi transactions found.");
+      return;
+    }
+
+    const data = results.map((record) => record.toJSON());
+
+    for (const record of data) {
+      try {
+        const response = await axios.get(
+          `https://sandbox-api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
+          {
+            headers: {
+              accept: "application/json",
+              authorization: basicAuthHeader,
+            },
+          }
+        );
+
+        const orderStatus = response.data.data.status;
+        console.log(`Order ${record.transactionIdFromStripe} status: ${response.data.data.status}`);
+
+        let newStatus = 1;
+        if (orderStatus === "fund_settled") {
+            newStatus = 2; // Completed
+          } else if (orderStatus === "fund_failed") {
+            newStatus = 10; // Failed
+          } else if (orderStatus === "initiated" || orderStatus === "fund_processing") {
+            newStatus = 1; // Still pending
+          }
+
+        const recordObject = results.find((rec) => rec.id === record.objectId);
+        if (recordObject) {
+          recordObject.set("status", newStatus);
+          await recordObject.save();
+
+          console.log(
+            `TransFi transaction updated for orderId ${record.transactionIdFromStripe} with status ${newStatus}`
+          );
+
+          if (newStatus === 2) {
+            const parentUserId = await getParentUserId(record.userId);
+            await updatePotBalance(parentUserId, record.transactionAmount, "recharge");
+          }
+        }
+      } catch (err) {
+        console.error(
+          `TransFi API error for orderId ${record.transactionIdFromStripe}:`,
+          err.response?.data || err.message
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error in checking TransFi transactions:", error.message);
+    return {
+      status: "error",
+      code: 500,
+      message: error.message,
+    };
+  }
+});
