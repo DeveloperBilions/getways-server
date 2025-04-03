@@ -55,8 +55,8 @@ async function startParseServer() {
   app.use("/dashboard", dashboard);
 
   // Start the server
-  const port = 1337;
-  // const port = 6000;
+  //const port = 1337;
+ const port = 6000;
 
   app.listen(port, function () {
     console.log(
