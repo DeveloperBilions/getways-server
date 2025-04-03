@@ -308,15 +308,10 @@ archive.set("originalUpdatedAt", record.updatedAt);
       throw error;
     }
   });
-<<<<<<< HEAD
   const Stripe = require("stripe");
 
 
   
-=======
-  
-
->>>>>>> 532b67bdf8bfc8b8a4f5f502d96eac7814c072ce
 Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
   const  chargeIds = ["ch_3QwKqrLlUR10IID50C8EOQws",
   "py_3QvSZdLlUR10IID51YStlt5V",
@@ -537,10 +532,7 @@ Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
         checkoutSessionId,
         userId,
         username: user.get("username"),
-<<<<<<< HEAD
         agent: user.get("userParentName")
-=======
->>>>>>> 532b67bdf8bfc8b8a4f5f502d96eac7814c072ce
       });
 
     } catch (err) {
@@ -550,7 +542,6 @@ Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
   console.log(results)
   return results;
 });
-<<<<<<< HEAD
 
 Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
   const THIRTY_MINUTES_AGO = new Date(Date.now() - 30 * 60 * 1000);
@@ -647,5 +638,3 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 });
 
 
-=======
->>>>>>> 532b67bdf8bfc8b8a4f5f502d96eac7814c072ce
