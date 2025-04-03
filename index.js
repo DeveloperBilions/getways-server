@@ -55,8 +55,8 @@ async function startParseServer() {
   app.use("/dashboard", dashboard);
 
   // Start the server
-  //const port = 1337;
-   const port = 6000;
+  const port = 1337;
+  // const port = 6000;
 
   app.listen(port, function () {
     console.log(
@@ -130,7 +130,7 @@ async function startParseServer() {
     try {
       console.log("Running cloud function every 10 minutes...");
 
-      await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
+      //await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
@@ -141,7 +141,7 @@ async function startParseServer() {
     try {
       //console.log("Update The Status of blank or 0 status to 1...");
       // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
-      await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
+     // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
       ///await Parse.Cloud.run("migration")
     } catch (error) {
       console.error("Error running cloud function:", error);
