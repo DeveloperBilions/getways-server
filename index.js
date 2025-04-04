@@ -55,7 +55,7 @@ async function startParseServer() {
   app.use("/dashboard", dashboard);
 
   // Start the server
-  //const port = 1337;
+//const port = 1337;
  const port = 6000;
 
   app.listen(port, function () {
@@ -120,6 +120,8 @@ async function startParseServer() {
       console.log("Running cloud function every 30 seconds...");
 
       await Parse.Cloud.run("checkTransactionStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+      await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+
     } catch (error) {
       console.error("Error running cloud function:", error);
     }

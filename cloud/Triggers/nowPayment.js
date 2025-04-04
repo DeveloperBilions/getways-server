@@ -129,7 +129,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     for (const record of data) {
       try {
         const response = await axios.get(
-          `https://api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
+          `https://sandbox-api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
           {
             headers: {
               accept: "application/json",
@@ -180,6 +180,69 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     };
   }
 });
+Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
+  try {
+    const username = process.env.TRANSFI_USERNAME;
+    const password = process.env.TRANSFI_PASSWORD;
+    const basicAuthHeader =
+      "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+    const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+    const query = new Parse.Query(TransfiUserInfo);
+    query.equalTo("kycVerified", false);
+    query.limit(1000);
+
+    const results = await query.find({ useMasterKey: true });
+
+    if (!results.length) {
+      console.log("No unverified KYC records found.");
+      return "No updates required.";
+    }
+
+    for (const record of results) {
+      const email = record.get("email");
+
+      try {
+        const response = await axios.get(
+          `https://sandbox-api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
+          {
+            headers: {
+              accept: "application/json",
+              authorization: basicAuthHeader,
+            },
+          }
+        );
+
+        const status = response.data.status;
+        console.log(`Email: ${email}, KYC Status: ${status}`);
+
+        // ✅ Update kycStatus from TransFi response
+        record.set("kycStatus", status);
+
+        // ✅ Update kycVerified only if KYC was successful
+        if (status === "kyc_success") {
+          record.set("kycVerified", true);
+        } else {
+          record.set("kycVerified", false);
+        }
+
+        await record.save(null, { useMasterKey: true });
+        console.log(`KYC record updated for ${email}: status=${status}`);
+      } catch (err) {
+        console.error(
+          `Failed to fetch KYC status for ${email}:`,
+          err.response?.data || err.message
+        );
+      }
+    }
+
+    return "KYC status check completed.";
+  } catch (error) {
+    console.error("Error in checkKycStatusTransfi:", error.message);
+    throw new Error("Internal server error.");
+  }
+});
+
 
 Parse.Cloud.define("expireOldTransfiTransactions", async (request) => {
     try {
