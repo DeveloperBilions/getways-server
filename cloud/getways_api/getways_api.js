@@ -1,6 +1,5 @@
 const axios = require("axios");
 const dumpRequest = async (request) => {
-	console.log(request);
 	var data = {userId: request.user
 		, appId: request.appId
 		, requestTime: new Date()
@@ -15,7 +14,6 @@ const dumpRequest = async (request) => {
 }
 
 const dumpResponse = async (response, id) => {
-	console.log(response);
 	var data = {requestId: id
 		, responseTime: new Date()
 		, params: response.params
@@ -33,17 +31,12 @@ const getTransaction = async (params) => {
             "https://aogglobal.org/AOGCRPT/controllers/api/GetTransaction.php",
             { params }
         )
-        // console.log(
-        //     `API response for playerId:`,
-        //     response.data
-        // );
         var res = (({ status, statusText, headers, config, data }) => (
         	{ status, statusText, headers, config, data })
         	)(response);
 		return res; 
     } 
     catch (error) {
-        console.log(error);
         throw error;
     }
 }
@@ -51,7 +44,6 @@ const getTransaction = async (params) => {
 
 const performTransaction = async (params, type) => {
 	try{
-		console.log(params, type)
 		const externalApiUrl = type==="deposit" 
 			? "https://aogglobal.org/AOGCRPT/controllers/api/DepositTransaction.php"
 			: type==="withdraw" ? "https://aogglobal.org/AOGCRPT/controllers/api/WithdrawTransaction.php" : null;
@@ -71,16 +63,14 @@ const performTransaction = async (params, type) => {
 		return res;
 	} 
 	catch (error) {
-        console.log(error);
         throw error;
     }
 }
 
 Parse.Cloud.define("GetTransaction", async (request) => {
-	console.log("GETTRANSACTION CALLED");
 	var res = await dumpRequest(request);
 	var response = await getTransaction(request.params);
-	var res1 = await dumpResponse(response, res.id);
+	await dumpResponse(response, res.id);
 	response = (({ status, statusText, headers, data }) => (
 		{ status, statusText, headers, data })
 	)(response)
@@ -88,10 +78,9 @@ Parse.Cloud.define("GetTransaction", async (request) => {
 });
 
 Parse.Cloud.define("DepositTransaction", async (request) => {
-	console.log("DEPOSITTRANSACTION CALLED");
 	var res = await dumpRequest(request);
 	var response = await performTransaction(request.params, "deposit");
-	var res1 = await dumpResponse(response, res.id);
+	await dumpResponse(response, res.id);
 	response = (({ status, statusText, headers, data }) => (
 		{ status, statusText, headers, data })
 	)(response)
@@ -99,10 +88,9 @@ Parse.Cloud.define("DepositTransaction", async (request) => {
 });
 
 Parse.Cloud.define("WithdrawTransaction", async (request) => {
-	console.log("WITHDRAWTRANSACTION CALLED");
 	var res = await dumpRequest(request);
 	var response = await performTransaction(request.params, "withdraw");
-	var res1 = await dumpResponse(response, res.id)
+	await dumpResponse(response, res.id)
 	response = (({ status, statusText, headers, data }) => (
 		{ status, statusText, headers, data })
 	)(response)

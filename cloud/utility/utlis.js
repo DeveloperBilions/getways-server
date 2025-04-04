@@ -50,8 +50,6 @@ async function updatePotBalance(userId, amount, type) {
   
       user.set("potBalance", newPotBalance);
       await user.save(null, { useMasterKey: true });
-  
-      console.log(`Updated potBalance for user ${userId}: ${newPotBalance} (${type})`);
     } catch (error) {
       console.error(`Error updating potBalance for user ${userId}: ${error.message}`);
     }

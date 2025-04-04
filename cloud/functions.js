@@ -1,5 +1,4 @@
 const XLSX = require("xlsx");
-const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
 const { getParentUserId, updatePotBalance } = require("./utility/utlis");
@@ -12,7 +11,6 @@ Parse.Cloud.define("createUser", async (request) => {
     username,
     name,
     email,
-    balance,
     phoneNumber,
     password,
     userParentId,
@@ -124,7 +122,7 @@ Parse.Cloud.define("createUser", async (request) => {
 });
 
 Parse.Cloud.define("updateUser", async (request) => {
-  const { userId, username, name, email, balance, password } = request.params;
+  const { userId, username, name, email, password } = request.params;
 
   try {
     const validatorData = {
@@ -158,6 +156,13 @@ Parse.Cloud.define("updateUser", async (request) => {
 
     // Save the user
     await user.save(null, { useMasterKey: true });
+
+     pusher.trigger("transaction-channel", "user-update", {
+       username: username,
+       name: name,
+       email: email,
+       message: "Coins have been credited successfully!",
+     });
 
     return { success: true, message: "User updated successfully" };
   } catch (error) {
@@ -280,7 +285,7 @@ Parse.Cloud.define("getUserById", async (request) => {
   }
 });
 
-Parse.Cloud.define("fetchAllUsers", async (request) => {
+Parse.Cloud.define("fetchAllUsers", async () => {
   try {
     const userQuery = new Parse.Query(Parse.User);
     userQuery.select(
@@ -344,8 +349,6 @@ Parse.Cloud.define("userTransaction", async (request) => {
       throw new Parse.Error(404, `User with ID ${id} not found`);
     }
 
-    let finalAmount;
-
     if (type === "redeem") {
       // Amount deduct form user balance
       finalAmount = balance - parseFloat(transactionAmount);
@@ -376,8 +379,6 @@ Parse.Cloud.define("userTransaction", async (request) => {
     await transactionDetails.save(null, { useMasterKey: true });
     const transactionId = transactionDetails.id;
 
-    console.log("@@@ transaction id @@@", transactionId);
-
     // Axios call to an external API
     const externalApiUrl =
       "https://aogglobal.org/AOGCRPT/controllers/api/DepositTransaction.php";
@@ -395,9 +396,6 @@ Parse.Cloud.define("userTransaction", async (request) => {
       });
 
       if (axiosResponse.data.success) {
-        // Server responded with an success
-        console.log("*** Axios Success ***", axiosResponse.data);
-        console.log("*** set 1 ***");
 
         // Update status to 1 on Axios success
         transactionDetails.set("status", 1);
@@ -450,7 +448,7 @@ Parse.Cloud.define("userTransaction", async (request) => {
   }
 });
 
-Parse.Cloud.define("checkTransactionStatus", async (request) => {
+Parse.Cloud.define("checkTransactionStatus", async () => {
   const axios = require("axios");
 
   try {
@@ -469,10 +467,6 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
     query.descending("updatedAt");
     const results = await query.find();
 
-    if (results != null && results.length > 0) {
-      console.log("Total Pending records " + results.length);
-    }
-
     // Step 2: Map results to JSON for readability
     const data = results.map((record) => record.toJSON());
 
@@ -490,10 +484,6 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
         const response = await axios.get(
           "https://aogglobal.org/AOGCRPT/controllers/api/GetTransaction.php",
           { params }
-        );
-        console.log(
-          `API response for playerId ${record.userId}:`,
-          response.data
         );
 
         // Step 6: Update the record's status if API call succeeds
@@ -526,9 +516,6 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 
                 // Save the updated user record
                 await user.save(null, { useMasterKey: true });
-                console.log(
-                  `User balance updated successfully for playerId: ${record.userId}`
-                );
               }
             }
           }
@@ -574,7 +561,6 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     id,
     type,
     username,
-    balance,
     transactionAmount,
     remark,
     percentageAmount,
@@ -774,7 +760,6 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       const walletQuery = new Parse.Query(Wallet);
       walletQuery.equalTo("objectId", walletId);
       const wallet = await walletQuery.first();
-      console.log(wallet, "wallet  ");
       if (wallet) {
         const currentBalance = wallet.get("balance") || 0;
         if(currentBalance < transactionAmount){
@@ -864,7 +849,6 @@ Parse.Cloud.define("agentRejectRedeemRedords", async (request) => {
 
 Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
   const {
-    id,
     userId,
     orderId,
     percentageAmount,
@@ -908,11 +892,6 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
       );
       wallet.set("balance", netAmount);
       await wallet.save(null);
-      console.log(
-        `Wallet updated for userId ${userId} with balance ${
-          currentBalance + percentageAmount
-        }`
-      );
     } else {
       console.log(`Wallet not found for userId ${userId}.`);
     }
@@ -924,7 +903,6 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
       data: transaction,
     };
   } catch (error) {
-    console.log(error, "error from");
     if (error instanceof Parse.Error) {
       // Return the error if it's a Parse-specific error
       return {
@@ -1265,8 +1243,6 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
     }
     // Check if userReferralCode is provided
     if (!userReferralCode) {
-      console.log("in referral code");
-
       throw new Parse.Error(400, "Missing parameter: userReferralCode");
     }
 
@@ -1355,7 +1331,6 @@ Parse.Cloud.define("redeemServiceFee", async (request) => {
     redeemService,
     redeemServiceEnabled,
     redeemServiceZeroAllowed,
-    changeAllAgentOnly,
   } = request.params;
 
   if (!userId) {
@@ -1737,7 +1712,7 @@ Parse.Cloud.define("summaryFilter", async (request) => {
   } catch (error) {}
 });
 
-Parse.Cloud.define("readExcelFile", async (request) => {
+Parse.Cloud.define("readExcelFile", async () => {
   const XLSX = require("xlsx");
   const fs = require("fs");
 
@@ -1872,11 +1847,6 @@ Parse.Cloud.define("readExcelFile", async (request) => {
             // Save the updated role with the relation to the users
             await role.save(null, { useMasterKey: true });
 
-            console.log(
-              `Batch from ${startIndex + 1} to ${
-                startIndex + batch.length
-              } inserted successfully and users added to the 'agent' role.`
-            );
             success = true;
           } catch (error) {
             console.error(
@@ -1887,8 +1857,6 @@ Parse.Cloud.define("readExcelFile", async (request) => {
             attempt++;
 
             if (attempt < retryLimit) {
-              // If retrying, wait before the next attempt
-              console.log(`Retrying batch in ${RETRY_DELAY / 1000} seconds...`);
               await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
             } else {
               throw new Error(
@@ -1915,7 +1883,7 @@ Parse.Cloud.define("readExcelFile", async (request) => {
   }
 });
 
-Parse.Cloud.define("exportAndEmailPreviousDayTransactions", async (request) => {
+Parse.Cloud.define("exportAndEmailPreviousDayTransactions", async () => {
   try {
     // Step 1: Define the start and end date for the previous day
     const now = new Date();
@@ -2045,7 +2013,7 @@ Parse.Cloud.define("exportAndEmailPreviousDayTransactions", async (request) => {
   }
 });
 
-Parse.Cloud.define("cleanupReferralLink", async (request) => {
+Parse.Cloud.define("cleanupReferralLink", async () => {
   try {
     const query = new Parse.Query(Parse.User);
     // Add a constraint to fetch users with a referral value
@@ -2066,11 +2034,9 @@ Parse.Cloud.define("cleanupReferralLink", async (request) => {
 
     // Iterate through users and delete each one
     for (const users of user) {
-      console.log("Deleting User:", users.get("username"));
       await users.destroy({ useMasterKey: true });
     }
 
-    console.log("Users deleted successfully.");
     return { message: `${user.length} users deleted.` };
   } catch (error) {}
 });
@@ -2126,7 +2092,6 @@ async function sendEmailNotification(username, transactionAmount) {
 
     // Send email
     await transporter.sendMail(mailOptions);
-    console.log("Emails sent successfully.");
   } catch (error) {
     console.error("Error sending email:", error);
   }

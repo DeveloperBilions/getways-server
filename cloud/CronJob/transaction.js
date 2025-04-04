@@ -2,7 +2,7 @@ const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 const nodemailer = require('nodemailer');
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
-Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
+Parse.Cloud.define("checkTransactionStatusStripe", async () => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Filter by status=1
@@ -43,9 +43,6 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
         if (recordObject) {
           recordObject.set("status", record.status);
           await recordObject.save();
-          console.log(
-            `Stripe transaction updated for orderId ${record.objectId} with status ${record.status}`
-          );
           if (record.status === 2) {
             const parentUserId = await getParentUserId(record.userId)
             await updatePotBalance(parentUserId, record.transactionAmount,"recharge");
@@ -60,14 +57,12 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     }
   } catch (error) {
     if (error instanceof Parse.Error) {
-      console.log(`Parse-specific error: ${error.code} - ${error.message}`);
       return {
         status: "error",
         code: error.code,
         message: error.message,
       };
     } else {
-      console.log(`An unexpected error occurred: ${error.message}`);
       return {
         status: "error",
         code: 500,
@@ -76,7 +71,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     }
   }
 });
-Parse.Cloud.define("expiredTransactionStripe", async (request) => {  
+Parse.Cloud.define("expiredTransactionStripe", async () => {  
     try {
       const query = new Parse.Query("TransactionRecords");
       query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
@@ -84,7 +79,6 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
       query.limit(10000);
 
       const results = await query.find();
-      console.log(`${results.length} transactions found to check with Stripe.`);
   
       for (const record of results) {
         const transactionId = record.get("transactionIdFromStripe");
@@ -106,7 +100,6 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
               }
               record.set("status", newStatus);
               await record.save();
-              console.log(`Updated transaction record ${record.id} to status ${newStatus}`);
             }
           } catch (stripeError) {
             console.error(`Error retrieving Stripe session for transactionId ${transactionId}: ${stripeError.message}`);
@@ -117,14 +110,12 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
       }
     } catch (error) {
       if (error instanceof Parse.Error) {
-        console.log(`Parse-specific error: ${error.code} - ${error.message}`);
         return {
           status: "error",
           code: error.code,
           message: error.message,
         };
       } else {
-        console.log(`An unexpected error occurred: ${error.message}`);
         return {
           status: "error",
           code: 500,
@@ -133,7 +124,7 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
       }
     }
 });
-Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
+Parse.Cloud.define("updateTransactionStatusForBlankData", async () => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 0); // Filter by status=0 (initial or pending state)
@@ -142,7 +133,6 @@ Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
     const results = await query.find();
 
     if (results.length > 0) {
-      console.log(`Found ${results.length} transactions to update or remove.`);
       for (const record of results) {
         const transactionId = record.get("transactionIdFromStripe");
 
@@ -150,15 +140,9 @@ Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
           // Assuming 'paid' on Stripe should update the record to status=1
           record.set("status", 1);
           await record.save();
-          console.log(
-            `Transaction updated for recordId ${record.id} with new status 1`
-          );
         } else {
           // If there is no transactionId and status is 0, delete the record
           await record.destroy();
-          console.log(
-            `Transaction record deleted for recordId ${record.id} due to missing transactionId`
-          );
         }
       }
     } else {
@@ -166,14 +150,12 @@ Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
     }
   } catch (error) {
     if (error instanceof Parse.Error) {
-      console.log(`Parse-specific error: ${error.code} - ${error.message}`);
       return {
         status: "error",
         code: error.code,
         message: error.message,
       };
     } else {
-      console.log(`An unexpected error occurred: ${error.message}`);
       return {
         status: "error",
         code: 500,
@@ -183,7 +165,7 @@ Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
   }
 });
 
-Parse.Cloud.define("expireRedeemRequest", async (request) => {
+Parse.Cloud.define("expireRedeemRequest", async () => {
   // Calculate 24 hours ago
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
@@ -220,7 +202,7 @@ Parse.Cloud.define("expireRedeemRequest", async (request) => {
   }
 });
 
-Parse.Cloud.define("migration", async (request) => {
+Parse.Cloud.define("migration", async () => {
   try {
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const Wallet = Parse.Object.extend("Wallet");
@@ -232,7 +214,6 @@ Parse.Cloud.define("migration", async (request) => {
     query.ascending("transactionDate"); // Process oldest transactions first
 
     const transactions = await query.find();
-    console.log(`Found ${transactions.length} transactions to migrate.`);
 
     const now = new Date();
 
@@ -255,7 +236,6 @@ Parse.Cloud.define("migration", async (request) => {
         wallet = new Wallet();
         wallet.set("userID", userId);
         wallet.set("balance", 0);
-        console.log(`Creating new wallet for user ${userId}`);
       }
 
       // Update the wallet's balance
@@ -278,12 +258,6 @@ Parse.Cloud.define("migration", async (request) => {
       // Update the transaction status to 6
      // transaction.set("status", 6);
      // await transaction.save(null, { useMasterKey: true });
-
-      console.log(
-        `Processed transaction ${transaction.id} for user ${userId}. Added net amount: ${netAmount}. New wallet balance: ${wallet.get(
-          "balance"
-        )}`
-      );
     }
 
     // Step 2: Update transactions with status = 6 older than 24 hours
@@ -293,9 +267,6 @@ Parse.Cloud.define("migration", async (request) => {
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const oldTransactions = await status6Query.find();
-    console.log(
-      `Found ${oldTransactions.length} transactions with status = 6 to check.`
-    );
 
     for (const transaction of oldTransactions) {
       const transactionDate = transaction.get("transactionDate");
@@ -303,7 +274,6 @@ Parse.Cloud.define("migration", async (request) => {
       if (transactionDate < twentyFourHoursAgo) {
         transaction.set("status", 9);
         await transaction.save(null, { useMasterKey: true });
-        console.log(`Updated transaction ${transaction.id} status to 9.`);
       } else {
         const userId = transaction.get("userId");
 
@@ -330,17 +300,15 @@ Parse.Cloud.define("migration", async (request) => {
           wallet.set("balance", 0); // Initialize balance
           await wallet.save(null, { useMasterKey: true });
 
-          console.log(`Created wallet for user ${userId}`);
         }
       }
     }
 
-    console.log("Migration completed successfully.");
   } catch (error) {
     console.error("Error during migration:", error.message);
   }
 });
-Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
+Parse.Cloud.define("sendDailyTransactionEmail", async () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -595,12 +563,11 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully");
   } catch (error) {
     console.error("Error sending email:", error);
   }
 });
-Parse.Cloud.define("updateTransactionBalances", async (request) => {
+Parse.Cloud.define("updateTransactionBalances", async () => {
   try {
     // Step 1: Fetch Master-Agent and Agent users
     const fetchMasterAgentsAndAgents = async () => {
@@ -616,7 +583,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
 
     for (const masterAgentOrAgent of masterAgentsAndAgents) {
       const userId = masterAgentOrAgent.id;
-      const role = masterAgentOrAgent.get("roleName");
+      masterAgentOrAgent.get("roleName");
 
       // Step 2: Fetch players under this Master-Agent or Agent
       const fetchPlayers = async (parentId) => {
@@ -664,13 +631,11 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
       const potBalance = Math.floor(totalRechargeAmount * 0.15);
 
       // Step 6: Calculate balance for the Master-Agent or Agent (floor value)
-      const balance = Math.floor((totalRechargeAmount - potBalance) - totalRedeemAmount);
+      Math.floor((totalRechargeAmount - potBalance) - totalRedeemAmount);
 
       // Step 7: Update balance & potBalance in User table
       masterAgentOrAgent.set("potBalance", potBalance);
       await masterAgentOrAgent.save(null, { useMasterKey: true });
-
-      console.log(`Updated balance for ${role} (User ID: ${userId}): ${balance}, Pot Balance: ${potBalance}`);
     }
 
     return `Updated balances & pot balances for ${masterAgentsAndAgents.length} users in TransactionRecords and User table`;

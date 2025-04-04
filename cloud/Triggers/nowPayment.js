@@ -1,7 +1,7 @@
 const axios = require("axios");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
-Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
+Parse.Cloud.define("checkTransactionStatusNowPayments", async () => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Only pending records
@@ -14,7 +14,6 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
     const results = await query.find();
 
     if (!results || results.length === 0) {
-      console.log("No pending NOWPayments transactions found.");
       return;
     }
 
@@ -43,8 +42,6 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
         const paymentData = paymentCheck.data?.data?.[0];
         const paymentStatus = paymentData?.payment_status;
         const actuallyPaid = paymentData?.actually_paid;
-        //const paymentStatus = paymentCheck.data?.data?.[0]?.payment_status;
-        console.log(paymentStatus,"paymentStatus",actuallyPaid)
 
         let newStatus = 1
         if (paymentStatus === "waiting" || paymentStatus === "confirming") {
@@ -66,9 +63,6 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
         if (recordObject) {
           recordObject.set("status", newStatus);
           if (newStatus === 2 && actuallyPaid && record.transactionAmount != actuallyPaid) {
-            console.log(
-              `Updating transactionAmount from ${record.transactionAmount} to ${actuallyPaid}`
-            );
             recordObject.set("actualTransactionAmount", record.transactionAmount);
 
             recordObject.set("transactionAmount", actuallyPaid);
@@ -76,10 +70,6 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
           }
 
           await recordObject.save();
-
-          console.log(
-            `NOWPayments transaction updated for transactionId ${record.transactionIdFromStripe} with status ${newStatus}`
-          );
 
           if (newStatus === 2) {
             const parentUserId = await getParentUserId(record.userId);
@@ -103,7 +93,7 @@ Parse.Cloud.define("checkTransactionStatusNowPayments", async (request) => {
   }
 });
 
-Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
+Parse.Cloud.define("checkTransactionStatusTransfi", async () => {
   try {
     const username = process.env.TRANSFI_USERNAME;
     const password = process.env.TRANSFI_PASSWORD;
@@ -120,7 +110,6 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     const results = await query.find();
 
     if (!results || results.length === 0) {
-      console.log("No pending TransFi transactions found.");
       return;
     }
 
@@ -139,7 +128,6 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
         );
 
         const orderStatus = response.data.data.status;
-        console.log(`Order ${record.transactionIdFromStripe} status: ${response.data.data.status}`);
 
         let newStatus = 1;
         if (orderStatus === "fund_settled") {
@@ -155,9 +143,6 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
           recordObject.set("status", newStatus);
           await recordObject.save();
 
-          console.log(
-            `TransFi transaction updated for orderId ${record.transactionIdFromStripe} with status ${newStatus}`
-          );
 
           if (newStatus === 2) {
             const parentUserId = await getParentUserId(record.userId);
@@ -181,7 +166,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
   }
 });
 
-Parse.Cloud.define("expireOldTransfiTransactions", async (request) => {
+Parse.Cloud.define("expireOldTransfiTransactions", async () => {
     try {
       const query = new Parse.Query("TransactionRecords");
       query.equalTo("status", 1); // Only pending
@@ -194,14 +179,12 @@ Parse.Cloud.define("expireOldTransfiTransactions", async (request) => {
       const oldRecords = await query.find();
   
       if (!oldRecords || oldRecords.length === 0) {
-        console.log("No pending transactions older than 30 minutes.");
         return;
       }
   
       for (const record of oldRecords) {
         record.set("status", 9); // Expire the record
         await record.save();
-        console.log(`Transaction ${record.id} expired.`);
       }
   
       return { status: "success", expiredCount: oldRecords.length };
@@ -308,11 +291,8 @@ archive.set("originalUpdatedAt", record.updatedAt);
       throw error;
     }
   });
-  const Stripe = require("stripe");
-
-
   
-Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
+Parse.Cloud.define("getUsersFromStripeCharges", async () => {
   const  chargeIds = ["ch_3QwKqrLlUR10IID50C8EOQws",
   "py_3QvSZdLlUR10IID51YStlt5V",
   "ch_3Qx221LlUR10IID51sEbBUSM",
@@ -539,7 +519,6 @@ Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
       results.push({ chargeId, error: err.message });
     }
   }
-  console.log(results)
   return results;
 });
 

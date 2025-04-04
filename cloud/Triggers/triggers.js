@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 
-Parse.Cloud.define("sendDailyTransactionSummaryIfDiscrepancy", async (request) => {
+Parse.Cloud.define("sendDailyTransactionSummaryIfDiscrepancy", async () => {
     try {
       const playerQuery = new Parse.Query(Parse.User);
       playerQuery.equalTo("roleName", "Player");
@@ -8,7 +8,6 @@ Parse.Cloud.define("sendDailyTransactionSummaryIfDiscrepancy", async (request) =
       const players = await playerQuery.findAll({ useMasterKey: true });
   
       if (players.length === 0) {
-        console.log("No players found for validation.");
         return { status: "success", message: "No players found for validation." };
       }
   
@@ -92,11 +91,8 @@ Parse.Cloud.define("sendDailyTransactionSummaryIfDiscrepancy", async (request) =
           });
         }
       });
-      console.log("userIdToUsername map:", userIdToUsername);
-      console.log("Transaction results:", transactionResults);
       
       if (discrepancies.length === 0) {
-        console.log("No discrepancies found. Email not sent.");
         return { status: "success", message: "No discrepancies found. Email not sent." };
       }
   
@@ -158,6 +154,6 @@ Parse.Cloud.define("sendDailyTransactionSummaryIfDiscrepancy", async (request) =
       console.error("Error sending daily transaction discrepancy email:", error);
       throw new Error("Failed to send email: " + error.message);
     }
-  });
+});
   
 

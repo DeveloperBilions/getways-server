@@ -55,8 +55,8 @@ async function startParseServer() {
   app.use("/dashboard", dashboard);
 
   // Start the server
-  //const port = 1337;
- const port = 6000;
+  const port = 1337;
+//  const port = 6000;
 
   app.listen(port, function () {
     console.log(
@@ -98,18 +98,13 @@ async function startParseServer() {
     res.json(posts);
   });
 
-  async function callReadExcelFile() {
-    try {
-      console.log("Calling readExcelFile cloud function...");
-
-      // Call the cloud function directly
-      const response = await Parse.Cloud.run("readExcelFile");
-
-      console.log("Cloud function response:", response);
-    } catch (error) {
-      console.error("Error calling cloud function:", error.message);
-    }
-  }
+  // async function callReadExcelFile() {
+  //   try {
+  //     const response = await Parse.Cloud.run("readExcelFile");
+  //   } catch (error) {
+  //     console.error("Error calling cloud function:", error.message);
+  //   }
+  // }
 
   // Call the function
   // callReadExcelFile();
@@ -117,9 +112,7 @@ async function startParseServer() {
   // Runs every 30 seconds to perform rapid checks and updates on transactions:
   setInterval(async () => {
     try {
-      console.log("Running cloud function every 30 seconds...");
-
-      await Parse.Cloud.run("checkTransactionStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+      await Parse.Cloud.run("checkTransactionStatusTransfi"); 
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
@@ -139,7 +132,6 @@ async function startParseServer() {
   // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
   setTimeout(async () => {
     try {
-      //console.log("Update The Status of blank or 0 status to 1...");
       // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
      // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
       ///await Parse.Cloud.run("migration")
@@ -179,9 +171,6 @@ async function startParseServer() {
           await Parse.Cloud.run("exportAndEmailPreviousDayTransactions");
 
           const completedTime = getCurrentTimeInTimezone(timezone);
-          console.log(
-            `Task completed successfully at ${completedTime} (${timezone})`
-          );
         } catch (error) {
           console.error(`Task failed: ${error.message}`);
         }
