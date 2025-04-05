@@ -749,6 +749,7 @@ Parse.Cloud.define("processTransfiDeposit", async (request) => {
 
     return depositRes.data;
   } catch (error) {
+    console.log(error,"error msg")
     throw new Error(error.response?.data || error.message);
   }
 });
