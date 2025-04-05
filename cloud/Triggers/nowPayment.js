@@ -242,6 +242,57 @@ Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
     throw new Error("Internal server error.");
   }
 });
+async function verifyTransfiKycStatusByEmail(email) {
+  const username = process.env.TRANSFI_USERNAME;
+  const password = process.env.TRANSFI_PASSWORD;
+  const basicAuthHeader =
+    "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+  const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+  const query = new Parse.Query(TransfiUserInfo);
+  query.equalTo("email", email);
+  const record = await query.first({ useMasterKey: true });
+
+  if (!record) {
+    throw new Error(`No user found with email: ${email}`);
+  }
+
+  try {
+    const response = await axios.get(
+      `https://api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
+      {
+        headers: {
+          accept: "application/json",
+          authorization: basicAuthHeader,
+        },
+      }
+    );
+
+    const status = response.data.status;
+    console.log(`Email: ${email}, KYC Status: ${status}`);
+
+    // Update fields
+    record.set("kycStatus", status);
+    record.set("kycVerified", status === "kyc_success");
+
+    await record.save(null, { useMasterKey: true });
+    console.log(`KYC record updated for ${email}`);
+    return { email, status, success: true };
+  } catch (err) {
+    console.error(
+      `Failed to verify KYC for ${email}:`,
+      err.response?.data || err.message
+    );
+    return { email, status: "error", success: false, error: err.message };
+  }
+}
+
+Parse.Cloud.define("verifySingleKycEmail", async (request) => {
+  const email = request.params.email;
+  if (!email) throw new Error("Email is required.");
+
+  return await verifyTransfiKycStatusByEmail(email);
+});
 
 
 Parse.Cloud.define("expireOldTransfiTransactions", async (request) => {
