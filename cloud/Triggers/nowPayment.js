@@ -272,12 +272,12 @@ async function verifyTransfiKycStatusByEmail(email) {
     console.log(`Email: ${email}, KYC Status: ${status}`);
 
     // Update fields
-    record.set("kycStatus", status);
-    record.set("kycVerified", status === "kyc_success");
+    // record.set("kycStatus", status);
+    // record.set("kycVerified", status === "kyc_success");
 
-    await record.save(null, { useMasterKey: true });
+    // await record.save(null, { useMasterKey: true });
     console.log(`KYC record updated for ${email}`);
-    return { email, status, success: true };
+    return { email, status, success: true , response:response?.data};
   } catch (err) {
     console.error(
       `Failed to verify KYC for ${email}:`,
