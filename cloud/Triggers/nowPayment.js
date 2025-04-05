@@ -700,4 +700,222 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
   }
 });
 
+Parse.Cloud.define("processTransfiDeposit", async (request) => {
+  const axios = require("axios");
+  const { transactionAmount, userId } = request.params;
+
+  const username = process.env.TRANSFI_USERNAME;
+  const password = process.env.TRANSFI_PASSWORD;
+  const redirectUrl = process.env.URL_TRANSFI;
+  const basicAuthHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+  try {
+    const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+    const query = new Parse.Query(TransfiUserInfo);
+    query.equalTo("userId", userId);
+    const userRecord = await query.first({ useMasterKey: true });
+
+    if (!userRecord) throw "User not found in TransfiUserInfo. Please complete KYC first.";
+    if (!userRecord.get("kycVerified")) throw "KYC is not verified. Please complete KYC.";
+
+    const email = userRecord.get("email");
+    const firstName = userRecord.get("firstName");
+    const lastName = userRecord.get("lastName");
+
+    const depositRes = await axios.post(
+      "https://api.transfi.com/v2/orders/gaming",
+      {
+        paymentType: "card",
+        purposeCode: "fee_payments",
+        type: "individual",
+        amount: parseFloat(transactionAmount) / 100,
+        balanceCurrency: "USDT",
+        country: "US",
+        currency: "USD",
+        email,
+        firstName,
+        lastName,
+        redirectUrl,
+        sourceUrl: redirectUrl,
+      },
+      {
+        headers: {
+          accept: "application/json",
+          authorization: basicAuthHeader,
+          "content-type": "application/json",
+        },
+      }
+    );
+
+    return depositRes.data;
+  } catch (error) {
+    throw new Error(error.response?.data || error.message);
+  }
+});
+
+
+Parse.Cloud.define("submitTransfiKyc", async (request) => {
+  const axios = require("axios");
+  const {
+    myuserId,
+    email,
+    firstName,
+    lastName,
+    dob,
+    country = "US",
+  } = request.params;
+
+  const username = process.env.TRANSFI_USERNAME;
+  const password = process.env.TRANSFI_PASSWORD;
+  const redirectUrl = process.env.URL_TRANSFI;
+  const basicAuthHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+  const formatDob = (isoDate) => {
+    const [year, month, day] = isoDate.split("-");
+    return `${day}-${month}-${year}`;
+  };
+
+  try {
+    let userExists = false;
+
+    try {
+      const checkUserRes = await axios.get(
+        "https://api.transfi.com/v2/users/individuals",
+        {
+          params: { email },
+          headers: {
+            accept: "application/json",
+            authorization: basicAuthHeader,
+          },
+        }
+      );
+      userExists = checkUserRes.data?.users?.length > 0;
+    } catch (err) {
+      if (err.response?.data?.code !== "NOT_FOUND") throw err;
+    }
+
+    if (!userExists) {
+      await axios.post(
+        "https://api.transfi.com/v2/users/individual",
+        {
+          email,
+          firstName,
+          lastName,
+          country,
+          date: formatDob(dob),
+        },
+        {
+          headers: {
+            accept: "application/json",
+            authorization: basicAuthHeader,
+            "content-type": "application/json",
+          },
+        }
+      );
+    }
+
+    const kycRes = await axios.post(
+      "https://api.transfi.com/v2/kyc/standard",
+      {
+        email,
+        firstName,
+        lastName,
+        country,
+        date: dob,
+        redirectUrl,
+      },
+      {
+        headers: {
+          Authorization: basicAuthHeader,
+          "Content-Type": "application/json",
+          accept: "application/json",
+        },
+      }
+    );
+
+    const { userId, redirectUrl: kycRedirectUrl } = kycRes.data;
+
+    const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+    const transfiRecord = new TransfiUserInfo();
+
+    transfiRecord.set("email", email);
+    transfiRecord.set("firstName", firstName);
+    transfiRecord.set("lastName", lastName);
+    transfiRecord.set("country", country);
+    transfiRecord.set("userId", myuserId);
+    transfiRecord.set("transfiUserId", userId);
+    transfiRecord.set("redirectUrl", kycRedirectUrl);
+    transfiRecord.set("kycVerified", false);
+    transfiRecord.set("kycStatus", "kyc_pending");
+    transfiRecord.set("dob", dob);
+    transfiRecord.set("linkGeneratedAt", new Date());
+
+    await transfiRecord.save(null, { useMasterKey: true });
+
+    return { userId, redirectUrl: kycRedirectUrl };
+  } catch (error) {
+    console.log(error.message,"messagemessagemessagemessagemessage")
+    throw new Error(error.response?.data || error.message);
+  }
+});
+Parse.Cloud.define("regenerateTransfiKycLink", async (request) => {
+  const axios = require("axios");
+  const { myuserId } = request.params;
+
+  const username = process.env.TRANSFI_USERNAME;
+  const password = process.env.TRANSFI_PASSWORD;
+  const redirectUrl = process.env.URL_TRANSFI;
+  const basicAuthHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+  const formatDob = (isoDate) => {
+    const [year, month, day] = isoDate.split("-");
+    return `${day}-${month}-${year}`;
+  };
+
+  try {
+    const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+    const query = new Parse.Query(TransfiUserInfo);
+    query.equalTo("userId", myuserId);
+    const record = await query.first({ useMasterKey: true });
+
+    if (!record) throw "No Transfi user record found.";
+
+    const email = record.get("email");
+    const firstName = record.get("firstName");
+    const lastName = record.get("lastName");
+    const dob = record.get("dob");
+    const country = record.get("country") || "US";
+
+    const res = await axios.post(
+      "https://api.transfi.com/v2/kyc/standard",
+      {
+        email,
+        firstName,
+        lastName,
+        country,
+        date: formatDob(dob),
+        redirectUrl,
+      },
+      {
+        headers: {
+          Authorization: basicAuthHeader,
+          "Content-Type": "application/json",
+          accept: "application/json",
+        },
+      }
+    );
+
+    const { redirectUrl: newRedirectUrl } = res.data;
+
+    record.set("redirectUrl", newRedirectUrl);
+    record.set("kycStatus", "kyc_pending");
+    record.set("linkGeneratedAt", new Date());
+
+    await record.save(null, { useMasterKey: true });
+
+    return { redirectUrl: newRedirectUrl };
+  } catch (error) {
+    throw new Error(error.response?.data || error.message);
+  }
+});
 
