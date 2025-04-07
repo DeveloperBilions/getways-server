@@ -5,6 +5,15 @@ const { getParentUserId, updatePotBalance } = require("./utility/utlis");
 const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
+const Pusher = require("pusher");
+
+const pusher = new Pusher({
+  appId: "1815071",
+  key: "c7244340ac58e6b550b3",
+  secret: "318e5acc150baf45194b",
+  cluster: "ap2",
+  useTLS: true,
+});
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
@@ -158,9 +167,7 @@ Parse.Cloud.define("updateUser", async (request) => {
     await user.save(null, { useMasterKey: true });
 
      pusher.trigger("transaction-channel", "user-update", {
-       username: username,
-       name: name,
-       email: email,
+       userId: userId,
        message: "Coins have been credited successfully!",
      });
 
