@@ -129,7 +129,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     for (const record of data) {
       try {
         const response = await axios.get(
-          `https://sandbox-api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
+          `https://api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
           {
             headers: {
               accept: "application/json",
@@ -142,7 +142,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
         console.log(`Order ${record.transactionIdFromStripe} status: ${response.data.data.status}`);
 
         let newStatus = 1;
-        if (orderStatus === "fund_settled") {
+        if (orderStatus === "fund_settled" || orderStatus === "completed") {
             newStatus = 2; // Completed
           } else if (orderStatus === "fund_failed") {
             newStatus = 10; // Failed
@@ -204,7 +204,7 @@ Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
 
       try {
         const response = await axios.get(
-          `https://sandbox-api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
+          `https://api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
           {
             headers: {
               accept: "application/json",
@@ -267,7 +267,7 @@ async function verifyTransfiKycStatusByEmail(email) {
 
   try {
     const response = await axios.get(
-      `https://sandbox-api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
+      `https://api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
       {
         headers: {
           accept: "application/json",
@@ -782,7 +782,7 @@ Parse.Cloud.define("processTransfiDeposit", async (request) => {
     const lastName = userRecord.get("lastName");
 
     const depositRes = await axios.post(
-      "https://sandbox-api.transfi.com/v2/orders/gaming",
+      "https://api.transfi.com/v2/orders/gaming",
       {
         paymentType: "card",
         purposeCode: "fee_payments",
@@ -840,7 +840,7 @@ Parse.Cloud.define("submitTransfiKyc", async (request) => {
 
     try {
       const checkUserRes = await axios.get(
-        "https://sandbox-api.transfi.com/v2/users/individuals",
+        "https://api.transfi.com/v2/users/individuals",
         {
           params: { email },
           headers: {
@@ -856,7 +856,7 @@ Parse.Cloud.define("submitTransfiKyc", async (request) => {
 
     if (!userExists) {
       await axios.post(
-        "https://sandbox-api.transfi.com/v2/users/individual",
+        "https://api.transfi.com/v2/users/individual",
         {
           email,
           firstName,
@@ -875,7 +875,7 @@ Parse.Cloud.define("submitTransfiKyc", async (request) => {
     }
 
     const kycRes = await axios.post(
-      "https://sandbox-api.transfi.com/v2/kyc/standard",
+      "https://api.transfi.com/v2/kyc/standard",
       {
         email,
         firstName,
@@ -947,7 +947,7 @@ Parse.Cloud.define("regenerateTransfiKycLink", async (request) => {
     const country = record.get("country") || "US";
 
     const res = await axios.post(
-      "https://sandbox-api.transfi.com/v2/kyc/standard",
+      "https://api.transfi.com/v2/kyc/standard",
       {
         email,
         firstName,
