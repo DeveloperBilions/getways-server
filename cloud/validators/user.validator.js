@@ -2,7 +2,7 @@ const usernameRegex = /^(?=.*[a-zA-Z0-9])[a-zA-Z0-9._]{3,10}$/;
 const nameRegex = /^[a-zA-Z\s]{1,25}$/;
 const phoneNumberRegex = /^\d{10}$/;
 const emailRegex = /^(?!.*\.\.)([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/;
-const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@.!_])[A-Za-z\d@.!_]{6,}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 function validateCreateUser(user) {
 
     const errors = {};
