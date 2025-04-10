@@ -894,7 +894,15 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     const parentUserId = await getParentUserId(userId);
 
     if (parentUserId) {
-      await updatePotBalance(parentUserId, transactionAmount,"redeem");
+      const result = await updatePotBalance(parentUserId, transactionAmount, "redeem");
+    
+      if (!result.success) {
+        console.error("Pot balance update failed:", result.message);
+        return {
+          status: "error",
+          message: result.message,
+        };
+      }
     }
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
