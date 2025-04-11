@@ -250,6 +250,40 @@ Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
     throw new Error("Internal server error.");
   }
 });
+Parse.Cloud.define("expireTransfiKycAfterOneHour", async (request) => {
+  try {
+    const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
+    const query = new Parse.Query(TransfiUserInfo);
+
+    // Only those NOT verified
+    query.equalTo("kycVerified", false);
+
+    // Created more than 1 hour ago
+    const oneHourAgo = new Date(Date.now() - 30 * 60 * 1000);
+    query.lessThan("linkGeneratedAt", oneHourAgo);
+    query.limit(1000);
+
+    const results = await query.find({ useMasterKey: true });
+
+    if (results.length === 0) {
+      console.log("No KYC records to expire.");
+      return "No records expired.";
+    }
+
+    for (const record of results) {
+      // Set a flag like `kycExpired = true`
+      record.set("kycStatus", "kyc_expired");
+      record.set("failed_reason", ["KYC expired after 1 hour."]);
+      await record.save(null, { useMasterKey: true });
+    }
+
+    return `${results.length} KYC records marked as expired.`;
+  } catch (error) {
+    console.error("Error in expireTransfiKycAfterOneHour:", error.message);
+    throw new Error("Internal server error.");
+  }
+});
+
 async function verifyTransfiKycStatusByEmail(email) {
   const username = process.env.TRANSFI_USERNAME;
   const password = process.env.TRANSFI_PASSWORD;
@@ -914,8 +948,8 @@ Parse.Cloud.define("submitTransfiKyc", async (request) => {
 
     return { userId, redirectUrl: kycRedirectUrl };
   } catch (error) {
-    console.log(error.message,"messagemessagemessagemessagemessage")
-    throw new Error(error.response?.data || error.message);
+    console.log(error.response?.data?.message,"messagemessagemessagemessagemessage")
+    throw new Error(error.response?.data?.message || error.message);
   }
 });
 Parse.Cloud.define("regenerateTransfiKycLink", async (request) => {
@@ -975,7 +1009,8 @@ Parse.Cloud.define("regenerateTransfiKycLink", async (request) => {
 
     return { redirectUrl: newRedirectUrl };
   } catch (error) {
-    throw new Error(error.response?.data || error.message);
+    console.log(error.response)
+    throw new Error(error.response?.data?.message || error.message);
   }
 });
 
