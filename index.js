@@ -26,7 +26,7 @@ async function startParseServer() {
     masterKey: process.env.MASTER_KEY,
     encodeParseObjectInCloudFunction: false,
     liveQuery: {
-      classNames: ["Transaction", "User", "Wallet"], // Add the class names you want LiveQuery enabled for
+      classNames: ["TransactionRecords", "_User", "Wallet"], // Add the class names you want LiveQuery enabled for
     },
   });
 

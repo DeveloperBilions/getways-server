@@ -2,7 +2,7 @@ const usernameRegex = /^(?=.*[a-zA-Z0-9])[a-zA-Z0-9._]{3,10}$/;
 const nameRegex = /^[a-zA-Z\s]{1,25}$/;
 const phoneNumberRegex = /^\d{10}$/;
 const emailRegex = /^(?!.*\.\.)([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/;
-const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@.!_])[A-Za-z\d@.!_]{6,}$/;
+const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$&_])[A-Za-z\d!@#$&_]{6,}$/;
 function validateCreateUser(user) {
 
     const errors = {};
@@ -34,7 +34,7 @@ function validateCreateUser(user) {
     if (!user.password) {
         errors.password = "Password is required";
     } else if (!passwordRegex.test(user.password)) {
-        errors.password = "Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter, and one number.";
+        errors.password = "Password must be at least 6 characters long and include at least one uppercase letter, one special letter, and one number.";
     }
 
     return {
