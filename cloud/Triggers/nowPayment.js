@@ -190,6 +190,7 @@ Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
     const TransfiUserInfo = Parse.Object.extend("TransfiUserInfo");
     const query = new Parse.Query(TransfiUserInfo);
     query.equalTo("kycVerified", false);
+    query.notEqualTo("kycStatus", "kyc_expired");
     query.limit(1000);
 
     const results = await query.find({ useMasterKey: true });
