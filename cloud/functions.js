@@ -1493,7 +1493,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
       potBalance:user.get("potBalance"),
-      rechargeDisabled:user.get("rechargeDisabled")
+      rechargeDisabled:user.get("rechargeDisabled") || false
     };
   } catch (error) {
     // Handle different error types
