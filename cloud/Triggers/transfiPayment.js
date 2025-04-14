@@ -202,12 +202,12 @@ Parse.Cloud.define("expireTransfiKycAfterOneHour", async (request) => {
 });
 Parse.Cloud.define("expireOldTransfiTransactions", async (request) => {
   try {
-    const THIRTY_MINUTES_AGO = new Date(Date.now() - 30 * 60 * 1000);
+    const ONE_HOUR_AGO = new Date(Date.now() - 60 * 60 * 1000);
 
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1);
     query.equalTo("type", "recharge");
-    query.lessThan("createdAt", THIRTY_MINUTES_AGO);
+    query.lessThan("createdAt", ONE_HOUR_AGO);
 
     const results = await query.findAll({ useMasterKey: true });
 
