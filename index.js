@@ -122,7 +122,7 @@ const port = 1337;
       await Parse.Cloud.run("checkTransactionStatusTransfi"); // Checks and updates transaction statuses from Stripe.
       await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
       await Parse.Cloud.run("expireTransfiKycAfterOneHour")
-
+     await Parse.Cloud.run("expireOldTransfiTransactions")
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
