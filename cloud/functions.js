@@ -2200,6 +2200,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   const headers = {
     "API-Key": process.env.REACT_APP_Xremit_API,
     signature: signature,
+    "Content-Type": "application/json",
   };
 
   try {
