@@ -27,7 +27,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     for (const record of data) {
       try {
         const response = await axios.get(
-          `https://api.transfi.com/v2/orders/${record.transactionIdFromStripe}`,
+          `https://sanbox-sandbox.xremit.io/v2/orders/${record.transactionIdFromStripe}`,
           {
             headers: {
               accept: "application/json",
@@ -116,7 +116,7 @@ Parse.Cloud.define("checkKycStatusTransfi", async (request) => {
 
       try {
         const response = await axios.get(
-          `https://api.transfi.com/v2/kyc/user?email=${encodeURIComponent(
+          `https://sanbox-sandbox.xremit.io/v2/kyc/user?email=${encodeURIComponent(
             email
           )}`,
           {
@@ -252,7 +252,7 @@ async function verifyTransfiKycStatusByEmail(email) {
 
   try {
     const response = await axios.get(
-      `https://api.transfi.com/v2/kyc/user?email=${encodeURIComponent(email)}`,
+      `https://sanbox-sandbox.xremit.io/v2/kyc/user?email=${encodeURIComponent(email)}`,
       {
         headers: {
           accept: "application/json",
