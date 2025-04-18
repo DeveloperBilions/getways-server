@@ -2205,24 +2205,29 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
+  
     if (response.data) {
       const GiftCard = Parse.Object.extend("GiftCardHistory");
       const giftCardEntry = new GiftCard();
-
+  
       giftCardEntry.set("userId", externalUserId);
       giftCardEntry.set("productId", productId);
       giftCardEntry.set("price", price);
       giftCardEntry.set("orderId", orderId);
-      giftCardEntry.set("apiResponse", response.data); // store full API response if needed
-
+      giftCardEntry.set("apiResponse", response.data); // Store full API response if needed
+  
       await giftCardEntry.save(null, { useMasterKey: true });
     }
-    return {result:response.data ,status:"success"};
+  
+    // Returning response data and status
+    return { result: response.data, status: "success" };
   } catch (error) {
-    console.error("Request Error:", error.response);
-
-    throw new Parse.Error(500, "Failed to complete purchase.");
+    // Log the error and return a specific error message for easier debugging
+    console.error("Request Error:", error.response || error.message);
+  
+    throw new Parse.Error(500, `Failed to complete purchase: ${error.message}`);
   }
+  
 })
 
 Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {
