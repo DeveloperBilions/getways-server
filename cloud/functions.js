@@ -2183,7 +2183,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   } = request.params;
 
   const method = "POST";
-  const path = `/purchase`;
+  const path = `/purchaseimmediate`;
   const bodyData = JSON.stringify({
     orderId,
     price,

@@ -12,7 +12,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     query.limit(1000);
     const now = new Date();
     const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000);
-    query.greaterThanOrEqualTo("updatedAt", halfHourAgo);
+    query.greaterThanOrEqualTo("createdAt", halfHourAgo);
     query.descending("updatedAt");
 
     const results = await query.find();
@@ -23,7 +23,7 @@ Parse.Cloud.define("checkTransactionStatusTransfi", async (request) => {
     }
 
     const data = results.map((record) => record.toJSON());
-    const diffInMinutes = (now - createdAt) / (1000 * 60);
+    //const diffInMinutes = (now - createdAt) / (1000 * 60);
     for (const record of data) {
       try {
         const response = await axios.get(
