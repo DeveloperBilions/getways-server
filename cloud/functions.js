@@ -2205,7 +2205,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
-    if (response.data && response.data.status === "success") {
+    if (response.data) {
       const GiftCard = Parse.Object.extend("GiftCardHistory");
       const giftCardEntry = new GiftCard();
 
@@ -2217,7 +2217,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
       await giftCardEntry.save(null, { useMasterKey: true });
     }
-    return response.data;
+    return {result:response.data ,status:"success"};
   } catch (error) {
     console.error("Request Error:", error.response);
 
