@@ -456,7 +456,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 
       try {
         const url = new URL("https://partner.wert.io/api/external/orders");
-        url.searchParams.append("search_by", "txn-1745323957607");
+        url.searchParams.append("search_by", orderId);
         //url.searchParams.append("click_id", "txn-1745323957607");
 
         const response = await fetch(url.toString(), {
