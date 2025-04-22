@@ -455,14 +455,14 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
       }
 
       try {
-        const url = new URL("https://partner-sandbox.wert.io/api/external/orders");
-        url.searchParams.append("search_by", "order_id");
-        url.searchParams.append("order_id", orderId);
+        const url = new URL("https://partner.wert.io/api/external/orders");
+        url.searchParams.append("search_by", "txn-1745323957607");
+        //url.searchParams.append("click_id", "txn-1745323957607");
 
         const response = await fetch(url.toString(), {
           method: "GET",
           headers: {
-            "X-API-KEY": WERT_API_KEY,
+            "X-API-KEY": process.env.WERT_APP_KEY,
             "Content-Type": "application/json",
           },
         });
@@ -481,8 +481,8 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 
         const wertStatus = order.status;
         let newStatus = txn.get("status"); // default to existing if no match
-
-        // 🧠 Map Wert statuses to your internal codes
+        console.log(wertStatus,"wertStatus",order)
+        // 🧠 Map Wert  statuses to your internal codes
         switch (wertStatus) {
           case "success":
             newStatus = 2; // success

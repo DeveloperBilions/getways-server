@@ -22,7 +22,11 @@ async function startParseServer() {
     serverURL: process.env.SERVER_URL,
     appId: process.env.APP_ID,
     masterKey: process.env.MASTER_KEY,
-    encodeParseObjectInCloudFunction: false,
+    encodeParseObjectInCloudFunction: false, 
+    accountLockout: {
+      threshold: 5,
+duration: 30,  
+    }
   });
 
   // Start Parse Server
@@ -38,7 +42,7 @@ async function startParseServer() {
         serverURL: process.env.SERVER_URL,
         appId: process.env.APP_ID,
         masterKey: process.env.MASTER_KEY,
-        appName: process.env.APP_NAME,
+        appName: process.env.APP_NAME, 
       },
     ],
     users: [
@@ -55,8 +59,8 @@ async function startParseServer() {
   app.use("/dashboard", dashboard);
 
   // Start the server
-//const port = 1337;
- const port = 6000;
+  const port = 1337;
+ //const port = 6000;
 
   app.listen(port, function () {
     console.log(
@@ -119,37 +123,37 @@ async function startParseServer() {
     try {
       console.log("Running cloud function every 30 seconds...");
 
-      await Parse.Cloud.run("checkTransactionStatusTransfi"); // Checks and updates transaction statuses from Stripe.
-      await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
-      await Parse.Cloud.run("expireTransfiKycAfterOneHour")
-     await Parse.Cloud.run("expireOldTransfiTransactions")
+      await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
+    //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+    //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
+    //  await Parse.Cloud.run("expireOldTransfiTransactions")
     } catch (error) {
       console.error("Error running cloud function:", error);
     }
   }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
 
   // Runs every 10 minutes to handle potentially expired transactions:
-  setInterval(async () => {
-    try {
-      console.log("Running cloud function every 10 minutes...");
+  // setInterval(async () => {
+  //   try {
+  //     console.log("Running cloud function every 10 minutes...");
 
-      //await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
-    } catch (error) {
-      console.error("Error running cloud function:", error);
-    }
-  }, process.env.expiredTransactionStripe); // 10 minutes interval.
+  //     //await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
+  //   } catch (error) {
+  //     console.error("Error running cloud function:", error);
+  //   }
+  // }, process.env.expiredTransactionStripe); // 10 minutes interval.
 
-  // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
-  setTimeout(async () => {
-    try {
-      //console.log("Update The Status of blank or 0 status to 1...");
-      // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
-     // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
-      ///await Parse.Cloud.run("migration")
-    } catch (error) {
-      console.error("Error running cloud function:", error);
-    }
-  }, 5000); // 5 seconds after initialization.
+  // // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
+  // setTimeout(async () => {
+  //   try {
+  //     //console.log("Update The Status of blank or 0 status to 1...");
+  //     // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+  //    // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
+  //     ///await Parse.Cloud.run("migration")
+  //   } catch (error) {
+  //     console.error("Error running cloud function:", error);
+  //   }
+  // }, 5000); // 5 seconds after initialization.
 
   // Helper function to get the current time in a specific timezone
   function getCurrentTimeInTimezone(timezone) {
@@ -203,13 +207,13 @@ async function startParseServer() {
   // Call the function to schedule the cron task
   scheduleTask();
 
-  // cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
-  //   try {
-  //     await Parse.Cloud.run("cleanupReferralLink");
-  //   } catch (error) {
-  //     console.error("Error executing cloud function:", error);
-  //   }
-  // });
+  cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
+    try {
+      await Parse.Cloud.run("cleanupReferralLink");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  });
 
   cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
     try {
