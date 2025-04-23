@@ -102,3 +102,96 @@ Parse.Cloud.define("generateScInputData", async (req) => {
       };
     }
   });
+
+  Parse.Cloud.define("checkRecentPendingWertTransactionsAOG", async () => {
+    const THIRTY_MINUTES_AGO = new Date(Date.now() - 30 * 60 * 1000);
+  
+    try {
+      const query = new Parse.Query("AOGTransaction");
+      query.equalTo("status", "Pending"); // Only pending records
+      query.limit(10000);
+      query.greaterThanOrEqualTo("updatedAt", THIRTY_MINUTES_AGO);
+      query.descending("updatedAt");
+  
+      const pendingTransactions = await query.find({ useMasterKey: true });
+      const results = [];
+  
+      for (const txn of pendingTransactions) {
+        const orderId = txn.get("clickId");
+  
+        if (!orderId) {
+          results.push({ id: txn.id, skipped: true, reason: "Missing transactionIdFromStripe" });
+          continue;
+        }
+  
+        try {
+          const url = new URL("https://partner.wert.io/api/external/orders");
+          url.searchParams.append("search_by", orderId);
+          //url.searchParams.append("click_id", "txn-1745323957607");
+  
+          const response = await fetch(url.toString(), {
+            method: "GET",
+            headers: {
+              "X-API-KEY": process.env.WERT_APP_KEY,
+              "Content-Type": "application/json",
+            },
+          });
+  
+          if (!response.ok) {
+            throw new Error(`Wert API error: ${response.statusText}`);
+          }
+  
+          const { data } = await response.json();
+          const order = data?.[0];
+  
+          if (!order) {
+            //results.push({ id: txn.id, updated: false, reason: "Order not found in Wert" });
+            ///continue;
+          }
+  
+          const wertStatus = order?.status || "N/A";
+          let newStatus = txn.get("status"); // default to existing if no match
+          console.log(wertStatus,"wertStatus",order)
+          // 🧠 Map Wert  statuses to your internal codes
+          switch (wertStatus) {
+            case "success":
+              newStatus = 2; // success
+              break;
+            case "failed":
+            case "cancelled":
+              newStatus = 10; // failed
+              break;
+            case "pending":
+            case "progress":
+            case "created":
+              newStatus = 1; // still pending
+              break;
+            default:
+              newStatus = 9; // expired or unknown
+              break;
+          }
+  
+          // Only update if status has changed
+          if (txn.get("status") !== newStatus) {
+            txn.set("status", wertStatus);
+            await txn.save(null, { useMasterKey: true });
+  
+            results.push({ id: txn.id, updated: true, newStatus, wertStatus });
+          } else {
+            results.push({ id: txn.id, updated: false, wertStatus });
+          }
+        } catch (err) {
+          console.error(`❌ Error processing txn ${txn.id}:`, err.message);
+          results.push({ id: txn.id, error: err.message });
+        }
+      }
+  
+      return {
+        processed: pendingTransactions.length,
+        results,
+      };
+    } catch (err) {
+      console.error("❌ Error in checkRecentPendingWertTransactions:", err.message);
+      throw new Error("Failed to sync Wert transactions");
+    }
+  });
