@@ -55,3 +55,50 @@ Parse.Cloud.define("generateScInputData", async (req) => {
       signedData,
     };
   });
+
+  Parse.Cloud.define("getAOGTransactions", async (request) => {
+    const { userId, page = 1, limit = 10 } = request.params;
+  
+    if (!userId) {
+      throw new Error("userId is required");
+    }
+  
+    const AOGTransaction = Parse.Object.extend("AOGTransaction");
+  
+    const query = new Parse.Query(AOGTransaction);
+    query.equalTo("userId", userId);
+    query.descending("createdAt");
+    query.skip((page - 1) * limit);
+    query.limit(limit);
+  
+    try {
+      // Fetch total count separately
+      const countQuery = new Parse.Query(AOGTransaction);
+      countQuery.equalTo("userId", userId);
+      const totalCount = await countQuery.count({ useMasterKey: true });
+  
+      const results = await query.find({ useMasterKey: true });
+  
+      const formatted = results.map((txn) => ({
+        clickId: txn.get("clickId"),
+        walletAddress: txn.get("walletAddress"),
+        amount: txn.get("amount"),
+        status: txn.get("status"),
+        date: txn.get("date"),
+      }));
+  
+      return {
+        success: true,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+        transactions: formatted,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
