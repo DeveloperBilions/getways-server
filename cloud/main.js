@@ -7,6 +7,7 @@ async function loadModule() {
     await import('./Triggers/nowPayment.js')
     await import('./Triggers/transfiPayment.js')
     await import('./Triggers/WalletAddress.js')
+    await import('./ScInputData/generateInput.js')
 
 }
 
