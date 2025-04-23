@@ -8,6 +8,7 @@ async function loadModule() {
     await import('./Triggers/transfiPayment.js')
     await import('./Triggers/WalletAddress.js')
     await import('./ScInputData/generateInput.js')
+    await import('./WalletProcessing/wallet.js')
 
 }
 
