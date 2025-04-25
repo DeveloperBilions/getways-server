@@ -65,14 +65,14 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
     const walletAddr = user.get("walletAddr");
     if (!walletAddr) continue;
 
-    const now = new Date();
-        const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
+    // const now = new Date();
+    //     const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
-        if (txAgeInMinutes > 15) {
-          tx.set("status", 9); // Expired
-          await tx.save(null, { useMasterKey: true });
-          continue;
-        }
+    //     if (txAgeInMinutes > 15) {
+    //       tx.set("status", 9); // Expired
+    //       await tx.save(null, { useMasterKey: true });
+    //       continue;
+    //     }
     try {
       const result = await getLatestUSDCTransaction(walletAddr);
       if (result.confirmed) {
@@ -96,16 +96,16 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
           continue;
         }
 
-        if (
-          timeDiffInMinutes !== null &&
-          timeDiffInMinutes >= 10 &&
-          timeDiffInMinutes <= 15
-        ) {
+        // if (
+        //   timeDiffInMinutes !== null &&
+        //   timeDiffInMinutes >= 10 &&
+        //   timeDiffInMinutes <= 15
+        // ) {
           tx.set("status", 2);
           tx.set("transactionHash", transactionHash);
           await tx.save(null, { useMasterKey: true });
           verifiedCount++;
-        }
+        //}
       }
     } catch (err) {
       console.error(`Error verifying tx for user ${userId}:`, err.message);

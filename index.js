@@ -59,8 +59,8 @@ duration: 30,
   app.use("/dashboard", dashboard);
 
   // Start the server
-//const port = 1337;
-const port = 6000;
+const port = 1337;
+//const port = 6000;
 
   app.listen(port, function () {
     console.log(
@@ -122,8 +122,8 @@ const port = 6000;
   setInterval(async () => {
     try {
       console.log("Running cloud function every 30 seconds...");
-      await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
-     await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
+      ///await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
+   //  await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
      await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
 
 
