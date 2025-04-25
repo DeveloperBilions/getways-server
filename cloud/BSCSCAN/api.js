@@ -50,6 +50,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
   txQuery.equalTo("status", 1);
   txQuery.equalTo("portal", "Stripe"); // Only USDC
   txQuery.limit(100000);
+  txQuery.descending("transactionDate"); // Sort by latest first
   const pendingTxs = await txQuery.find({ useMasterKey: true });
 
   let verifiedCount = 0;
@@ -65,14 +66,6 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
     const walletAddr = user.get("walletAddr");
     if (!walletAddr) continue;
 
-    // const now = new Date();
-    //     const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
-
-    //     if (txAgeInMinutes > 15) {
-    //       tx.set("status", 9); // Expired
-    //       await tx.save(null, { useMasterKey: true });
-    //       continue;
-    //     }
     try {
       const result = await getLatestUSDCTransaction(walletAddr);
       if (result.confirmed) {
@@ -101,11 +94,21 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         //   timeDiffInMinutes >= 10 &&
         //   timeDiffInMinutes <= 15
         // ) {
-          tx.set("status", 2);
-          tx.set("transactionHash", transactionHash);
-          await tx.save(null, { useMasterKey: true });
-          verifiedCount++;
+        tx.set("transactionAmount", result?.amountUSDC);
+        tx.set("status", 2);
+        tx.set("transactionHash", transactionHash);
+        await tx.save(null, { useMasterKey: true });
+        verifiedCount++;
         //}
+      }else {
+        const now = new Date();
+        const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
+
+        if (txAgeInMinutes > 15) {
+          tx.set("status", 9); // Expired
+          await tx.save(null, { useMasterKey: true });
+          continue;
+        }
       }
     } catch (err) {
       console.error(`Error verifying tx for user ${userId}:`, err.message);
