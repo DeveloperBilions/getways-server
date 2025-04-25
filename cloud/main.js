@@ -9,6 +9,7 @@ async function loadModule() {
     await import('./Triggers/WalletAddress.js')
     await import('./ScInputData/generateInput.js')
     await import('./WalletProcessing/wallet.js')
+    await import('./BSCSCAN/api.js')
 
 }
 
