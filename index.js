@@ -8,6 +8,8 @@ const cron = require("node-cron");
 require("dotenv").config();
 const app = express();
 const setupSwagger = require("./cloud/swagger");
+const http = require("http");
+const httpServer = http.createServer(app);
 
 // Add CORS middleware
 app.use(cors());
@@ -62,11 +64,12 @@ duration: 30,
 const port = 1337;
 //const port = 6000;
 
-  app.listen(port, function () {
-    console.log(
-      `##### parse-server running on ${process.env.SERVER_URL} #####`
-    );
-  });
+httpServer.listen(port, () => {
+  console.log(`##### parse-server running on ${process.env.SERVER_URL} #####`);
+});
+
+// Start LiveQuery server
+ParseServer.createLiveQueryServer(httpServer);
 
   //auth flow for AOG API
   app.post("/requestToken", (req, res) => {
