@@ -11,9 +11,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@wert-io/widget-sc-signer": "^2.0.1",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.9",
     "cron": "^3.5.0",
+    "csvtojson": "^2.0.10",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
@@ -26,6 +28,7 @@
     "stripe": "^17.5.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "web3": "^1.10.0",
     "xlsx": "^0.18.5"
   }
 }

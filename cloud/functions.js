@@ -1501,7 +1501,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
       potBalance:user.get("potBalance"),
-      rechargeDisabled:user.get("rechargeDisabled")
+      rechargeDisabled:user.get("rechargeDisabled") || false
     };
   } catch (error) {
     // Handle different error types
@@ -2191,7 +2191,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   } = request.params;
 
   const method = "POST";
-  const path = `/purchase`;
+  const path = `/purchaseimmediate`;
   const bodyData = JSON.stringify({
     orderId,
     price,
@@ -2208,28 +2208,57 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   const headers = {
     "API-Key": process.env.REACT_APP_Xremit_API,
     signature: signature,
+    "Content-Type": "application/json",
   };
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
-    if (response.data && response.data.status === "success") {
+  
+    if (response.data) {
       const GiftCard = Parse.Object.extend("GiftCardHistory");
       const giftCardEntry = new GiftCard();
-
+  
       giftCardEntry.set("userId", externalUserId);
-      giftCardEntry.set("productId", productId);
+      giftCardEntry.set("productId", productId.toString());
       giftCardEntry.set("price", price);
       giftCardEntry.set("orderId", orderId);
-      giftCardEntry.set("apiResponse", response.data); // store full API response if needed
+      giftCardEntry.set("apiResponse", response.data); // Store full API response if needed
+      giftCardEntry.set("status", response.data.status); // Store full API response if needed
 
       await giftCardEntry.save(null, { useMasterKey: true });
-    }
-    return response.data;
-  } catch (error) {
-    console.error("Request Error:", error.response);
 
-    throw new Parse.Error(500, "Failed to complete purchase.");
+      
+      const Wallet = Parse.Object.extend("Wallet");
+      const walletQuery = new Parse.Query(Wallet);
+      const wallet = await walletQuery
+        .equalTo("userID", externalUserId)
+        .first({ useMasterKey: true });
+
+      if (wallet) {
+        const currentBalance = wallet.get("balance") || 0; // Get current balance
+        const newBalance = currentBalance - price; // Deduct price from balance
+
+        if (newBalance < 0) {
+          return { error: "Insufficient balance.", status: "Failed" };
+        }
+
+        wallet.set("balance", newBalance); // Update wallet balance
+        await wallet.save(null, { useMasterKey: true });
+      } else {
+        return { error: "Wallet not found.", status: "Failed" };
+      }
+    }
+  
+    // Returning response data and status
+    return { result: response.data, status: "success" };
+  } catch (error) {
+    // Log the error and return a specific error message for easier debugging
+    console.error("Request Error:", error.response.data.error || error.message.data.error);
+    return { error: error.response.data.error || error.message.data.error || "Failed Purchasing gift card " , status: "Failed" };
+
+    //throw new Parse.Error(500, `Failed to complete purchase: ${error.response.data.error || error.message.data.error }`);
   }
+  
 })
 
 Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {

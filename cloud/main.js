@@ -5,6 +5,11 @@ async function loadModule() {
     await import('./CronJob/transaction.js')
     await import('./Triggers/triggers.js')
     await import('./Triggers/nowPayment.js')
+    await import('./Triggers/transfiPayment.js')
+    await import('./Triggers/WalletAddress.js')
+    await import('./ScInputData/generateInput.js')
+    await import('./WalletProcessing/wallet.js')
+    await import('./BSCSCAN/api.js')
 
 }
 
