@@ -48,7 +48,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
 
   const txQuery = new Parse.Query(TransactionRecords);
   txQuery.equalTo("status", 1);
-  txQuery.equalTo("portal", "Stripe"); // Only USDC
+  txQuery.containedIn("portal", ["Stripe", "Coinbase"]);
   txQuery.limit(100000);
   txQuery.descending("transactionDate"); // Sort by latest first
   const pendingTxs = await txQuery.find({ useMasterKey: true });
