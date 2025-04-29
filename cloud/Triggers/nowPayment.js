@@ -738,6 +738,9 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
         if (txn.get("status") !== newStatus) {
           txn.set("status", newStatus);
           txn.set("transactionDate", new Date(order.updated_at || Date.now()));
+          if(newStatus === 10){
+            txn.set("fail_reason", order?.fail_reason);
+          }
           await txn.save(null, { useMasterKey: true });
 
           results.push({ id: txn.id, updated: true, newStatus, wertStatus });
