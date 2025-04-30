@@ -148,8 +148,8 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
     if (!walletAddr) continue;
 
     try {
-      const result = await getLatestUSDCTransaction(walletAddr);
-      if (result.confirmed && result?.txs?.from === "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43") {
+      const result = await getLatestUSDCTransactionFromEtherV2(walletAddr);
+      if (result.confirmed && result?.txs?.from === "0x1985EA6E9c68E1C272d8209f3B478AC2Fdb25c87") {
         const usdcTimestamp = result.timestamp
           ? new Date(result.timestamp)
           : null;
@@ -202,8 +202,46 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
   return { message: `Verified ${verifiedCount} USDC transactions.` };
 });
 
-// async function  getstatus(){
-//   const result = await getLatestUSDCTransaction("0xb69b947183C5a4434bB028e295947a3496e12298");
-//   console.log(result?.txs?.from,"result")
-// }
-// getstatus()
+const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
+
+  const url = `https://api.etherscan.io/v2/api`;
+  const params = {
+    module: "account",
+    action: "tokentx",
+    address: walletAddress,
+    // contractaddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
+    sort: "desc",
+    chainid:8453,
+    apikey: process.env.ETHERSCAN_API_KEY,
+  };
+
+  try {
+    const response = await axios.get(url, { params });
+    const txs = response.data.result;
+    const latestIncomingTx = txs.find(
+      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase()
+    );
+    if (latestIncomingTx) {
+      const valueInUSDC = parseFloat(latestIncomingTx.value) / 1e6;
+      const timestamp = new Date(
+        parseInt(latestIncomingTx.timeStamp) * 1000
+      ).toISOString();
+      return {
+        confirmed: true,
+        amountUSDC: valueInUSDC,
+        txHash: latestIncomingTx.hash,
+        timestamp,
+        txs:latestIncomingTx
+      };
+    } else {
+      return {
+        confirmed: false,
+        message: "No incoming USDC transaction found",
+      };
+    }
+  } catch (err) {
+    console.error("Error fetching from Etherscan:", err.message);
+    return { confirmed: false, error: err.message };
+  }
+};
+
