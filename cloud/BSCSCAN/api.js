@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
 const getLatestUSDCTransaction = async (walletAddress) => {
   const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
@@ -30,6 +31,7 @@ const getLatestUSDCTransaction = async (walletAddress) => {
         amountUSDC: valueInUSDC,
         txHash: latestIncomingTx.hash,
         timestamp,
+        txs:latestIncomingTx
       };
     } else {
       return {
@@ -48,7 +50,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
 
   const txQuery = new Parse.Query(TransactionRecords);
   txQuery.equalTo("status", 1);
-  txQuery.containedIn("portal", ["Stripe", "Coinbase"]);
+  txQuery.equalTo("portal", "Stripe");
   txQuery.limit(100000);
   txQuery.descending("transactionDate"); // Sort by latest first
   const pendingTxs = await txQuery.find({ useMasterKey: true });
@@ -68,7 +70,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
 
     try {
       const result = await getLatestUSDCTransaction(walletAddr);
-      if (result.confirmed) {
+      if (result.confirmed && result?.txs?.from === "0xCfC0F98f30742B6d880f90155d4EbB885e55aB33") {
         const usdcTimestamp = result.timestamp
           ? new Date(result.timestamp)
           : null;
@@ -98,6 +100,9 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
         await tx.save(null, { useMasterKey: true });
+        const parentUserId = await getParentUserId(userId)
+        await updatePotBalance(parentUserId, result?.amountUSDC,"recharge");
+        
         verifiedCount++;
         //}
       }else {
@@ -117,3 +122,88 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
 
   return { message: `Verified ${verifiedCount} USDC transactions.` };
 });
+
+
+Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
+  const TransactionRecords = Parse.Object.extend("TransactionRecords");
+
+  const txQuery = new Parse.Query(TransactionRecords);
+  txQuery.equalTo("status", 1);
+  txQuery.equalTo("portal", "Coinbase");
+  txQuery.limit(100000);
+  txQuery.descending("transactionDate"); // Sort by latest first
+  const pendingTxs = await txQuery.find({ useMasterKey: true });
+
+  let verifiedCount = 0;
+  for (const tx of pendingTxs) {
+    const userId = tx.get("userId");
+    const txAmount = parseFloat(tx.get("transactionAmount"));
+    const txDate = tx.get("transactionDate");
+
+    if (!userId || !txAmount) continue;
+
+    const userQuery = new Parse.Query(Parse.User);
+    const user = await userQuery.get(userId, { useMasterKey: true });
+    const walletAddr = user.get("walletAddr");
+    if (!walletAddr) continue;
+
+    try {
+      const result = await getLatestUSDCTransaction(walletAddr);
+      if (result.confirmed && result?.txs?.from === "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43") {
+        const usdcTimestamp = result.timestamp
+          ? new Date(result.timestamp)
+          : null;
+        const transactionHash = result.txHash;
+
+        const timeDiffInMinutes = usdcTimestamp
+          ? Math.abs((txDate.getTime() - usdcTimestamp.getTime()) / 60000)
+          : null;
+
+        // Check if this txHash was already recorded
+        const existingHashQuery = new Parse.Query(TransactionRecords);
+        existingHashQuery.equalTo("transactionHash", transactionHash);
+        const alreadyExists = await existingHashQuery.first({
+          useMasterKey: true,
+        });
+        if (alreadyExists) {
+          console.log(`Transaction hash already verified: ${transactionHash}`);
+          continue;
+        }
+
+        // if (
+        //   timeDiffInMinutes !== null &&
+        //   timeDiffInMinutes >= 10 &&
+        //   timeDiffInMinutes <= 15
+        // ) {
+        tx.set("transactionAmount", result?.amountUSDC);
+        tx.set("status", 2);
+        tx.set("transactionHash", transactionHash);
+        await tx.save(null, { useMasterKey: true });
+        const parentUserId = await getParentUserId(userId)
+        await updatePotBalance(parentUserId, result?.amountUSDC,"recharge");
+        
+        verifiedCount++;
+        //}
+      }else {
+        const now = new Date();
+        const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
+
+        if (txAgeInMinutes > 15) {
+          tx.set("status", 9); // Expired
+          await tx.save(null, { useMasterKey: true });
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error(`Error verifying tx for user ${userId}:`, err.message);
+    }
+  }
+
+  return { message: `Verified ${verifiedCount} USDC transactions.` };
+});
+
+// async function  getstatus(){
+//   const result = await getLatestUSDCTransaction("0xb69b947183C5a4434bB028e295947a3496e12298");
+//   console.log(result?.txs?.from,"result")
+// }
+// getstatus()

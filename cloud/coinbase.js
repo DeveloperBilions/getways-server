@@ -2,12 +2,20 @@ const { sign } = require("jsonwebtoken");
 const crypto = require("crypto");
 const axios = require("axios");
 
+const privateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEINsDgVAmtK16FamIb4ioRICfE6ZaEvNTKfP6B5FIoXoGoAoGCCqGSM49
+AwEHoUQDQgAEbhFkt0mJ94Fv4VBDPNL1+ripy6o0/StMKbTrzmD55dqfot5ttoIL
+ZvXgbwVfWZDc+CebujYV4AnAhWIl/A4ArA==
+-----END EC PRIVATE KEY-----
+`
+
+
 // Create Parse Cloud Function
 Parse.Cloud.define("getCoinbaseOnrampTransactions", async (request) => {
   try {
     // Step 1: Prepare your keys
     const key_name = "2aedc492-fd0d-453d-adb5-bbc5dfc13567"; // Example: 2aedc492-fd0d-453d-adb5-bbc5dfc13567
-    const key_secret = "-----BEGIN EC PRIVATE KEY-----\nvR0v/RHfQ6FsOaqLjC56q3dktb4//2EtkCnl1mPLOEEddM+Tnu2CY/8h5R1CruT/+2YEXTuEQHVPu/F7eP/ICg==\n-----END EC PRIVATE KEY-----\n"; // Your private key (PEM encoded or base64 decoded)
+    const key_secret = "vR0v/RHfQ6FsOaqLjC56q3dktb4//2EtkCnl1mPLOEEddM+Tnu2CY/8h5R1CruT/+2YEXTuEQHVPu/F7eP/ICg=="; // Your private key (PEM encoded or base64 decoded)
     const client_api_key = "XGbFS7Q4CdFwBqTDCKKZAZ9MUeGOQayn"; // optional if you need it later
 
     // Coinbase URL components
@@ -26,7 +34,7 @@ Parse.Cloud.define("getCoinbaseOnrampTransactions", async (request) => {
         sub: key_name,
         uri,
       },
-      key_secret,
+      privateKey,
       {
         algorithm: "ES256",
         header: {

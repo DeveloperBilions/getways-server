@@ -666,14 +666,11 @@ Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
 });
 
 Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
-  const THIRTY_MINUTES_AGO = new Date(Date.now() - 30 * 60 * 1000);
-
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Only pending records
     query.notEqualTo("portal", "stripe");
     query.limit(10000);
-    query.greaterThanOrEqualTo("updatedAt", THIRTY_MINUTES_AGO);
     query.descending("updatedAt");
 
     const pendingTransactions = await query.find({ useMasterKey: true });
@@ -681,6 +678,8 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 
     for (const txn of pendingTransactions) {
       const orderId = txn.get("transactionIdFromStripe");
+      const userId = txn.get("userId");
+      const transactionAmount = txn.get("transactionAmount");
 
       if (!orderId) {
         results.push({ id: txn.id, skipped: true, reason: "Missing transactionIdFromStripe" });
@@ -740,6 +739,11 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
           txn.set("transactionDate", new Date(order.updated_at || Date.now()));
           if(newStatus === 10){
             txn.set("fail_reason", order?.fail_reason);
+          }
+          if(newStatus === 2){
+            const parentUserId = await getParentUserId(userId)
+            await updatePotBalance(parentUserId, transactionAmount,"recharge");
+          
           }
           await txn.save(null, { useMasterKey: true });
 
