@@ -149,7 +149,7 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
 
     try {
       const result = await getLatestUSDCTransactionFromEtherV2(walletAddr);
-      if (result.confirmed && result?.txs?.from === "0x1985EA6E9c68E1C272d8209f3B478AC2Fdb25c87") {
+      if (result.confirmed && result?.txs?.from === "0x1985ea6e9c68e1c272d8209f3b478ac2fdb25c87") {
         const usdcTimestamp = result.timestamp
           ? new Date(result.timestamp)
           : null;
