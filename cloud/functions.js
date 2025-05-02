@@ -2283,3 +2283,97 @@ Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {
     throw new Parse.Error(500, "Failed to save callback gift card data.");
   }
 });
+Parse.Cloud.define("sendCheckbookPayment", async (request) => {
+  const { amount, email, name, description } = request.params;
+
+  if (!amount || !email || !name || !description) {
+    throw new Error("Missing required fields.");
+  }
+
+  const user = request.user;
+  if (!user) {
+    throw new Error("User not authenticated.");
+  }
+
+  const number = `${Date.now()}`;
+
+  try {
+    const payload = {
+      amount: parseFloat(amount),
+      deposit_options: ["PRINT"],
+      description,
+      name,
+      number,
+      recipient: email,
+    };
+    console.log("Sending Checkbook payload:", payload);
+
+    // 🔁 Call Checkbook API
+    const response = await fetch("https://api.checkbook.io/v3/check/digital", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "a5e3acd961a04d5aaba30475f84f5c20:roRCkg6IkwuVhj2an2LQrzKppn93iw",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.error || "Payment API failed.");
+    }
+
+    // 🧾 Create Transaction Record
+    const Transaction = Parse.Object.extend("TransactionRecords");
+    const txn = new Transaction();
+
+    txn.set("status", 12);
+    txn.set("userId", user.id);
+    txn.set("username", user.get("username"));
+    txn.set("userParentId", user.get("userParentId") || "");
+    txn.set("type", "redeem");
+    txn.set("transactionAmount", parseFloat(amount));
+    txn.set("gameId", "786");
+    txn.set("transactionDate", new Date());
+    txn.set("transactionIdFromStripe", number);
+    txn.set("checkbookResponse", data);
+    txn.set("recipientName", name);
+    txn.set("paymentDescription", description);
+    txn.set("isCashOut", true);
+
+    await txn.save(null, { useMasterKey: true });
+
+    // 💰 Update Wallet
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    walletQuery.equalTo("userID", user.id);
+    const wallet = await walletQuery.first({ useMasterKey: true });
+
+    if (!wallet) {
+      throw new Error("Wallet not found.");
+    }
+
+    const currentBalance = wallet.get("balance") || 0;
+    const newBalance = currentBalance - parseFloat(amount);
+
+    if (newBalance < 0) {
+      throw new Error("Insufficient wallet balance.");
+    }
+
+    wallet.set("balance", newBalance);
+    await wallet.save(null, { useMasterKey: true });
+
+    return {
+      success: true,
+      message: "Check sent successfully.",
+      checkbookResponse: data,
+    };
+  } catch (error) {
+    console.error("Cloud Function Error:", error);
+     return {
+      success: false,
+      message: error.message || "Something went wrong." 
+    };
+  }
+});

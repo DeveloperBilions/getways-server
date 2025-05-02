@@ -122,23 +122,23 @@ ParseServer.createLiveQueryServer(httpServer);
   // callReadExcelFile();
 
   // Runs every 30 seconds to perform rapid checks and updates on transactions:
-  setInterval(async () => {
-    try {
-      console.log("Running cloud function every 30 seconds...");
-      ///await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
-     await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
-     await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
-     await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
+  // setInterval(async () => {
+  //   try {
+  //     console.log("Running cloud function every 30 seconds...");
+  //     ///await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
+  //    await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
+  //    await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
+  //    await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
 
      
 
-    //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
-    //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
-    //  await Parse.Cloud.run("expireOldTransfiTransactions")
-    } catch (error) {
-      console.error("Error running cloud function:", error);
-    }
-  }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
+  //   //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+  //   //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
+  //   //  await Parse.Cloud.run("expireOldTransfiTransactions")
+  //   } catch (error) {
+  //     console.error("Error running cloud function:", error);
+  //   }
+  // }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
 
   // Runs every 10 minutes to handle potentially expired transactions:
   // setInterval(async () => {
@@ -215,13 +215,13 @@ ParseServer.createLiveQueryServer(httpServer);
   // Call the function to schedule the cron task
   scheduleTask();
 
-  cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
-    try {
-      await Parse.Cloud.run("cleanupReferralLink");
-    } catch (error) {
-      console.error("Error executing cloud function:", error);
-    }
-  });
+//   cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
+//     try {
+//       await Parse.Cloud.run("cleanupReferralLink");
+//     } catch (error) {
+//       console.error("Error executing cloud function:", error);
+//     }
+//   });
 
   cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
     try {
