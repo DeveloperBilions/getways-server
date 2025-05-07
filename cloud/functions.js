@@ -3,9 +3,17 @@ const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
 const { getParentUserId, updatePotBalance } = require("./utility/utlis");
-const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
+const {
+  validateCreateUser,
+  validateUpdateUser,
+} = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
@@ -76,7 +84,7 @@ Parse.Cloud.define("createUser", async (request) => {
     if (!role) {
       throw new Parse.Error(404, "Role not found");
     }
-    
+
     // Create a new Parse User
     const user = new Parse.User();
     user.set("username", username);
@@ -102,7 +110,7 @@ Parse.Cloud.define("createUser", async (request) => {
     relation.add(user);
     await role.save(null, { useMasterKey: true });
 
-    return { code:200,success: true, message: "User created successfully!" };
+    return { code: 200, success: true, message: "User created successfully!" };
   } catch (error) {
     // Handle different error types
     if (error instanceof Parse.Error) {
@@ -133,7 +141,7 @@ Parse.Cloud.define("updateUser", async (request) => {
       email,
       password,
     };
-  
+
     const validatorResponse = validateUpdateUser(validatorData);
     if (!validatorResponse.isValid) {
       throw new Parse.Error(400, validatorResponse.errors);
@@ -581,7 +589,6 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     redeemServiceFee,
   } = request.params;
 
-  
   try {
     const validatorResponse = validatePositiveNumber(transactionAmount);
     if (!validatorResponse.isValid) {
@@ -598,7 +605,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         status: "error",
         message: "Amount should be a positive number greater than 0",
       };
-    }    
+    }
     // Step 1: Fetch the user's wallet
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
@@ -621,7 +628,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
     const parentUserId = await getParentUserId(id);
 
     if (parentUserId) {
-      await updatePotBalance(parentUserId, transactionAmount,"redeem");
+      await updatePotBalance(parentUserId, transactionAmount, "redeem");
     }
     // Step 4: Save the transaction record
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
@@ -707,7 +714,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
         message: "User Information are not correct",
       };
     }
-     if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
+    if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
       return {
         status: "error",
         message: "Amount should be a positive number greater than 0",
@@ -763,7 +770,6 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
     transactionDetails.set("paymentMethodType", paymentMethodType);
     transactionDetails.set("walletId", walletId);
 
-
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", id);
     const user = await userQuery.first({ useMasterKey: true });
@@ -777,7 +783,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       console.log(wallet, "wallet  ");
       if (wallet) {
         const currentBalance = wallet.get("balance") || 0;
-        if(currentBalance < transactionAmount){
+        if (currentBalance < transactionAmount) {
           return {
             status: "error",
             message: "Insufficient balance in wallet",
@@ -894,8 +900,12 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
     const parentUserId = await getParentUserId(userId);
 
     if (parentUserId) {
-      const result = await updatePotBalance(parentUserId, transactionAmount, "redeem");
-    
+      const result = await updatePotBalance(
+        parentUserId,
+        transactionAmount,
+        "redeem"
+      );
+
       if (!result.success) {
         console.error("Pot balance update failed:", result.message);
         return {
@@ -997,7 +1007,6 @@ Parse.Cloud.define("coinsCredit", async (request) => {
     }
   }
 });
-
 
 Parse.Cloud.define("caseInsensitiveLogin", async (request) => {
   const { email, password } = request.params;
@@ -1147,7 +1156,10 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
   const { roleName, currentusr } = request.params;
 
   if (!Array.isArray(roleName) || roleName.length === 0) {
-    throw new Parse.Error(400, "Role names array is required and must not be empty");
+    throw new Parse.Error(
+      400,
+      "Role names array is required and must not be empty"
+    );
   }
 
   try {
@@ -1209,7 +1221,6 @@ Parse.Cloud.define("getUsersByRole", async (request) => {
   }
 });
 
-
 Parse.Cloud.define("referralUserCheck", async (request) => {
   const { userReferralCode } = request.params;
   try {
@@ -1257,8 +1268,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
   const { userReferralCode, username, name, phoneNumber, email, password } =
     request.params;
 
-    
-    try {
+  try {
     const validatorData = {
       username,
       name,
@@ -1266,7 +1276,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
       email,
       password,
     };
-  
+
     const validatorResponse = validateCreateUser(validatorData);
     if (!validatorResponse.isValid) {
       throw new Parse.Error(400, validatorResponse.errors);
@@ -1485,7 +1495,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("rechargeLimit");
     query.select("isReedeemZeroAllowed");
     query.select("potBalance");
-    query.select("rechargeDisabled")
+    query.select("rechargeDisabled");
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1500,8 +1510,8 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
-      potBalance:user.get("potBalance"),
-      rechargeDisabled:user.get("rechargeDisabled") || false
+      potBalance: user.get("potBalance"),
+      rechargeDisabled: user.get("rechargeDisabled") || false,
     };
   } catch (error) {
     // Handle different error types
@@ -2140,12 +2150,12 @@ async function sendEmailNotification(username, transactionAmount) {
   }
 }
 
-const crypto = require('crypto');
-const axios = require('axios');
+const crypto = require("crypto");
+const axios = require("axios");
 
-const generateSignature = (method, path, body = '') => {
+const generateSignature = (method, path, body = "") => {
   const dataToHash = `${method}${path}${process.env.REACT_APP_Xremit_API_SECRET}${body}`;
-  return crypto.createHash('sha256').update(dataToHash).digest('hex');
+  return crypto.createHash("sha256").update(dataToHash).digest("hex");
 };
 
 Parse.Cloud.define("fetchGiftCards", async (request) => {
@@ -2154,7 +2164,9 @@ Parse.Cloud.define("fetchGiftCards", async (request) => {
   const perPage = request.params.perPage || 50; // Default if not passed
 
   const method = "GET";
-  const path = `/brands/country/USA?currentPage=${currentPage}&perPage=${perPage}&textSearch=${encodeURIComponent(searchTerm)}`;
+  const path = `/brands/country/USA?currentPage=${currentPage}&perPage=${perPage}&textSearch=${encodeURIComponent(
+    searchTerm
+  )}`;
   const signature = generateSignature(method, path);
 
   const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
@@ -2213,11 +2225,11 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
-  
+
     if (response.data) {
       const GiftCard = Parse.Object.extend("GiftCardHistory");
       const giftCardEntry = new GiftCard();
-  
+
       giftCardEntry.set("userId", externalUserId);
       giftCardEntry.set("productId", productId.toString());
       giftCardEntry.set("price", price);
@@ -2227,7 +2239,6 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
       await giftCardEntry.save(null, { useMasterKey: true });
 
-      
       const Wallet = Parse.Object.extend("Wallet");
       const walletQuery = new Parse.Query(Wallet);
       const wallet = await walletQuery
@@ -2248,18 +2259,26 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
         return { error: "Wallet not found.", status: "Failed" };
       }
     }
-  
+
     // Returning response data and status
     return { result: response.data, status: "success" };
   } catch (error) {
     // Log the error and return a specific error message for easier debugging
-    console.error("Request Error:", error.response.data.error || error.message.data.error);
-    return { error: error.response.data.error || error.message.data.error || "Failed Purchasing gift card " , status: "Failed" };
+    console.error(
+      "Request Error:",
+      error.response.data.error || error.message.data.error
+    );
+    return {
+      error:
+        error.response.data.error ||
+        error.message.data.error ||
+        "Failed Purchasing gift card ",
+      status: "Failed",
+    };
 
     //throw new Parse.Error(500, `Failed to complete purchase: ${error.response.data.error || error.message.data.error }`);
   }
-  
-})
+});
 
 Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {
   const callbackData = request.params; // This contains the POST data sent by xRemit
@@ -2313,7 +2332,8 @@ Parse.Cloud.define("sendCheckbookPayment", async (request) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "a5e3acd961a04d5aaba30475f84f5c20:roRCkg6IkwuVhj2an2LQrzKppn93iw",
+        Authorization:
+          "a5e3acd961a04d5aaba30475f84f5c20:roRCkg6IkwuVhj2an2LQrzKppn93iw",
       },
       body: JSON.stringify(payload),
     });
@@ -2371,9 +2391,37 @@ Parse.Cloud.define("sendCheckbookPayment", async (request) => {
     };
   } catch (error) {
     console.error("Cloud Function Error:", error);
-     return {
+    return {
       success: false,
-      message: error.message || "Something went wrong." 
+      message: error.message || "Something went wrong.",
+    };
+  }
+});
+
+Parse.Cloud.define("chatbot", async (request) => {
+  try {
+    const { message } = request.params;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a helpful AI assistant." },
+        { role: "user", content: message },
+      ],
+      max_tokens: 150,
+      temperature: 0.7,
+    });
+
+    const reply = response.choices[0].message.content;
+    return {
+      success: true,
+      data: reply,
+    };
+  } catch (error) {
+    console.error("Cloud Function Error:", error);
+    return {
+      success: false,
+      message: error.message || "Something went wrong.",
     };
   }
 });
