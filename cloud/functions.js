@@ -2227,7 +2227,26 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
       await giftCardEntry.save(null, { useMasterKey: true });
 
-      
+      const userQuery = new Parse.Query(Parse.User);
+      const user = await userQuery.get(externalUserId, { useMasterKey: true });
+
+      // 🧾 Create Transaction Record
+      const Transaction = Parse.Object.extend("TransactionRecords");
+      const txn = new Transaction();
+
+      txn.set("status", 12);
+      txn.set("userId", user.id);
+      txn.set("username", user.get("username"));
+      txn.set("userParentId", user.get("userParentId") || "");
+      txn.set("type", "redeem");
+      txn.set("transactionAmount", parseFloat(price));
+      txn.set("gameId", "786");
+      txn.set("transactionDate", new Date());
+      txn.set("transactionIdFromStripe", orderId);
+      txn.set("isCashOut", true);
+
+      await txn.save(null, { useMasterKey: true });
+
       const Wallet = Parse.Object.extend("Wallet");
       const walletQuery = new Parse.Query(Wallet);
       const wallet = await walletQuery

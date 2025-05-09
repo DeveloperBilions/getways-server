@@ -245,3 +245,124 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
   }
 };
 
+
+// Parse.Cloud.define("getUserUSDCBalances", async (request) => {
+//   const limit = request.params.limit || 1000;
+//   const skip = request.params.skip || 0;
+
+//   const query = await new Parse.Query(Parse.User)
+//   .exists("walletAddr")
+//   .limit(10000);
+
+//   const users = await query.find({ useMasterKey: true });
+//   const results = [];
+
+//   for (const user of users) {
+//     const walletAddr = user.get("walletAddr");
+//     const userId = user.id;
+
+//     try {
+//       const balance = await getUSDCBalance(walletAddr);
+//       results.push({
+//         userId,
+//         walletAddr,
+//         usdcBalance: balance,
+//       });
+//     } catch (err) {
+//       console.error(`Failed to get USDC balance for ${walletAddr}:`, err.message);
+//       results.push({
+//         userId,
+//         walletAddr,
+//         error: err.message,
+//       });
+//     }
+//   }
+
+//   return results;
+// });
+
+// const getUSDCBalance = async (walletAddress) => {
+//   const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Ethereum USDC
+//   const url = `https://api.basescan.org/api`;
+// const params = {
+//   module: "account",
+//   action: "balance",
+//   address: walletAddress,
+//   tag:"latest",
+//   apikey: process.env.BASESCAN_API_KEY,
+// };
+
+//   try {
+//     const response = await axios.get(url, { params });
+//     const rawBalance = response.data.result;
+//     return parseFloat(rawBalance) / 1e6; // USDC has 6 decimals
+//   } catch (err) {
+//     throw new Error("Failed to fetch USDC balance");
+//   }
+// };
+
+
+
+Parse.Cloud.define("getUserBaseBalances", async (request) => {
+  const limit = request.params.limit || 1000;
+  const skip = request.params.skip || 0;
+
+  const query = new Parse.Query(Parse.User);
+  query.exists("walletAddr");
+  query.limit(limit);
+  query.skip(skip);
+
+  const users = await query.find({ useMasterKey: true });
+
+  const addressToUserMap = {};
+  const addresses = [];
+
+  for (const user of users) {
+    const wallet = user.get("walletAddr");
+    if (wallet) {
+      const lowerWallet = wallet.toLowerCase();
+      addressToUserMap[lowerWallet] = user.id;
+      addresses.push(lowerWallet);
+    }
+  }
+
+  const chunks = chunkArray(addresses, 20); // BaseScan limit = 20 per request
+  const results = [];
+
+  for (const batch of chunks) {
+    try {
+      const response = await axios.get("https://api.basescan.org/api", {
+        params: {
+          module: "account",
+          action: "balancemulti",
+          address: batch.join(","),
+          tag: "latest",
+          apikey: process.env.bscScan_API,
+        },
+      });
+
+      const balances = response?.data?.result || [];
+      console.log(balances,"balances")
+      for (const entry of balances) {
+        const wallet = entry.account?.toLowerCase();
+        const userId = addressToUserMap[wallet];
+        const balance = parseFloat(entry.balance) / 1e18;
+
+        results.push({ userId, walletAddr: wallet, baseBalance: balance });
+      }
+    } catch (err) {
+      console.error("Error calling balancemulti:", err.message);
+    }
+  }
+
+  return results;
+});
+
+// Utility to chunk large arrays into batches of 20
+function chunkArray(arr, size) {
+  const result = [];
+  for (let i = 0; i < arr.length; i += size) {
+    result.push(arr.slice(i, i + size));
+  }
+  return result;
+}
