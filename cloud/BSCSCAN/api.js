@@ -219,7 +219,7 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
     const response = await axios.get(url, { params });
     const txs = response.data.result;
     const latestIncomingTx = txs.find(
-      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase()
+      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase() && tx.tokenSymbol === 'USDC'
     );
     if (latestIncomingTx) {
       const valueInUSDC = parseFloat(latestIncomingTx.value) / 1e6;
