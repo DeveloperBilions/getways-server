@@ -40,10 +40,15 @@ const chatbotDescription = (role = "Player") => {
             - Some gift cards have no expiry date
                 
             Recharge Options:
-            - Quick Debit Recharge
-              - Launches Coinbase Onramp widget for quick USDC payment
-            - Instant Recharge
-            - Standard Recharge
+            1. Quick Debit Recharge (Coinbase Onramp):
+              - Looking for a fast and secure way to recharge? Use Quick Debit Recharge to instantly top up your account using your debit card via Coinbase. Your transaction will be safely tracked. Please ensure pop-ups are allowed in your browser!
+
+            2. Instant Recharge (Stripe/Wallet):
+              - Choose Instant Recharge for a seamless top-up experience. You can recharge via your linked Wallet or through our Payment Portal. It’s quick, safe, and perfect for verified users. Just select your method, add a note, and proceed.
+
+            3. Standard Recharge (External Link):
+              - Use Standard Recharge if you'd like to complete your payment through an external crypto platform. Simply copy your wallet address and proceed to the link we provide. This option offers flexibility, but make sure you send the exact amount to the correct wallet address to avoid delays.
+
             - Multiple denomination options: 10, 15, 20, 30, 40, 50, 75, 100
             - Payment portal integration with dropdown to select payment method
             - Users can add a transaction note during recharge
@@ -92,14 +97,14 @@ const chatbotDescription = (role = "Player") => {
             - Optional: Tick “Remember me” to stay logged in on the device.
             - Players cannot sign up directly.
             - If a user enters an invalid password 5 times in a row, their account will be temporarily locked.
-                - Error displayed: **"Login Failed: Your account is locked due to multiple failed login attempts. Please try again after 30 min."**
+                - Error displayed: "Login Failed: Your account is locked due to multiple failed login attempts. Please try again after 30 min."
                 
             Profile Menu Features:
             - Click the profile icon at the top right of the screen to open a dropdown menu.
             - The dropdown includes three options:
-              1. **Change Password** – Opens a form where you can change your current password by entering your old password and the new one.
-              2. **Help Video** – Opens a page that provides videos for help with login and sign-in. Only pre-registered users with a shared sign-in form Refferal Link from an agent can use this feature.
-              3. **Logout** – Logs you out of your session immediately.
+              1. Change Password – Opens a form where you can change your current password by entering your old password and the new one.
+              2. Help Video – Opens a page that provides videos for help with login and sign-in. Only pre-registered users with a shared sign-in form Refferal Link from an agent can use this feature.
+              3. Logout – Logs you out of your session immediately.
                 
             Frequently Asked Questions:
             - How do I recharge my account? Use one of three methods: Quick Debit, Instant, or Standard Recharge.
@@ -120,9 +125,16 @@ const chatbotDescription = (role = "Player") => {
             `;
   } else if (role === "Master-Agent") {
     return `
-          **Master Agent Section:**
+          GETWAYS Master Agent Information:
 
-          - **User Management:**
+          General Features:
+          - The Master Agent section of the GETWAYS platform is designed for overseeing Agents and Players, managing their activities, and accessing detailed records.
+          - Key functionalities include User Management, Recharge Records, Redeem Records, Summary, and Profile Options.
+          - Master Agents can create and manage Agents, perform actions like recharges and redeems for Players, view transaction records, export data, and monitor a combined balance of all users under them.
+
+          Master Agent Section:
+
+          - User Management:
             - View and manage a list of all Agents and Players under you, including User Name, Email, Parent User, User Type, and Date.
             Create a new Agent using the "Add New User" option.
             - Filter Agents and Players by Name and Username.
@@ -143,17 +155,17 @@ const chatbotDescription = (role = "Player") => {
               - Edit - Edit Player details.
               - Delete - Delete Player details.
 
-          - **Recharge Records:**
+          - Recharge Records:
             - View a list of all Recharge Records for Agents and Players under you.
             - Filter by Account, Status, and Mode.
             - Export data in PDF and Excel formats.
 
-          - **Redeem Records:**
+          - Redeem Records:
             - View a list of all Redeem Records for Agents and Players under you.
             - Filter by Account and Status.
             - Export data in PDF and Excel formats.
 
-          - **Summary:**
+          - Summary:
             - View a detailed summary with date-wise filtering.
             - Search for specific Agents or Players under you by name.
             - Summary includes:
@@ -164,18 +176,77 @@ const chatbotDescription = (role = "Player") => {
               - Pending Recharges 
               - Failed Redeems 
 
-              **Profile Options:**
+              Profile Options:
             - Access the following options by selecting the profile icon in the top right:
-            - **Change Password:** Master Agent can change their account password where popup will be shown. 
-            - **Recharge Limit:** Set Recharge Limits for Players and Agents under you.
-            - **Help Videos:** Watch videos to learn about Login and Sign Up processes.
-            - **Logout:** Log out of the Master Agent account.
+            - Change Password: Master Agent can change their account password where popup will be shown. 
+            - Recharge Limit: Set Recharge Limits for Players and Agents under you.
+            - Help Videos: Watch videos to learn about Login and Sign Up processes.
+            - Logout: Log out of the Master Agent account.
 
-          - **Additional Information:**
+          - Additional Information:
             - Master Agent Balance is Shown near on top right side near to Profile icon
               The balance displayed reflects the combined balance of all Agents under you and all Players under those Agents.
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete. for agent and 
+              -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
+          `;
+  } else if (role === "Agent") {
+    return `
+          GETWAYS Agent Information:
+
+          General Features:
+          - The Agent section of the GETWAYS platform enables Agents to manage Players, oversee their transactions, and access detailed records.
+          - Key functionalities include User Management, Recharge Records, Redeem Records, Summary, and Profile Options.
+          - Agents can create Players, generate referral links, perform actions like recharges and redeems, view transaction records, export data, and monitor the combined balance of all Players under them.
+          Agent Section:
+
+          - User Management:
+            - View and manage a list of Players under you, including User Name, Email, Parent User, User Type, and Date.
+            Create Referral Link for Players. Using this link, Players can sign up and be linked to the Agent.
+            Create a new Players using the "Add New User" option.
+            - Filter Players by Email and Username.
+            - For Players under you (accessible by clicking the "Actions" button in the table):
+              - Redeem - Perform Redeem actions.
+              - Recharge - Perform Recharge actions.
+              - Wallet - View Wallet Details (in that can see availabe balance and payment methods and cashout status).
+              - View Key - Can Copy Wallet Address of Player.
+              - BaseScan - Access BaseScan for transaction details.
+              - EtherScan - Access EtherScan for transaction details.
+              - Edit - Edit Player details.
+              - Delete - Delete Player details.
+
+          - Recharge Records:
+            - View a list of all Recharge Records for Players under you.
+            - Filter by Account, Status, and Mode.
+            - Export data in PDF and Excel formats.
+
+          - Redeem Records:
+            - View a list of all Redeem Records for Players under you.
+            - Filter by Account and Status.
+            - Export data in PDF and Excel formats.
+
+          - Summary:
+            - View a detailed summary with date-wise filtering.
+            - Search for specific Players under you by name.
+            - Summary includes:
+              - Total number of users
+              - Total Recharges
+              - Total Redeems 
+              - Pending Recharges 
+              - Failed Redeems 
+
+              Profile Options:
+            - Access the following options by selecting the profile icon in the top right:
+            - Change Password: Agent can change their account password where popup will be shown. 
+            - Recharge Limit: Set Recharge Limits for Players under you.
+            - Help Videos: Watch videos to learn about Login and Sign Up processes.
+            - Logout: Log out of the Agent account.
+
+          - Additional Information:
+            - Agent Balance is Shown near on top right side near to Profile icon
+              The balance displayed reflects the combined balance of all Players under those Agents.
+            - Flow - User Management (Tab) 
+              -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete.
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
           `;
   }
