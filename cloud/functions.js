@@ -2184,6 +2184,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
     orderId,
     price,
     productId,
+    productImage,
     externalUserId,
     externalUserFirstName,
     externalUserLastName,
@@ -2220,6 +2221,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   
       giftCardEntry.set("userId", externalUserId);
       giftCardEntry.set("productId", productId.toString());
+      giftCardEntry.set("productImage", productImage)
       giftCardEntry.set("price", price);
       giftCardEntry.set("orderId", orderId);
       giftCardEntry.set("apiResponse", response.data); // Store full API response if needed
