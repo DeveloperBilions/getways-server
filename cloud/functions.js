@@ -2244,6 +2244,8 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
       txn.set("transactionDate", new Date());
       txn.set("transactionIdFromStripe", orderId);
       txn.set("isCashOut", true);
+      txn.set("paymentMode", "GiftCard");
+      
 
       await txn.save(null, { useMasterKey: true });
 
