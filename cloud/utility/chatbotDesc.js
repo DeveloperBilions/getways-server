@@ -302,6 +302,65 @@ const chatbotDescription = (role = "Player") => {
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete.
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
           `;
+  } else if (role === "Super-User") {
+    return `
+            Super-User Section:
+
+            User Management:
+
+            - View and manage a list of all users in the system, including columns for User Name, Email, Parent User, User Type (Player, Agent, Master Agent, Super-User), and Date.
+            - Create a new user using the "Add New User" option, which opens a dialog with the following fields:
+              - Name
+              - Username
+              - Phone Number
+              - Email
+              - User Type (options: Master Agent, Agent, Player)
+              - Parent Type (options: Agents, Master Agents, Super User)
+              - Password
+              - Confirm Password
+
+            - Filter users with the following options:
+              - Search By: Username, Email, or Parent Name.
+              - Role: Player, Agents, Master Agents, or Super User.
+
+            - Actions for each Agent and Master Agent (accessible by clicking the "Actions" button in the table):
+              - Disable Recharge: Opens a dialog with the message "Are you sure you want to disable recharge for user ?" and two buttons: "Disable" and "Cancel".
+              - Recharge Limit: Opens a dialog with a toggle to enable/disable Recharge Limit Restriction. If enabled, fields for Monthly Recharge Limit and Daily Recharge Limit are available. Includes two buttons: "Save" and "Cancel".
+              - Redeem Service Fee: Opens a dialog to set the Redeem Service Fee for the Agent, with toggles for "Allow Agent to change Redeem Service?" and "Allow Agent to Add 0 Redeem Service?". Includes two buttons: "Confirm" and "Cancel".
+              - Password Permission: Opens a dialog with a checkbox for "Allow the Agent to set or reset their Player's password." Includes two buttons: "Save Changes" and "Cancel".
+              - Drawer: Performs an action related to the Agent’s drawer (specific details to be confirmed).
+              - Edit: Opens a dialog to edit the Agent’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
+              - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
+
+            - Actions for each Player (accessible by clicking the "Actions" button in the table):
+              - Redeem: Performs Redeem actions for the Player (specific details to be confirmed).
+              - Recharge: Performs Recharge actions for the Player (specific details to be confirmed).
+              - Wallet: Displays Wallet Details, including available balance, payment methods, and cashout status.
+              - View Key: Allows copying the Player’s wallet address.
+              - BaseScan: Provides access to BaseScan for the Player’s transaction details.
+              - EtherScan: Provides access to EtherScan for the Player’s transaction details.
+              - Edit: Opens a dialog to edit the Player’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
+              - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
+              - Blacklist User: Opens a dialog with the message "Are you sure you want to blacklist the user {username}? This action cannot be undone." Includes two buttons: "Confirm" and "Cancel".
+
+              Profile Options
+              - Access the following options by selecting the profile icon in the top-right corner:
+              - Global Recharge & Cashout Settings:
+                - Enable Recharge (Global): Toggle switch to enable or disable recharges for all Agents and Players globally.
+                - Enable Cashout (Global): Toggle switch to enable or disable cashouts for all Agents and Players globally.
+                - Note: If a Super User disables Recharge and Cashout for a specific Agent, the Recharge and Cashout functionality is also disabled for all Players under that Agent.
+              - Manage Payment Methods:
+                - Displays a list of payment methods (e.g., CashApp, PayPal, Venmo, Zelle).
+                - Each method has a toggle switch.
+                - Super User can enable or disable each payment method using the toggle switch.
+              - Manage Emergency Messages:
+                - Super User can compose multiple emergency messages in a text area.
+                - Messages are sent to all Agents and Master Agents under the Super User.
+              - Help Videos:
+                - Watch videos to learn about Login and Sign-Up processes.
+              - Logout:
+                - Log out of the Master Agent account.
+          `;
   }
 };
 
