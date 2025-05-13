@@ -198,61 +198,110 @@ Parse.Cloud.define("getCoinbaseUserTransactionsByRef", async (request) => {
 });
 
 Parse.Cloud.define("verifyCoinbaseTransactionByPartnerRef", async (request) => {
-  
+  const { partnerUserRef } = request.params;
   const TransactionRecords = Parse.Object.extend("TransactionRecords");
-  const txQuery = new Parse.Query(TransactionRecords);
-  //txQuery.equalTo("partnerUserRef", partnerUserRef);
-  txQuery.equalTo("portal", "Coinbase");
-  txQuery.equalTo("status", 1); // pending
-
-  const transaction = await txQuery.first({ useMasterKey: true });
-
-  if (!transaction) throw new Error("No matching pending Coinbase transaction found");
-
-  const transactionDate = transaction.get("transactionDate");
   const now = new Date();
 
-  const minutesSince = (now - transactionDate) / (1000 * 60);
+  // Step 1: Check the currently pending transaction
+  const pendingQuery = new Parse.Query(TransactionRecords);
+  pendingQuery.equalTo("portal", "Coinbase");
+  pendingQuery.equalTo("status", 1); // pending
+  pendingQuery.equalTo("partnerUserRef", partnerUserRef);
 
-  // Step 1: Expire old transactions
-  if (minutesSince > 30) {
-    transaction.set("status", 9); // expired
-    transaction.set("remark", "Expired after 30 mins with no success");
-    await transaction.save(null, { useMasterKey: true });
-    return { status: "expired", partnerUserRef };
+  const pendingTx = await pendingQuery.first({ useMasterKey: true });
+
+  if (pendingTx) {
+    const transactionDate = pendingTx.get("transactionDate");
+    const minutesSince = (now - transactionDate) / (1000 * 60);
+
+    if (minutesSince > 30) {
+      pendingTx.set("status", 9); // expired
+      pendingTx.set("failed_reason", "Expired after 30 mins with no success");
+      await pendingTx.save(null, { useMasterKey: true });
+      return { status: "expired", partnerUserRef };
+    }
+
+    // Check live status from Coinbase
+    try {
+      const result = await Parse.Cloud.run("getCoinbaseUserTransactionsByRef", { partnerUserRef });
+      const coinbaseTxs = result?.data || [];
+
+      if (coinbaseTxs.length === 0) {
+        return { status: "no_activity", message: "No transactions yet in Coinbase" };
+      }
+
+      const latestTx = coinbaseTxs[0];
+      const coinbaseStatus = latestTx.status;
+
+      if (coinbaseStatus === "ONRAMP_TRANSACTION_STATUS_FAILED") {
+        pendingTx.set("status", 10); // failed
+        pendingTx.set("failed_reason", latestTx.failure_reason || "Coinbase marked as failed");
+        await pendingTx.save(null, { useMasterKey: true });
+        return { status: "failed", reason: latestTx.failure_reason };
+      }
+
+      return {
+        status: "pending_or_successful",
+        coinbaseStatus,
+        message: "No action taken. Transaction is still in progress or succeeded externally.",
+      };
+    } catch (err) {
+      console.error("Coinbase fetch failed:", err.message);
+      throw new Error("Unable to fetch Coinbase transaction status");
+    }
   }
 
-  // Step 2: Fetch Coinbase transaction status
-  try {
-    const result = await Parse.Cloud.run("getCoinbaseUserTransactionsByRef", {
-      partnerUserRef,
-    });
+  // Step 2: No pending tx found — check if it expired in last 24 hours
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const expiredQuery = new Parse.Query(TransactionRecords);
+  expiredQuery.equalTo("portal", "Coinbase");
+  expiredQuery.equalTo("status", 9); // expired
+  expiredQuery.equalTo("partnerUserRef", partnerUserRef);
+  expiredQuery.greaterThan("updatedAt", yesterday);
 
+  const expiredTx = await expiredQuery.first({ useMasterKey: true });
+
+  if (!expiredTx) {
+    throw new Error("No matching Coinbase transaction found (pending or recently expired)");
+  }
+
+  // Retry Coinbase status check for expired tx
+  try {
+    const result = await Parse.Cloud.run("getCoinbaseUserTransactionsByRef", { partnerUserRef });
     const coinbaseTxs = result?.data || [];
 
     if (coinbaseTxs.length === 0) {
-      return { status: "no_activity", message: "No transactions yet in Coinbase" };
+      return { status: "expired_no_activity", message: "Still no activity on Coinbase after expiration" };
     }
 
     const latestTx = coinbaseTxs[0];
+    const coinbaseStatus = latestTx.status;
 
-    if (latestTx.status === "ONRAMP_TRANSACTION_STATUS_FAILED") {
-      transaction.set("status", 10); // failed
-      transaction.set("failed_reason", latestTx.failure_reason || "Coinbase marked as failed");
-      await transaction.save(null, { useMasterKey: true });
-      return { status: "failed", reason: latestTx.failure_reason };
+    if (coinbaseStatus === "ONRAMP_TRANSACTION_STATUS_FAILED") {
+      expiredTx.set("status", 10); // failed
+      expiredTx.set("failed_reason", latestTx.failure_reason || "Coinbase marked as failed");
+      await expiredTx.save(null, { useMasterKey: true });
+      return { status: "updated_to_failed_after_expiry", reason: latestTx.failure_reason };
+    }
+
+    if (coinbaseStatus === "ONRAMP_TRANSACTION_STATUS_SUCCESS") {
+      expiredTx.set("status", 2); // success (assumed)
+      expiredTx.unset("failed_reason"); // remove any previous failure reason
+      await expiredTx.save(null, { useMasterKey: true });
+      return { status: "updated_to_success_after_expiry" };
     }
 
     return {
-      status: "pending_or_successful",
-      coinbaseStatus: latestTx.status,
-      message: "No action taken. Transaction is still in progress or succeeded externally.",
+      status: "expired_but_still_processing",
+      coinbaseStatus,
+      message: "Coinbase reports processing even after expiration",
     };
   } catch (err) {
-    console.error("Coinbase fetch failed:", err.message);
-    throw new Error("Unable to fetch Coinbase transaction status");
+    console.error("Coinbase fetch failed for expired tx:", err.message);
+    throw new Error("Unable to verify expired Coinbase transaction");
   }
 });
+
 
 
 Parse.Cloud.define("markFailedCoinbaseTransactions", async (request) => {

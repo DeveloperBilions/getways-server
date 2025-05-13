@@ -184,16 +184,17 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
         
         verifiedCount++;
         //}
-      }else {
-        const now = new Date();
-        const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
-
-        if (txAgeInMinutes > 15) {
-          tx.set("status", 9); // Expired
-          await tx.save(null, { useMasterKey: true });
-          continue;
-        }
       }
+      // else {
+      //   const now = new Date();
+      //   const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
+
+      //   if (txAgeInMinutes > 15) {
+      //     tx.set("status", 9); // Expired
+      //     await tx.save(null, { useMasterKey: true });
+      //     continue;
+      //   }
+      // }
     } catch (err) {
       console.error(`Error verifying tx for user ${userId}:`, err.message);
     }
