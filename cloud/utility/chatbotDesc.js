@@ -136,8 +136,15 @@ const chatbotDescription = (role = "Player") => {
 
           - User Management:
             - View and manage a list of all Agents and Players under you, including User Name, Email, Parent User, User Type, and Date.
-            Create a new Agent using the "Add New User" option.
-            - Filter Agents and Players by Name and Username.
+            - Create a new Agent using the "Add New User" option.
+            - Filter Agents and Players by Email and Username.
+            - While creating a **Player**, the following fields must be filled:
+              - **Username**
+              - **Name**
+              - **Phone Number**
+              - **Email**
+              - **Password**
+              - **Confirm Password**
             - For Agents under you (accessible by clicking the "Actions" button in the table):
               - Disable Recharge - Can Disable the Recharge for the Selected Agent.
               - Recharge Limits - Can Set monthly and Daily Recharge Limits for agent.
@@ -157,13 +164,33 @@ const chatbotDescription = (role = "Player") => {
 
           - Recharge Records:
             - View a list of all Recharge Records for Agents and Players under you.
+            - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Parent**, **Recharge Date**.
             - Filter by Account, Status, and Mode.
+            - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
+            - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
+            - Recharge Action Logic:
+              - If **Status is Pending Confirmation**:
+                - The **Action** button will show a **Copy** button.
+                - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
+              - If **Status is Confirmed**:
+                - The **Action** button will show a **Coin Credit** button.
+                - Clicking this will open a confirmation dialog:
+                  - **Message**: "Are you sure you have transferred the points/coins to this user? This action is not reversible."
+                  - Buttons: **Confirm** and **Cancel**
+                  - On **Confirm**, the coins will be credited to the Player and action completed.
 
           - Redeem Records:
             - View a list of all Redeem Records for Agents and Players under you.
+            - Columns include: **Action**, **Accounts**, **Redeemed**, **Remark**, **Status**, **Service Fee**, **Parent**, **Redeem Date**.
             - Filter by Account and Status.
+            - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
             - Export data in PDF and Excel formats.
+            - Redeem Action Logic:
+              - If **Status is Pending Approval**:
+                - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
+                - Clicking ✅ will open a confirmation dialog to **approve** and complete the Redeem for the Player.
+                - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
             - View a detailed summary with date-wise filtering.
@@ -176,12 +203,12 @@ const chatbotDescription = (role = "Player") => {
               - Pending Recharges 
               - Failed Redeems 
 
-              Profile Options:
-            - Access the following options by selecting the profile icon in the top right:
-            - Change Password: Master Agent can change their account password where popup will be shown. 
-            - Recharge Limit: Set Recharge Limits for Players and Agents under you.
-            - Help Videos: Watch videos to learn about Login and Sign Up processes.
-            - Logout: Log out of the Master Agent account.
+            Profile Options:
+          - Access the following options by selecting the profile icon in the top right:
+          - Change Password: Master Agent can change their account password where popup will be shown. 
+          - Recharge Limit: Set Recharge Limits for Players and Agents under you.
+          - Help Videos: Watch videos to learn about Login and Sign Up processes.
+          - Logout: Log out of the Master Agent account.
 
           - Additional Information:
             - Master Agent Balance is Shown near on top right side near to Profile icon
@@ -202,9 +229,16 @@ const chatbotDescription = (role = "Player") => {
 
           - User Management:
             - View and manage a list of Players under you, including User Name, Email, Parent User, User Type, and Date.
-            Create Referral Link for Players. Using this link, Players can sign up and be linked to the Agent.
-            Create a new Players using the "Add New User" option.
+            - Create Referral Link for Players. Using this link, Players can sign up and be linked to the Agent.
+            - Create a new Players using the "Add New User" option.
             - Filter Players by Email and Username.
+            - While creating a **Player**, the following fields must be filled:
+              - **Username**
+              - **Name**
+              - **Phone Number**
+              - **Email**
+              - **Password**
+              - **Confirm Password**
             - For Players under you (accessible by clicking the "Actions" button in the table):
               - Redeem - Perform Redeem actions.
               - Recharge - Perform Recharge actions.
@@ -217,13 +251,33 @@ const chatbotDescription = (role = "Player") => {
 
           - Recharge Records:
             - View a list of all Recharge Records for Players under you.
+            - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Parent**, **Recharge Date**.
             - Filter by Account, Status, and Mode.
+              - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
+              - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
+            - Recharge Action Logic:
+              - If **Status is Pending Confirmation**:
+                - The **Action** button will show a **Copy** button.
+                - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
+              - If **Status is Confirmed**:
+                - The **Action** button will show a **Coin Credit** button.
+                - Clicking this will open a confirmation dialog:
+                  - **Message**: "Are you sure you have transferred the points/coins to this user? This action is not reversible."
+                  - Buttons: **Confirm** and **Cancel**
+                  - On **Confirm**, the coins will be credited to the Player and action completed.
 
           - Redeem Records:
             - View a list of all Redeem Records for Players under you.
+            - Columns include: **Action**, **Accounts**, **Redeemed**, **Remark**, **Status**, **Service Fee**, **Parent**, **Redeem Date**.
             - Filter by Account and Status.
+            - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
             - Export data in PDF and Excel formats.
+            - Redeem Action Logic:
+              - If **Status is Pending Approval**:
+                - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
+                - Clicking ✅ will open a confirmation dialog to **approve** and complete the Redeem for the Player.
+                - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
             - View a detailed summary with date-wise filtering.
@@ -244,7 +298,6 @@ const chatbotDescription = (role = "Player") => {
 
           - Additional Information:
             - Agent Balance is Shown near on top right side near to Profile icon
-              The balance displayed reflects the combined balance of all Players under those Agents.
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete.
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
