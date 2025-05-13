@@ -61,8 +61,8 @@ duration: 30,
   app.use("/dashboard", dashboard);
 
   // Start the server
- const port = 1337;
-//const port = 6000;
+ //const port = 1337;
+const port = 6000;
 
 httpServer.listen(port, () => {
   console.log(`##### parse-server running on ${process.env.SERVER_URL} #####`);
@@ -130,7 +130,8 @@ ParseServer.createLiveQueryServer(httpServer);
      await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
      await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
 
-     
+     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
+
 
     //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
     //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
