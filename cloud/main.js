@@ -10,6 +10,7 @@ async function loadModule() {
     await import('./ScInputData/generateInput.js')
     await import('./WalletProcessing/wallet.js')
     await import('./BSCSCAN/api.js')
+    await import('./CoinBaseOnRamp/CoinBase.js')
 
 }
 
