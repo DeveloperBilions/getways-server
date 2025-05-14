@@ -165,15 +165,16 @@ const chatbotDescription = (role = "Player") => {
           - Recharge Records:
             - View a list of all Recharge Records for Agents and Players under you.
             - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Parent**, **Recharge Date**.
-            - Filter by Account, Status, and Mode.
-            - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
-            - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
+            - Filter by Search By, Status, and Mode.
+              - Search By options include: Account, Recharge, Remark, Parent Name.
+              - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
+              - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
-              - If **Status is Pending Confirmation**:
+              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
                 - The **Action** button will show a **Copy** button.
                 - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
-              - If **Status is Confirmed**:
+              - If **Status is Confirmed** or Confirmed Coin Credit:
                 - The **Action** button will show a **Coin Credit** button.
                 - Clicking this will open a confirmation dialog:
                   - **Message**: "Are you sure you have transferred the points/coins to this user? This action is not reversible."
@@ -183,11 +184,12 @@ const chatbotDescription = (role = "Player") => {
           - Redeem Records:
             - View a list of all Redeem Records for Agents and Players under you.
             - Columns include: **Action**, **Accounts**, **Redeemed**, **Remark**, **Status**, **Service Fee**, **Parent**, **Redeem Date**.
-            - Filter by Account and Status.
-            - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
+            - Filter by Search By and Status.
+              - Search By options include: Account, Recharge, Remark, Parent Name.
+              - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
             - Export data in PDF and Excel formats.
             - Redeem Action Logic:
-              - If **Status is Pending Approval**:
+              - If **Status is Pending Approval** or Confirmed or Rejected Pending Approval:
                 - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
                 - Clicking ✅ will open a confirmation dialog to **approve** and complete the Redeem for the Player.
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
@@ -252,15 +254,16 @@ const chatbotDescription = (role = "Player") => {
           - Recharge Records:
             - View a list of all Recharge Records for Players under you.
             - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Parent**, **Recharge Date**.
-            - Filter by Account, Status, and Mode.
+            - Filter by Search By, Status, and Mode.
+              - Search By options include: Account, Recharge, Remark, Parent Name.
               - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
               - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
-              - If **Status is Pending Confirmation**:
+              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
                 - The **Action** button will show a **Copy** button.
                 - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
-              - If **Status is Confirmed**:
+              - If **Status is Confirmed** or Confirmed Coin Credit:
                 - The **Action** button will show a **Coin Credit** button.
                 - Clicking this will open a confirmation dialog:
                   - **Message**: "Are you sure you have transferred the points/coins to this user? This action is not reversible."
@@ -270,11 +273,12 @@ const chatbotDescription = (role = "Player") => {
           - Redeem Records:
             - View a list of all Redeem Records for Players under you.
             - Columns include: **Action**, **Accounts**, **Redeemed**, **Remark**, **Status**, **Service Fee**, **Parent**, **Redeem Date**.
-            - Filter by Account and Status.
-            - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
+            - Filter by Search By and Status.
+              - Search By options include: Account, Recharge, Remark, Parent Name.
+              - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction.
             - Export data in PDF and Excel formats.
             - Redeem Action Logic:
-              - If **Status is Pending Approval**:
+              - If **Status is Pending Approval** or Confirmed or Rejected Pending Approval:
                 - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
                 - Clicking ✅ will open a confirmation dialog to **approve** and complete the Redeem for the Player.
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
@@ -341,25 +345,233 @@ const chatbotDescription = (role = "Player") => {
               - EtherScan: Provides access to EtherScan for the Player’s transaction details.
               - Edit: Opens a dialog to edit the Player’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
               - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
-              - Blacklist User: Opens a dialog with the message "Are you sure you want to blacklist the user {username}? This action cannot be undone." Includes two buttons: "Confirm" and "Cancel".
+              - Blacklist User: Opens a dialog with the message "Are you sure you want to blacklist the user? This action cannot be undone." Includes two buttons: "Confirm" and "Cancel".
 
-              Profile Options
-              - Access the following options by selecting the profile icon in the top-right corner:
-              - Global Recharge & Cashout Settings:
-                - Enable Recharge (Global): Toggle switch to enable or disable recharges for all Agents and Players globally.
-                - Enable Cashout (Global): Toggle switch to enable or disable cashouts for all Agents and Players globally.
-                - Note: If a Super User disables Recharge and Cashout for a specific Agent, the Recharge and Cashout functionality is also disabled for all Players under that Agent.
-              - Manage Payment Methods:
-                - Displays a list of payment methods (e.g., CashApp, PayPal, Venmo, Zelle).
-                - Each method has a toggle switch.
-                - Super User can enable or disable each payment method using the toggle switch.
-              - Manage Emergency Messages:
-                - Super User can compose multiple emergency messages in a text area.
-                - Messages are sent to all Agents and Master Agents under the Super User.
-              - Help Videos:
-                - Watch videos to learn about Login and Sign-Up processes.
-              - Logout:
-                - Log out of the Master Agent account.
+            - Recharge Records:
+            - View a list of all Recharge Records for Agents and Players under you.
+            - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Transaction Confirmation Link**, **Parent**, Mode, **Recharge Date**.
+            - Filter by Search By, Status, and Mode.
+              - Search By options include: Account, Recharge, Remark, Parent Name.
+              - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
+              - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
+            - Export data in PDF and Excel formats.
+            - Recharge Action Logic:
+              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
+                - The **Action** button will show a **Copy** button.
+                - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
+              - If **Status is Confirmed** or Confirmed Coin Credit:
+                - The **Action** button will show a **Coin Credit** button.
+                - Clicking this will open a confirmation dialog:
+                  - **Message**: "Are you sure you have transferred the points/coins to this user? This action is not reversible."
+                  - Buttons: **Confirm** and **Cancel**
+                  - On **Confirm**, the coins will be credited to the Player and action completed.
+
+              - Redeem Records:
+              - View a list of all Redeem Records for Players under you.
+              - Columns include: **Action**, **Accounts**, **Redeemed**, **Remark**, **Status**, **Service Fee**, **Parent**, **Redeem Date**, **Payment Method**, **Payment Id**.
+              - Filter by Search By and Status.
+                - Search By options include: Account, Recharge, Remark, Parent Name.
+                - Statuses include: Failed, Pending Approval, Rejected, Redeem Successfully, Expired, Failed Transaction, Cashout, Cashout Successfully, Cashout Reject.
+              - Export data in PDF and Excel formats.
+              - Redeem Action Logic:
+                - If **Status is Pending Approval** or Confirmed or Rejected Pending Approval:
+                  - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
+                  - Clicking ✅ will open a confirmation dialog to **approve** and complete the Redeem for the Player.
+                  - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
+                
+                - If **Status is Cashout** or Confirmed or Rejected Cashout:
+                  - The **Action** section will show two buttons: ✅ (tick) and ❌ (cross).
+                  - Clicking ✅ will open a confirmation dialog to **confirm the Cashout for the Player**.
+                  - Clicking ❌ will **reject** the Cashout request and update the status accordingly.
+
+                - If **Status is Cashout Successfully** or Undone Cashout:
+                  - The **Action** section will show a ❌ (cross) button only.
+                  - Clicking ❌ will open a dialog asking the user to enter a **Remark**.
+                  - The dialog will display the message:
+                    > "Are you sure you wish to reject the cashout request of player?  
+                    > This action cannot be undone."
+                  - There will be **Confirm** and **Cancel** buttons in the dialog.
+              
+              - Summary:
+                - The Summary Page provides a detailed overview of key metrics and data related to Players, Agents, and Master Agents. To view the data, you need to provide the Start Date and End Date, then click the Apply Filter button.
+                - View a detailed summary with date-wise filtering.
+                - Search for specific Master Agent,  Agents or Players by name.
+                - Summary includes:
+                  - Total number of users
+                  - Total Agents.
+                  - Total Recharges
+                  - Total Redeems 
+                  - Pending Recharges 
+                  - Failed Redeems 
+                  - Total Cashout Redeems Successful
+                  - Total Cashout Redeems Pending
+                  - Total Fees Charged
+                  - Total Wallet Balance
+                  - Total Recharge (Filtered) - You can filter the total recharge using a dropdown menu within the box. The available filter options are Wallet, Others, and All. By default, the filter is set to All.
+                  - You can generate month-wise PDF and Excel reports for Recharge and Redeem by clicking the Export button at the top right of the page. When prompted, select the desired month to export.
+                  - You can generate the PDF or Excel report without entering the Start Date and End Date.
+                    - After selecting the month, choose the type of report you want to generate:
+                      - PDF for Recharge
+                      - Excel for Recharge
+                      - PDF for Redeem
+                      - Excel for Redeem
+
+
+              - Reports :
+                - The Reports section allows you to generate reports and charts to compare players and agents based on data from specific dates. You can visualize the data using bar charts, line charts, and pie charts.
+
+                - The Reports section includes the following components:
+                  - Overview Report
+                  - Comparison Report
+                  - Agent Overview Report
+                  - Player Overview Report 
+                  - Player Comparison Report
+                  - Particular Player Report
+                  - KYC Report
+                  - Transaction Export
+
+                    - Overview (Tab):
+                      - This Overview page is a comprehensive financial dashboard.
+
+                      - You have to provide the start date and end date to filter the data and after that click on Apply Filter button to see the data.
+
+                      - You will see the following data:
+                        - Conversion Rate, 
+                        - Ticket Amount, 
+                        - Transaction Overview - Pie Chart - It illustrates the distribution of various transaction types within the system.
+                        - Agent Overview - Bar Chart - It illustrates the distribution of different transaction types in the system.
+                        - Agent Overall Report Table It consists of the following columns: Agent Name, Total Recharge, Total Redeem, and Total Cashout. 
+                          - You can sort the Table by clicking on the column header. 
+                          - You can search for the Particular Agent by typing in the search box.
+                          - You can also download the Report in the PDF Format by clicking on the Export Button. It will generate the PDF file named Agent overall Report.
+
+            
+                  - Comparison (Tab):
+                    - This Comparison page enables users to analyze and compare the data between two dates or months or years.
+
+                    - You have to provide two dates or month or year and click on Apply Filter button to see the data.
+                    - It will compare the data on that particular date or month or year and show the data in the bar chart.
+                    - It will show the 3 Bar Charts 
+                      - Data Comparison - Recharge
+                      - Data Comparison - Redeem
+                      - Data Comparison - Cashout
+
+
+                  - Agent Overview (Tab):
+                    - The Agent Overview page allows admins to analyze an agent’s transactions.
+
+                    - You have to Provide the Agent Name and Start Date and End Data and click on Apply Filter button to see the data.
+                    - You will see the following data:
+                      - Total Transaction Summary - Pie Chart - It represents the transaction breakdown for a particular agent's Recahrge, Redeem, and Cashout.
+                      - Daily Transactions - Line Chart - It displays the day-wise transactions of a particular agent's Recharge, Redeem, and Cashout, from the given start date to the end date.
+
+                  - Player Overview (Tab):
+                    - The Player Overview page provides a detailed transactional analysis.
+
+                    - You have to provide the Start date and End date and then Click on Apply Filter button to see the data. You will see all the data of the Players. 
+                    - If you want to see the data on how many players are assigned to a particular agent, then provide the agent's name, along with the start date and end date. Then, click the "Apply Filter" button to view the data for that agent.
+
+                    - You will see the following data:
+                      - Transaction Overview - Total Distribution - Pie Chart - It illustrates the distribution of different transaction types within the system related to Recharge, Redeem, Cashout.
+                      - Players Transaction Overview - Bar Chart - It illustrates the transaction distribution among players's Recharge Redeem, and Cashout.
+                      - Player Transaction Table - This table consists of the following columns: Player Name, Total Recharge, Total Redeem, and Total Cashout. 
+                        - You can sort the table by clicking on the column headers. 
+                        - You can  search for a particular player by typing in the search box.
+                        - You can also download the Report in the PDF Format by clickin on the Export Button. It will generate the PDF file named Player Transaction Report.
+
+
+                  - Player Comparison (Tab):
+                    - The Player Comparison page allows users to compare player transaction data between two dates, months, or years.
+
+                    - You have to provide two dates or month or year and then Click on Apply Filter button to see the data.
+                    - If you want to see the data of a particular player, then provide the player's name along with the two dates or month or year.
+
+                    - You will see the following data:
+                      - Data Comparison - Recharge - You can also filter the data using the dropdown filter in the top right of that box. This allows you to see the top 5 players, top 10 players, top 20 players, or all players. The default view will be the top 30 players.
+                      - Data Comparison - Redeem - You can also filter the data using the dropdown filter in the top right of that box. This allows you to see the top 5 players, top 10 players, top 20 players, or all players. The default view will be the top 30 players.
+                      - Data Comparison - Cashout - You can also filter the data using the dropdown filter in the top right of that box. This allows you to see the top 5 players, top 10 players, top 20 players, or all players. The default view will be the top 30 players.
+
+                  - Particular Player (Tab):
+                    - The Particular Player page allows admins to analyze a player's transactions.
+
+                    - You have to provide the Player Name and Start Date and End Data and click on Apply Filter button to see the data.
+
+                    - You will see the following data:
+                      - Total Transaction Summary - Pie Chart - It illustrates the distribution of Recharge, Redeem, and Cashout transactions for a specific player.
+                      - Daily Player Transactions – Line Chart - It displays the day-wise transactions of a selected player, including Recharge, Redeem, and Cashout, from the given start date to the end date.
+
+                  - KYC (Tab):
+                    - This KYC page provides a comprehensive view of customer verification statuses.
+            
+                    - You Can See Data in the Pie Chart of KYC Status Overview 
+                      - Orange Color represent KYC Expired
+                      - Red Color represent KYC Failed
+                      - Yellow Color represent KYC Initiated
+                      - Blue Color represents KYC Pending
+                      - Green Color represents KYC Success
+                      - Light Green represents KYC Manual Review
+
+                    - Also you can see the Total KYC Total Selected KYC Requests in the Box below the pie chart
+                    - KYC Status Filter : You can filter transactions based on KYC status— Expired, Failed, Initiated, Pending, Success, or Manual Review—by clicking on "Status" and selecting the corresponding checkbox at the top right of the box.
+                    - KYC Records - PDF Report Export You can generate a PDF report for KYC records by clicking the Export button located at the top right of the box, next to the Status button.
+
+
+                  - Transaction Export
+                    - The Transaction Export page allows users to download transaction data.
+
+                    - To generate an Excel report, provide the Start Date and End Date, then click Export All and select the Excel option. The excel report will be generated accordingly.
+                    - You can also specify the Start Time and End Time along with the Start Date and End Date to export data for a particular time period.
+                    - The generated Excel report will include the following columns:
+                      - Transaction ID
+                      - Type
+                      - Amount
+                      - Transaction Date
+                      - Status
+                      - Stripe Transaction ID
+                      - Redeem Service Fee
+                      - Agent Name
+                      - Username
+                      - Agent Parent Name
+                      - isCashout
+                      - Payment Mode
+                      - Payment Method Type
+                      - Remark
+                      - Redeem Remark
+
+              - KYC
+                - The KYC Records Page provides a comprehensive view of customer verification statuses.
+                - You can see all the details in the table.
+                - The table consists of the following columns:
+                  - Account
+                  - Email 
+                  - Parent
+                  - KYC Status
+                  - verified
+                  - Failed Reason
+                  - Created At
+                - You can sort the table by clicking on the column headers.
+                - You can search via Email by entering the email in the first search box located at the upper left corner.
+                - You can search via Parent by entering the parent name in the second search box at the upper left corner.
+                - You can filter records by Status by clicking on "Status" and selecting the desired filter option. Available options include All, KYC Success, KYC Pending, KYC Failed, and KYC Expired. By default, the filter is set to All.
+                - You can generate a PDF of KYC Records by clicking the Export button, located at the top right of the table. The system will generate the PDF report accordingly.
+
+              - Profile Options
+                - Access the following options by selecting the profile icon in the top-right corner:
+                - Global Recharge & Cashout Settings:
+                  - Enable Recharge (Global): Toggle switch to enable or disable recharges for all Agents and Players globally.
+                  - Enable Cashout (Global): Toggle switch to enable or disable cashouts for all Agents and Players globally.
+                  - Note: If a Super User disables Recharge and Cashout for a specific Agent, the Recharge and Cashout functionality is also disabled for all Players under that Agent.
+                - Manage Payment Methods:
+                  - Displays a list of payment methods (e.g., CashApp, PayPal, Venmo, Zelle).
+                  - Each method has a toggle switch.
+                  - Super User can enable or disable each payment method using the toggle switch.
+                - Manage Emergency Messages:
+                  - Super User can compose multiple emergency messages in a text area.
+                  - Messages are sent to all Agents and Master Agents under the Super User.
+                - Help Videos:
+                  - Watch videos to learn about Login and Sign-Up processes.
+                - Logout:
+                  - Log out of the Master Agent account.
           `;
   }
 };
