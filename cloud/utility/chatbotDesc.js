@@ -308,6 +308,13 @@ const chatbotDescription = (role = "Player") => {
           `;
   } else if (role === "Super-User") {
     return `
+            GETWAYS Super-User Information:
+
+            General Features:
+              - The Super-User section of the GETWAYS platform provides comprehensive control over all users, including Master Agents, Agents, and Players, with advanced management and reporting capabilities.
+              - Key functionalities include User Management, Recharge Records, Redeem Records, Summary, Reports, KYC, and Profile Options.
+              - Super-Users can create and manage all user types, perform global settings adjustments, monitor transactions, generate detailed reports, and oversee KYC processes.
+
             Super-User Section:
 
             User Management:
@@ -416,7 +423,6 @@ const chatbotDescription = (role = "Player") => {
                       - PDF for Redeem
                       - Excel for Redeem
 
-
               - Reports :
                 - The Reports section allows you to generate reports and charts to compare players and agents based on data from specific dates. You can visualize the data using bar charts, line charts, and pie charts.
 
@@ -428,7 +434,7 @@ const chatbotDescription = (role = "Player") => {
                   - Player Comparison Report
                   - Particular Player Report
                   - KYC Report
-                  - Transaction Export
+                  - Transaction Export or Transaction Export Date wise
 
                     - Overview (Tab):
                       - This Overview page is a comprehensive financial dashboard.
@@ -455,7 +461,6 @@ const chatbotDescription = (role = "Player") => {
                       - Data Comparison - Recharge
                       - Data Comparison - Redeem
                       - Data Comparison - Cashout
-
 
                   - Agent Overview (Tab):
                     - The Agent Overview page allows admins to analyze an agent’s transactions.
@@ -515,8 +520,7 @@ const chatbotDescription = (role = "Player") => {
                     - KYC Status Filter : You can filter transactions based on KYC status— Expired, Failed, Initiated, Pending, Success, or Manual Review—by clicking on "Status" and selecting the corresponding checkbox at the top right of the box.
                     - KYC Records - PDF Report Export You can generate a PDF report for KYC records by clicking the Export button located at the top right of the box, next to the Status button.
 
-
-                  - Transaction Export
+                  - Transaction Export or Transaction Export Date Wise:
                     - The Transaction Export page allows users to download transaction data.
 
                     - To generate an Excel report, provide the Start Date and End Date, then click Export All and select the Excel option. The excel report will be generated accordingly.
