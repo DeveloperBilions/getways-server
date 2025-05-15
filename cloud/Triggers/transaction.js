@@ -14,17 +14,20 @@ Parse.Cloud.beforeSave("TransactionRecords", async (request) => {
         throw new Error("Wallet not found for user.");
       }
   
-      // ✅ Fetch the latest balance
-      await wallet.fetch({ useMasterKey: true });
-      const currentBalance = wallet.get("balance");
+      await wallet.fetch({ useMasterKey: true }); // Ensure fresh balance
   
-      if (currentBalance < amount) {
+      const currentBalance = wallet.get("balance");
+      const amountToDeduct = parseFloat(amount);
+  
+      if (currentBalance < amountToDeduct) {
         throw new Error("Insufficient wallet balance.");
       }
   
-      // Optional: Deduct balance here (if you want to do it inside beforeSave — not typical)
-      // wallet.set("balance", currentBalance - amount);
-      // await wallet.save(null, { useMasterKey: true });
+      const newBalance = currentBalance - amountToDeduct;
+      wallet.set("balance", newBalance);
+      await wallet.save(null, { useMasterKey: true });
+  
+      transaction.set("status", 2); // Mark as completed
     }
   });
   
