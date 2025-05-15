@@ -153,8 +153,8 @@ const chatbotDescription = (role = "Player") => {
               - Edit - Edit Agent details.
               - Delete - Delete Agent details.
             - For Players under you (accessible by clicking the "Actions" button in the table):
-              - Redeem - Perform Redeem actions.
-              - Recharge - Perform Recharge actions.
+              - Redeem -  Agent can directly redeem to the Player under them.
+              - Recharge -  Agent can directly recharge to the Player under them.
               - Wallet - View Wallet Details (in that can see availabe balance and payment methods and cashout status).
               - View Key - Can Copy Wallet Address of Player.
               - BaseScan - Access BaseScan for transaction details.
@@ -242,8 +242,8 @@ const chatbotDescription = (role = "Player") => {
               - **Password**
               - **Confirm Password**
             - For Players under you (accessible by clicking the "Actions" button in the table):
-              - Redeem - Perform Redeem actions.
-              - Recharge - Perform Recharge actions.
+              - Redeem - Agent can directly redeem to the Player under them.
+              - Recharge -  Agent can directly recharge to the Player under them.
               - Wallet - View Wallet Details (in that can see availabe balance and payment methods and cashout status).
               - View Key - Can Copy Wallet Address of Player.
               - BaseScan - Access BaseScan for transaction details.
