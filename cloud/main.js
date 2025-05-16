@@ -11,6 +11,8 @@ async function loadModule() {
     await import('./WalletProcessing/wallet.js')
     await import('./BSCSCAN/api.js')
     await import('./CoinBaseOnRamp/CoinBase.js')
+    await import('./parse.js')
+    await import('./Triggers/transaction.js')
 
 }
 
