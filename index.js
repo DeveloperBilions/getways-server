@@ -61,11 +61,7 @@ duration: 30,
   app.use("/dashboard", dashboard);
 
   // Start the server
-<<<<<<< HEAD
 // const port = 1337;
-=======
-/// const port = 1337;
->>>>>>> 50bf1b3dc8e17367ca88ecace7fad284a24b1a3e
 const port = 6000;
 
 httpServer.listen(port, () => {
