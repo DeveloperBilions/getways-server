@@ -61,8 +61,7 @@ duration: 30,
   app.use("/dashboard", dashboard);
 
   // Start the server
- const port = 1337;
-///const port = 6000;
+ const port = process.env.PORT;
 
 httpServer.listen(port, () => {
   console.log(`##### parse-server running on ${process.env.SERVER_URL} #####`);
