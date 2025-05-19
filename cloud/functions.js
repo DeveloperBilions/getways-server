@@ -6,6 +6,13 @@ const { getParentUserId, updatePotBalance } = require("./utility/utlis");
 const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
+const chatbotDescription = require("./utility/chatbotDesc");
+
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
@@ -2397,6 +2404,96 @@ Parse.Cloud.define("sendCheckbookPayment", async (request) => {
      return {
       success: false,
       message: error.message || "Something went wrong." 
+    };
+  }
+});
+
+Parse.Cloud.define("chatbot", async (request) => {
+  try {
+    const { message, conversationHistory = [],role = "Player" } = request.params;
+
+    // STEP 1: Define your website's information
+
+    const websiteInfo = chatbotDescription(role);
+
+    // STEP 2: Build the complete conversation history
+    const systemMessage = {
+      role: "system",
+      content: `You are a helpful AI assistant for our website. ONLY answer questions related to the website and its services.
+      If asked about anything not related to the website, politely redirect the user to ask about the website instead.
+      
+      Website Information:
+      ${websiteInfo}
+      
+      Maintain a conversational tone and remember details from earlier in the conversation.
+      If the user sends a short or partial message, interpret it in the context of the previous messages.`,
+    };
+
+    // Format the conversation history for the API
+    const formattedHistory = conversationHistory.map((msg) => ({
+      role: msg.role,
+      content: msg.text,
+    }));
+
+    // Add the current message
+    const messages = [
+      systemMessage,
+      ...formattedHistory,
+      { role: "user", content: message },
+    ];
+
+    // STEP 3: Check if the conversation (including context) is relevant to the website
+    const relevanceCheck = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a filter that determines if a conversation is related to a specific website or is about general knowledge. Consider the entire conversation history and respond with ONLY 'RELEVANT' or 'NOT_RELEVANT'.",
+        },
+        {
+          role: "user",
+          content: `Website information: ${websiteInfo}\n\nConversation: ${JSON.stringify(
+            messages
+          )}\n\nIs this conversation related to the website?`,
+        },
+      ],
+      max_tokens: 10,
+      temperature: 0.1,
+    });
+
+    const isRelevant =
+      relevanceCheck.choices[0].message.content.includes("RELEVANT");
+
+    // STEP 4: If not relevant, return a polite redirection
+    if (!isRelevant) {
+      const redirectMessage =
+        "I'm specialized in answering questions about our website and services only. For this question, I'd recommend using a general search engine. Is there anything specific about our website or services I can help you with?";
+
+      return {
+        success: true,
+        data: redirectMessage,
+      };
+    }
+
+    // STEP 5: If relevant, answer the question with conversation context
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+      max_tokens: 150,
+      temperature: 0.7,
+    });
+
+    const reply = response.choices[0].message.content;
+    return {
+      success: true,
+      data: reply,
+    };
+  } catch (error) {
+    console.error("Cloud Function Error:", error);
+    return {
+      success: false,
+      message: error.message || "Something went wrong.",
     };
   }
 });
