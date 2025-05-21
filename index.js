@@ -123,7 +123,7 @@ ParseServer.createLiveQueryServer(httpServer);
   // Runs every 30 seconds to perform rapid checks and updates on transactions:
   setInterval(async () => {
     try {
-      console.log("Running cloud function every 30 seconds...");
+     // console.log("Running cloud function every 30 seconds...");
       ///await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
      await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
      await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
@@ -213,7 +213,7 @@ ParseServer.createLiveQueryServer(httpServer);
   }
 
   // Call the function to schedule the cron task
-  scheduleTask();
+scheduleTask();
 
 //   cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
 //     try {
@@ -230,6 +230,8 @@ ParseServer.createLiveQueryServer(httpServer);
       console.error("Error executing cloud function:", error);
     }
   });
+  if (process.env.NODE_ENV === "production") {
+
   cron.schedule("59 23 * * *", async () => {
     try {
       await Parse.Cloud.run("sendDailyTransactionEmail");
@@ -240,6 +242,22 @@ ParseServer.createLiveQueryServer(httpServer);
   }, {
     timezone: "UTC" // Ensure it runs in UTC timezone
 });
+
+  }
+  if (process.env.NODE_ENV === "production") {
+
+cron.schedule("*/2 * * * *", async () => {  // runs every 2 minutes
+      try {
+        await Parse.Cloud.run("sendWalletAuditReportEmail");
+        console.log("Daily transaction email sent successfully.");
+      } catch (error) {
+        console.error("Error executing cloud function:", error);
+      }
+    }, {
+      timezone: "UTC" // Ensure it runs in UTC timezone
+  });
+  
+    }
 
 }
 

@@ -1,5 +1,5 @@
 const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
@@ -47,8 +47,12 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
             `Stripe transaction updated for orderId ${record.objectId} with status ${record.status}`
           );
           if (record.status === 2) {
-            const parentUserId = await getParentUserId(record.userId)
-            await updatePotBalance(parentUserId, record.transactionAmount,"recharge");
+            const parentUserId = await getParentUserId(record.userId);
+            await updatePotBalance(
+              parentUserId,
+              record.transactionAmount,
+              "recharge"
+            );
           }
         }
       } catch (error) {
@@ -76,62 +80,73 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     }
   }
 });
-Parse.Cloud.define("expiredTransactionStripe", async (request) => {  
-    try {
-      const query = new Parse.Query("TransactionRecords");
-      query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
-      query.descending("updatedAt");
-      query.limit(10000);
+Parse.Cloud.define("expiredTransactionStripe", async (request) => {
+  try {
+    const query = new Parse.Query("TransactionRecords");
+    query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
+    query.descending("updatedAt");
+    query.limit(10000);
 
-      const results = await query.find();
-      console.log(`${results.length} transactions found to check with Stripe.`);
-  
-      for (const record of results) {
-        const transactionId = record.get("transactionIdFromStripe");
-  
-        if (transactionId) {
-          try {
-            const session = await stripe.checkout.sessions.retrieve(transactionId);
-  
-            if (session && session.status) {
-              let newStatus;
-              if (session.status === "complete") {
-                newStatus = 2; // Assuming 2 represents 'completed'
-              } else if (session.status === "pending" || session.status === "open") {
-                newStatus = 1; // Pending
-              } else if (session.status === "expired") {
-                newStatus = 9; // Expired
-              } else {
-                newStatus = 10; // Failed or canceled
-              }
-              record.set("status", newStatus);
-              await record.save();
-              console.log(`Updated transaction record ${record.id} to status ${newStatus}`);
+    const results = await query.find();
+    console.log(`${results.length} transactions found to check with Stripe.`);
+
+    for (const record of results) {
+      const transactionId = record.get("transactionIdFromStripe");
+
+      if (transactionId) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(
+            transactionId
+          );
+
+          if (session && session.status) {
+            let newStatus;
+            if (session.status === "complete") {
+              newStatus = 2; // Assuming 2 represents 'completed'
+            } else if (
+              session.status === "pending" ||
+              session.status === "open"
+            ) {
+              newStatus = 1; // Pending
+            } else if (session.status === "expired") {
+              newStatus = 9; // Expired
+            } else {
+              newStatus = 10; // Failed or canceled
             }
-          } catch (stripeError) {
-            console.error(`Error retrieving Stripe session for transactionId ${transactionId}: ${stripeError.message}`);
+            record.set("status", newStatus);
+            await record.save();
+            console.log(
+              `Updated transaction record ${record.id} to status ${newStatus}`
+            );
           }
-        } else {
-          console.log(`No transaction ID found for record ${record.id}, unable to check with Stripe.`);
+        } catch (stripeError) {
+          console.error(
+            `Error retrieving Stripe session for transactionId ${transactionId}: ${stripeError.message}`
+          );
         }
-      }
-    } catch (error) {
-      if (error instanceof Parse.Error) {
-        console.log(`Parse-specific error: ${error.code} - ${error.message}`);
-        return {
-          status: "error",
-          code: error.code,
-          message: error.message,
-        };
       } else {
-        console.log(`An unexpected error occurred: ${error.message}`);
-        return {
-          status: "error",
-          code: 500,
-          message: "An unexpected error occurred.",
-        };
+        console.log(
+          `No transaction ID found for record ${record.id}, unable to check with Stripe.`
+        );
       }
     }
+  } catch (error) {
+    if (error instanceof Parse.Error) {
+      console.log(`Parse-specific error: ${error.code} - ${error.message}`);
+      return {
+        status: "error",
+        code: error.code,
+        message: error.message,
+      };
+    } else {
+      console.log(`An unexpected error occurred: ${error.message}`);
+      return {
+        status: "error",
+        code: 500,
+        message: "An unexpected error occurred.",
+      };
+    }
+  }
 });
 Parse.Cloud.define("updateTransactionStatusForBlankData", async (request) => {
   try {
@@ -242,8 +257,9 @@ Parse.Cloud.define("migration", async (request) => {
       const redeemServiceFee = transaction.get("redeemServiceFee") || 0; // Redeem service fee percentage
 
       // Calculate the net amount after deducting the service fee
-      const netAmount =
-        Math.floor(transactionAmount - transactionAmount * (redeemServiceFee / 100));
+      const netAmount = Math.floor(
+        transactionAmount - transactionAmount * (redeemServiceFee / 100)
+      );
 
       // Query the user's wallet
       const walletQuery = new Parse.Query(Wallet);
@@ -276,11 +292,13 @@ Parse.Cloud.define("migration", async (request) => {
       await wallet.save(null, { useMasterKey: true });
 
       // Update the transaction status to 6
-     // transaction.set("status", 6);
-     // await transaction.save(null, { useMasterKey: true });
+      // transaction.set("status", 6);
+      // await transaction.save(null, { useMasterKey: true });
 
       console.log(
-        `Processed transaction ${transaction.id} for user ${userId}. Added net amount: ${netAmount}. New wallet balance: ${wallet.get(
+        `Processed transaction ${
+          transaction.id
+        } for user ${userId}. Added net amount: ${netAmount}. New wallet balance: ${wallet.get(
           "balance"
         )}`
       );
@@ -347,8 +365,7 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
   tomorrow.setDate(today.getDate() + 1);
 
   const queryPipeline = [
-    { $match: {      transactionDate: { $gte: today, $lt: tomorrow } } },
-    { $limit: 10000 },
+    { $match: { createdAt: { $gte: today, $lt: tomorrow } } },
     {
       $facet: {
         totalRechargeAmount: [
@@ -395,7 +412,10 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
         totalRecords: [{ $count: "total" }],
         totalAmt: [
           {
-            $group: { _id: null, total: { $sum: { $ifNull: ["$transactionAmount", 0] } } },
+            $group: {
+              _id: null,
+              total: { $sum: { $ifNull: ["$transactionAmount", 0] } },
+            },
           },
         ],
         totalFeesCharged: [
@@ -423,10 +443,7 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
             $group: { _id: null, total: { $sum: "$calculatedFee" } },
           },
         ],
-        totalRedeemSuccessful: [
-          { $match: { status: 8 } },
-          { $count: "count" },
-        ],
+        totalRedeemSuccessful: [{ $match: { status: 8 } }, { $count: "count" }],
         totalRechargeByType: [
           { $match: { type: "recharge", status: { $in: [2, 3] } } },
           {
@@ -438,7 +455,9 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
           {
             $project: {
               _id: 0,
-              wallet: { $cond: [{ $eq: ["$_id.wallet", true] }, "wallet", "others"] },
+              wallet: {
+                $cond: [{ $eq: ["$_id.wallet", true] }, "wallet", "others"],
+              },
               totalAmount: 1,
             },
           },
@@ -450,7 +469,9 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
               transactionId: "$id",
               amount: { $ifNull: ["$transactionAmount", 0] },
               status: 1,
-              paymentType: { $cond: [{ $eq: ["$status", 12] }, "cashout", "redeem"] },
+              paymentType: {
+                $cond: [{ $eq: ["$status", 12] }, "cashout", "redeem"],
+              },
               transactionIdFromStripe: 1,
               transactionDate: 1,
               redeemServiceFee: 1,
@@ -466,7 +487,8 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
               date: "$date",
               status: 1,
               paymentType: {
-                $cond: [{ $eq: ["$useWallet", true] }, "wallet", "others"] },
+                $cond: [{ $eq: ["$useWallet", true] }, "wallet", "others"],
+              },
               transactionIdFromStripe: 1,
               transactionDate: 1,
             },
@@ -474,13 +496,24 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
         ],
       },
     },
-  ];  
+  ];
+
+  const giftCardQuery = new Parse.Query("GiftCardHistory");
+  giftCardQuery.greaterThanOrEqualTo("createdAt", today);
+  giftCardQuery.lessThan("createdAt", tomorrow);
+  const giftCardCount = await giftCardQuery.count({ useMasterKey: true });
 
   try {
-    const results = await new Parse.Query("TransactionRecords").aggregate(queryPipeline, { useMasterKey: true });
+    const results = await new Parse.Query("TransactionRecords").aggregate(
+      queryPipeline,
+      { useMasterKey: true }
+    );
     const summary = results[0] || {};
-    const formattedDate = today.toLocaleDateString("en-US", { 
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    const formattedDate = today.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
     const emailContent = `<!DOCTYPE html>
     <html>
@@ -545,23 +578,33 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
                 </tr>
                 <tr>
                     <td>Total Recharge Amount</td>
-                    <td class="highlight">${summary.totalRechargeAmount?.[0]?.total || 0}</td>
+                    <td class="highlight">${
+                      summary.totalRechargeAmount?.[0]?.total || 0
+                    }</td>
                 </tr>
                 <tr>
                     <td>Total Redeem Amount</td>
-                    <td class="highlight">${summary.totalRedeemAmount?.[0]?.total || 0}</td>
+                    <td class="highlight">${
+                      summary.totalRedeemAmount?.[0]?.total || 0
+                    }</td>
                 </tr>
                 <tr>
                     <td>Total Pending Recharge</td>
-                    <td>${summary.totalPendingRechargeAmount?.[0]?.total || 0}</td>
+                    <td>${
+                      summary.totalPendingRechargeAmount?.[0]?.total || 0
+                    }</td>
                 </tr>
                 <tr>
                     <td>Total Cashout Redeems Success</td>
-                    <td>${summary.totalCashoutRedeemsSuccess?.[0]?.total || 0}</td>
+                    <td>${
+                      summary.totalCashoutRedeemsSuccess?.[0]?.total || 0
+                    }</td>
                 </tr>
                 <tr>
                     <td>Total Cashout Redeems In Progress</td>
-                    <td>${summary.totalCashoutRedeemsInProgress?.[0]?.total || 0}</td>
+                    <td>${
+                      summary.totalCashoutRedeemsInProgress?.[0]?.total || 0
+                    }</td>
                 </tr>
                 <tr>
                     <td>Total Transactions</td>
@@ -571,6 +614,11 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
                     <td>Total Fees Charged</td>
                     <td>${summary.totalFeesCharged?.[0]?.total || 0}</td>
                 </tr>
+                <tr>
+  <td>Total Gift Card Issued</td>
+  <td class="highlight">${giftCardCount}</td>
+</tr>
+
             </table>
             <p>For a detailed breakdown, please refer to the attached report.</p>
             <div class="footer">&copy; 2025 The Bilions. All rights reserved.</div>
@@ -589,7 +637,8 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
 
     const mailOptions = {
       from: process.env.EMAIL,
-      to:  ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
+      to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
+      //to:"priti@thebilions.com",
       subject: "Daily Transaction Summary",
       html: emailContent,
     };
@@ -600,6 +649,152 @@ Parse.Cloud.define("sendDailyTransactionEmail", async (request) => {
     console.error("Error sending email:", error);
   }
 });
+
+Parse.Cloud.define("sendWalletAuditReportEmail", async () => {
+  const transactionAgg = await new Parse.Query("TransactionRecords").aggregate([
+    {
+      $match: {
+        status: { $in: [2, 3] },
+        type: "recharge",
+        $or: [{ useWallet: { $exists: false } }, { useWallet: false }],
+      },
+    },
+    {
+      $addFields: {
+        stripeId: { $ifNull: ["$transactionIdFromStripe", ""] },
+        referralLink: { $ifNull: ["$referralLink", ""] },
+      },
+    },
+    {
+      $addFields: {
+        mode: {
+          $switch: {
+            branches: [
+              { case: { $regexMatch: { input: "$stripeId", regex: "txn", options: "i" } }, then: "WERT" },
+              { case: { $regexMatch: { input: "$referralLink", regex: "pay.coinbase.com", options: "i" } }, then: "CoinBase" },
+              { case: { $regexMatch: { input: "$stripeId", regex: "crypto.link.com", options: "i" } }, then: "Link" },
+            ],
+            default: "Other",
+          },
+        },
+      },
+    },
+    {
+      $match: { mode: { $in: ["WERT", "CoinBase", "Link"] } },
+    },
+    {
+      $group: {
+        _id: "$userId",
+        username: { $first: "$username" },
+        walletAddr: { $first: "$walletAddr" },
+        totalAmount: { $sum: "$transactionAmount" },
+        wertTotal: {
+          $sum: { $cond: [{ $eq: ["$mode", "WERT"] }, "$transactionAmount", 0] },
+        },
+        coinbaseTotal: {
+          $sum: { $cond: [{ $eq: ["$mode", "CoinBase"] }, "$transactionAmount", 0] },
+        },
+        linkTotal: {
+          $sum: { $cond: [{ $eq: ["$mode", "Link"] }, "$transactionAmount", 0] },
+        },
+      },
+    },
+  ], { useMasterKey: true });
+
+  const API_KEY = process.env.ETHERSCAN_API_KEY;
+  const CHAIN_ID = "8453";
+  const CONTRACT_BASE_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  const LINK_CONTRACT_ETH = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+
+  const delay = (ms) => new Promise(res => setTimeout(res, ms));
+  const discrepancies = [];
+
+  for (const user of transactionAgg) {
+    const { walletAddr, username, coinbaseTotal = 0, linkTotal = 0 } = user;
+    let baseUsdc = 0;
+    let ethUsdc = 0;
+
+    if (!walletAddr) continue;
+
+    try {
+      const res = await fetch(`https://api.etherscan.io/v2/api?chainid=${CHAIN_ID}&module=account&action=tokenbalance&contractaddress=${CONTRACT_BASE_USDC}&address=${walletAddr}&tag=latest&apikey=${API_KEY}`);
+      const json = await res.json();
+      baseUsdc = json?.result ? parseFloat(json.result) / 1e6 : 0;
+    } catch {}
+
+    try {
+      const res = await fetch(`https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokenbalance&contractaddress=${LINK_CONTRACT_ETH}&address=${walletAddr}&tag=latest&apikey=${API_KEY}`);
+      const json = await res.json();
+      ethUsdc = json?.result ? parseFloat(json.result) / 1e6 : 0;
+    } catch {}
+
+    const usdcBalance = baseUsdc + ethUsdc;
+    const recorded = coinbaseTotal + linkTotal;
+    const diff = parseFloat((usdcBalance - recorded).toFixed(2));
+
+    if (Math.abs(diff) > 0.01) {
+      discrepancies.push({
+        username,
+        walletAddr,
+        usdcBalance: usdcBalance.toFixed(2),
+        recorded: recorded.toFixed(2),
+        diff: diff.toFixed(2),
+      });
+    }
+
+    await delay(200); // throttle to prevent Etherscan rate-limiting
+  }
+
+  if (!discrepancies.length) {
+    console.log("✅ No discrepancies found.");
+    return "No balance differences found.";
+  }
+
+  // build email table
+  const tableRows = discrepancies.map(d =>
+    `<tr>
+      <td>${d.username}</td>
+      <td>${d.walletAddr}</td>
+      <td>${d.recorded}</td>
+      <td>${d.usdcBalance}</td>
+      <td>${d.diff}</td>
+    </tr>`).join("");
+
+  const emailHTML = `
+    <html>
+      <body>
+        <h2>🔍 Wallet Audit Discrepancy Report</h2>
+        <table border="1" cellpadding="8" cellspacing="0">
+          <thead>
+            <tr><th>Username</th><th>Wallet</th><th>Expected</th><th>Actual</th><th>Diff</th></tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <p>Total users with discrepancy: ${discrepancies.length}</p>
+      </body>
+    </html>
+  `;
+
+  const nodemailer = require("nodemailer");
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL,
+      pass: process.env.PASSWORD,
+    },
+  });
+
+  await transporter.sendMail({
+    from: process.env.EMAIL,
+    to:  ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
+    subject: "🧾 Wallet Audit Discrepancy Report",
+    html: emailHTML,
+  });
+
+  return `📩 Sent discrepancy report for ${discrepancies.length} users`;
+});
+
 Parse.Cloud.define("updateTransactionBalances", async (request) => {
   try {
     // Step 1: Fetch Master-Agent and Agent users
@@ -640,7 +835,10 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
         rechargeQuery.select("transactionAmount");
 
         const results = await rechargeQuery.find({ useMasterKey: true });
-        return results.reduce((sum, trx) => sum + (trx.get("transactionAmount") || 0), 0);
+        return results.reduce(
+          (sum, trx) => sum + (trx.get("transactionAmount") || 0),
+          0
+        );
       };
 
       const totalRechargeAmount = await fetchTotalRecharge();
@@ -655,7 +853,10 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
         redeemQuery.select("transactionAmount");
 
         const results = await redeemQuery.find({ useMasterKey: true });
-        return results.reduce((sum, trx) => sum + (trx.get("transactionAmount") || 0), 0);
+        return results.reduce(
+          (sum, trx) => sum + (trx.get("transactionAmount") || 0),
+          0
+        );
       };
 
       const totalRedeemAmount = await fetchTotalRedeem();
@@ -664,17 +865,23 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
       const potBalance = Math.floor(totalRechargeAmount * 0.15);
 
       // Step 6: Calculate balance for the Master-Agent or Agent (floor value)
-      const balance = Math.floor((totalRechargeAmount - potBalance) - totalRedeemAmount);
+      const balance = Math.floor(
+        totalRechargeAmount - potBalance - totalRedeemAmount
+      );
 
       // Step 7: Update balance & potBalance in User table
       masterAgentOrAgent.set("potBalance", potBalance);
       await masterAgentOrAgent.save(null, { useMasterKey: true });
 
-      console.log(`Updated balance for ${role} (User ID: ${userId}): ${balance}, Pot Balance: ${potBalance}`);
+      console.log(
+        `Updated balance for ${role} (User ID: ${userId}): ${balance}, Pot Balance: ${potBalance}`
+      );
     }
 
     return `Updated balances & pot balances for ${masterAgentsAndAgents.length} users in TransactionRecords and User table`;
   } catch (error) {
-    throw `Error updating transaction records and user balances: ${error.message || error}`;
+    throw `Error updating transaction records and user balances: ${
+      error.message || error
+    }`;
   }
 });
