@@ -246,7 +246,7 @@ scheduleTask();
   }
   if (process.env.NODE_ENV === "production") {
 
-cron.schedule("*/2 * * * *", async () => {  // runs every 2 minutes
+cron.schedule("59 23 * * * *", async () => {  // runs every 2 minutes
       try {
         await Parse.Cloud.run("sendWalletAuditReportEmail");
         console.log("Daily transaction email sent successfully.");
