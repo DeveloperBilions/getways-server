@@ -140,7 +140,7 @@ const chatbotDescription = (role = "Player") => {
 
           - User Management:
             - View and manage a list of all Agents and Players under you, including User Name, Email, Parent User, User Type, and Date.
-            - Create a new Agent using the "Add New User" option.
+            - Create a new Agent using the "Add New User" option on the top right side above the table.
             - Filter Agents and Players by Email and Username.
             - While creating a **Player**, the following fields must be filled:
               - **Username**
@@ -222,6 +222,9 @@ const chatbotDescription = (role = "Player") => {
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete. for agent and 
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
+          - Note:
+            - Master Agent can not change Profile Icon.
+            - Master Agent donot have any information about the Super User.
           `;
   } else if (role === "Agent") {
     return `
@@ -234,9 +237,9 @@ const chatbotDescription = (role = "Player") => {
           Agent Section:
 
           - User Management:
-            - View and manage a list of Players under you, including User Name, Email, Parent User, User Type, and Date.
-            - Create Referral Link for Players. Using this link, Players can sign up and be linked to the Agent.
-            - Create a new Players using the "Add New User" option.
+            - View and manage a list of Players under you, including User Name, Email and Date.
+            - Create Referral Link for Players on the top right side above the table. Using this link, Players can sign up and be linked to the Agent.
+            - Create a new Players using the "Add New User" option on the top right side above the table.
             - Filter Players by Email and Username.
             - While creating a **Player**, the following fields must be filled:
               - **Username**
@@ -309,6 +312,10 @@ const chatbotDescription = (role = "Player") => {
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete.
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
+
+          - Note:
+            - Agent can not change Profile Icon.
+            - Agent donot have any information about the Master Agent and Super User.
           `;
   } else if (role === "Super-User") {
     return `
@@ -616,6 +623,7 @@ const chatbotDescription = (role = "Player") => {
               - Note:
                 - Profile options are Only have the option of Global Recharge & Cashout Settings, Manage Payment Methods, Manage Emergency Messages, Help Videos, and Logout. No other Profile options are available.
                 - Super User Can not Change own Password and Profile Icon.
+                - Super User can not change the Profile Icon of Master Agent, Agent and Player.
                 
               - Profile Options:
                 - Access the following options by selecting the profile in the top-right corner:
