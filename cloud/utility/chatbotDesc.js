@@ -559,6 +559,56 @@ const chatbotDescription = (role = "Player") => {
                 - You can filter records by Status by clicking on "Status" and selecting the desired filter option. Available options include All, KYC Success, KYC Pending, KYC Failed, and KYC Expired. By default, the filter is set to All.
                 - You can generate a PDF of KYC Records by clicking the Export button, located at the top right of the table. The system will generate the PDF report accordingly.
 
+              - Gift Card:
+                - "The Gift Card Page allows a super user to track and manage gift card transactions and their history.
+                - You can see all the details in the table.
+                  - The table consists of the following columns:
+                    - Username
+                    - Order ID 
+                    - Price
+                    - Product ID
+                    - Product Name
+                    - Status
+                    - Product Image
+                    - Created At
+                  - You can sort the table by clicking on the column headers.
+                - At the top left side of the table, there is a search box where you can search by username.
+                - Next to it, there is a Status Filter option that allows you to filter transactions based on their status. 
+                  - The availabe option are All, Processed, Failed, Pending. By default the filter is set to All.
+              
+              
+              - Wallet Audit:
+                - The Wallet Audit Report page provides a comprehensive overview of wallet transactions.
+                - You can see all the details in the table.
+                  - The table consists of the following columns:
+                    - Username - Shows the name of the user.
+                    - Wallet - Shows the wallet address of the user.
+                    - WERT Total - Shows the total amount in WERT.
+                    - Coinbase Total - Shows the total amount in Coinbase.
+                    - Link Total - Shows the total amount in Link.
+                    - USDC Balance - Shows the balance in USDC.
+                    - Difference - It shows the difference in amounts, calculated based on the formula: Coinbase + Link - USDC
+                    - Actions - When you click on the Actions menu, a modal will open where you can view the details in table of a specific user's transaction.
+                      - On top of the modal there is a Mode Filter option available that allows you to filter transactions based on their mode.
+                        - There are 5 Options Mode avilable:
+                        - All Modes
+                        - WERT
+                        - CoinBase
+                        - Link
+                        - Other 
+                        - By default, all modes filter is applied. You can select any mode to filter transactions based on your chosen option.  
+                      - That table consists of the following columns:
+                        - Amount 
+                        - Status
+                        - Mode 
+                        - Confirmation Link 
+                        - Date 
+                       - At the bottom of the modal, there is a close button that you can click to exit the modal.
+                    - You can sort the table by clicking on the column headers. 
+
+                  - You can search via Username by entering the username in the first search box located at the upper left corner on the top of table.
+                  - You can export the data by clicking on the Export button, located at the top right of the table. The system will generate the Excel report accordingly.
+                
               - Profile Options
                 - Access the following options by selecting the profile icon in the top-right corner:
                 - Global Recharge & Cashout Settings:

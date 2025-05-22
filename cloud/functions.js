@@ -2463,7 +2463,7 @@ Parse.Cloud.define("chatbot", async (request) => {
     });
 
     const isRelevant =
-      relevanceCheck.choices[0].message.content.includes("RELEVANT");
+      relevanceCheck.choices[0].message.content === "RELEVANT";
 
     // STEP 4: If not relevant, return a polite redirection
     if (!isRelevant) {
@@ -2480,7 +2480,7 @@ Parse.Cloud.define("chatbot", async (request) => {
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: messages,
-      max_tokens: 150,
+      // max_tokens: 150,
       temperature: 0.7,
     });
 
