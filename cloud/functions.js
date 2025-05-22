@@ -2453,9 +2453,7 @@ Parse.Cloud.define("chatbot", async (request) => {
         },
         {
           role: "user",
-          content: `Website information: ${websiteInfo}\n\nConversation: ${JSON.stringify(
-            messages
-          )}\n\nIs this conversation related to the website?`,
+          content: `Website information: ${websiteInfo}\n\nQuestion: ${message}\n\nIs this conversation related to the website?`,
         },
       ],
       max_tokens: 10,
@@ -2468,7 +2466,7 @@ Parse.Cloud.define("chatbot", async (request) => {
     // STEP 4: If not relevant, return a polite redirection
     if (!isRelevant) {
       const redirectMessage =
-        "I'm specialized in answering questions about our website and services only. For this question, I'd recommend using a general search engine. Is there anything specific about our website or services I can help you with?";
+        "Sorry, I can only help with Getways support-related queries.";
 
       return {
         success: true,
@@ -2481,7 +2479,7 @@ Parse.Cloud.define("chatbot", async (request) => {
       model: "gpt-3.5-turbo",
       messages: messages,
       // max_tokens: 150,
-      temperature: 0.7,
+      temperature: 0.0,
     });
 
     const reply = response.choices[0].message.content;

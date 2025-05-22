@@ -43,7 +43,7 @@ const chatbotDescription = (role = "Player") => {
             1. Quick Debit Recharge (Coinbase Onramp):
               - Looking for a fast and secure way to recharge? Use Quick Debit Recharge to instantly top up your account using your debit card via Coinbase. Your transaction will be safely tracked. Please ensure pop-ups are allowed in your browser!
 
-            2. Instant Recharge (Stripe/Wallet):
+            2. Instant Recharge (Wert/Wallet):
               - Choose Instant Recharge for a seamless top-up experience. You can recharge via your linked Wallet or through our Payment Portal. It’s quick, safe, and perfect for verified users. Just select your method, add a note, and proceed.
 
             3. Standard Recharge (External Link):
@@ -98,9 +98,13 @@ const chatbotDescription = (role = "Player") => {
             - Players cannot sign up directly.
             - If a user enters an invalid password 5 times in a row, their account will be temporarily locked.
                 - Error displayed: "Login Failed: Your account is locked due to multiple failed login attempts. Please try again after 30 min."
+            
+            - Note:
+                - Profile option are Only have the option of Change Password, Help Videos, and Logout. No other Profile option are available.
+                -Player Can not Change Profile Icon.
                 
-            Profile Menu Features:
-            - Click the profile icon at the top right of the screen to open a dropdown menu.
+            Profile options:
+            - Access the following options by selecting the profile icon in the top right:
             - The dropdown includes three options:
               1. Change Password – Opens a form where you can change your current password by entering your old password and the new one.
               2. Help Video – Opens a page that provides videos for help with login and sign-in. Only pre-registered users with a shared sign-in form Refferal Link from an agent can use this feature.
@@ -340,7 +344,7 @@ const chatbotDescription = (role = "Player") => {
               - Redeem Service Fee: Opens a dialog to set the Redeem Service Fee for the Agent, with toggles for "Allow Agent to change Redeem Service?" and "Allow Agent to Add 0 Redeem Service?". Includes two buttons: "Confirm" and "Cancel".
               - Password Permission: Opens a dialog with a checkbox for "Allow the Agent to set or reset their Player's password." Includes two buttons: "Save Changes" and "Cancel".
               - Drawer: Performs an action related to the Agent’s drawer (specific details to be confirmed).
-              - Edit: Opens a dialog to edit the Agent’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
+              - Edit: Opens a dialog to Only edit the Agent’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
               - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
 
             - Actions for each Player (accessible by clicking the "Actions" button in the table):
@@ -350,7 +354,7 @@ const chatbotDescription = (role = "Player") => {
               - View Key: Allows copying the Player’s wallet address.
               - BaseScan: Provides access to BaseScan for the Player’s transaction details.
               - EtherScan: Provides access to EtherScan for the Player’s transaction details.
-              - Edit: Opens a dialog to edit the Player’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
+              - Edit: Opens a dialog to Only edit the Player’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
               - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
               - Blacklist User: Opens a dialog with the message "Are you sure you want to blacklist the user? This action cannot be undone." Includes two buttons: "Confirm" and "Cancel".
 
@@ -608,9 +612,13 @@ const chatbotDescription = (role = "Player") => {
 
                   - You can search via Username by entering the username in the first search box located at the upper left corner on the top of table.
                   - You can export the data by clicking on the Export button, located at the top right of the table. The system will generate the Excel report accordingly.
+
+              - Note:
+                - Profile options are Only have the option of Global Recharge & Cashout Settings, Manage Payment Methods, Manage Emergency Messages, Help Videos, and Logout. No other Profile options are available.
+                - Super User Can not Change own Password and Profile Icon.
                 
-              - Profile Options
-                - Access the following options by selecting the profile icon in the top-right corner:
+              - Profile Options:
+                - Access the following options by selecting the profile in the top-right corner:
                 - Global Recharge & Cashout Settings:
                   - Enable Recharge (Global): Toggle switch to enable or disable recharges for all Agents and Players globally.
                   - Enable Cashout (Global): Toggle switch to enable or disable cashouts for all Agents and Players globally.
