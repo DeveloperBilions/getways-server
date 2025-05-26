@@ -150,6 +150,9 @@ const chatbotDescription = (role = "Player") => {
               - **Password**
               - **Confirm Password**
             - For Agents under you (accessible by clicking the "Actions" button in the table):
+              - Note:
+                - There is Only Disable Recharge, Recharge Limit, Redeem Service Fee, Password Permission, Allow Creation Permission, Edit, Delete options for Agents.
+                - There is no Maximum Recharge Limit, Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan options for Agents.
               - Disable Recharge - Can Disable the Recharge for the Selected Agent.
               - Recharge Limits - Can Set monthly and Daily Recharge Limits for agent.
               - Password Permission - Allow Agents to set or reset their Players' passwords.
@@ -157,6 +160,9 @@ const chatbotDescription = (role = "Player") => {
               - Edit - Edit Agent details.
               - Delete - Delete Agent details.
             - For Players under you (accessible by clicking the "Actions" button in the table):
+              - Note:
+                - There is Only Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete options for Players.
+                - There is no Maximum Recharge Limit, Disable Recharge, Recharge Limit, Redeem Service Fee, Password Permission, Drawer Option for Players.
               - Redeem -  Agent can directly redeem to the Player under them.
               - Recharge -  Agent can directly recharge to the Player under them.
               - Wallet - View Wallet Details (in that can see availabe balance and payment methods and cashout status).
@@ -212,7 +218,7 @@ const chatbotDescription = (role = "Player") => {
             Profile Options:
           - Access the following options by selecting the profile icon in the top right:
           - Change Password: Master Agent can change their account password where popup will be shown. 
-          - Recharge Limit: Set Recharge Limits for Players and Agents under you.
+          - Recharge Limit: Set minimum Recharge Limits for Players and Agents under you. Not Maximum.
           - Help Videos: Watch videos to learn about Login and Sign Up processes.
           - Logout: Log out of the Master Agent account.
 
@@ -235,6 +241,10 @@ const chatbotDescription = (role = "Player") => {
           - Key functionalities include User Management, Recharge Records, Redeem Records, Summary, and Profile Options.
           - Agents can create Players, generate referral links, perform actions like recharges and redeems, view transaction records, export data, and monitor the combined balance of all Players under them.
           Agent Section:
+
+          - Note:
+            - Agent can not change Profile Icon.
+            - Agent donot have any information about the Master Agent and Super User.
 
           - User Management:
             - View and manage a list of Players under you, including User Name, Email and Date.
@@ -303,7 +313,7 @@ const chatbotDescription = (role = "Player") => {
               Profile Options:
             - Access the following options by selecting the profile icon in the top right:
             - Change Password: Agent can change their account password where popup will be shown. 
-            - Recharge Limit: Set Recharge Limits for Players under you.
+            - Recharge Limit: Set minimum Recharge Limits for Players under you. Not Maximum.
             - Help Videos: Watch videos to learn about Login and Sign Up processes.
             - Logout: Log out of the Agent account.
 
@@ -312,10 +322,6 @@ const chatbotDescription = (role = "Player") => {
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete.
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
-
-          - Note:
-            - Agent can not change Profile Icon.
-            - Agent donot have any information about the Master Agent and Super User.
           `;
   } else if (role === "Super-User") {
     return `
@@ -346,6 +352,9 @@ const chatbotDescription = (role = "Player") => {
               - Role: Player, Agents, Master Agents, or Super User.
 
             - Actions for each Agent and Master Agent (accessible by clicking the "Actions" button in the table):
+              - Note:
+                - There is Only Disable Recharge, Recharge Limit, Redeem Service Fee, Password Permission, Drawer, Edit, Delete options for Agents and Master Agents.
+                - There is no Maximum Recharge Limit, Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan and Blacklist options for Agents and Master Agents.
               - Disable Recharge: Opens a dialog with the message "Are you sure you want to disable recharge for user ?" and two buttons: "Disable" and "Cancel".
               - Recharge Limit: Opens a dialog with a toggle to enable/disable Recharge Limit Restriction. If enabled, fields for Monthly Recharge Limit and Daily Recharge Limit are available. Includes two buttons: "Save" and "Cancel".
               - Redeem Service Fee: Opens a dialog to set the Redeem Service Fee for the Agent, with toggles for "Allow Agent to change Redeem Service?" and "Allow Agent to Add 0 Redeem Service?". Includes two buttons: "Confirm" and "Cancel".
@@ -354,7 +363,10 @@ const chatbotDescription = (role = "Player") => {
               - Edit: Opens a dialog to Only edit the Agent’s Username, Name, and Email. Includes two buttons: "Update" and "Cancel".
               - Delete: Opens a dialog requiring the user to type "DELETE" to confirm the deletion. Includes two buttons: "Delete" and "Cancel".
 
-            - Actions for each Player (accessible by clicking the "Actions" button in the table):
+            -  Actions for each Player (accessible by clicking the "Actions" button in the table):
+              - Note:
+                - There is Only Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete, Blacklist User options for Players.
+                - There is no Maximum Recharge Limit, Disable Recharge, Recharge Limit, Redeem Service Fee, Password Permission, Drawer Option for Players.
               - Redeem: Performs Redeem actions for the Player (specific details to be confirmed).
               - Recharge: Performs Recharge actions for the Player (specific details to be confirmed).
               - Wallet: Displays Wallet Details, including available balance, payment methods, and cashout status.
@@ -411,7 +423,9 @@ const chatbotDescription = (role = "Player") => {
                   - There will be **Confirm** and **Cancel** buttons in the dialog.
               
               - Summary:
-                - The Summary Page provides a detailed overview of key metrics and data related to Players, Agents, and Master Agents. To view the data, you need to provide the Start Date and End Date, then click the Apply Filter button.
+                - Note:
+                  - The Summary Page provides a detailed overview of key metrics and data related to Players, Agents, and Master Agents. To view the Summary, you need to provide the Start Date and End Date, then click the Apply Filter button for Summary.
+                  - For generate/export month-wise PDF and Excel reports, you can generate just by clicking the Export button without entering the Start Date and End Date.
                 - View a detailed summary with date-wise filtering.
                 - Search for specific Master Agent,  Agents or Players by name.
                 - Summary includes:
@@ -424,10 +438,26 @@ const chatbotDescription = (role = "Player") => {
                   - Total Cashout Redeems Successful
                   - Total Cashout Redeems Pending
                   - Total Fees Charged
-                  - Total Wallet Balance
+                  - Total Wallet Balance - This is the total balance of all Players under you.
                   - Total Recharge (Filtered) - You can filter the total recharge using a dropdown menu within the box. The available filter options are Wallet, Others, and All. By default, the filter is set to All.
                   - You can generate month-wise PDF and Excel reports for Recharge and Redeem by clicking the Export button at the top right of the page. When prompted, select the desired month to export.
                   - You can generate the PDF or Excel report without entering the Start Date and End Date.
+                    The PDF and Excel reports will include the following data:
+                      - In Recharge:
+                        - ID
+                        - Amount
+                        - Status
+                        - Stripe ID
+                        - Payment Type
+                        - Agent Name
+                        - User Name
+                      - In Redeem:
+                        - Amount
+                        - Transaction Date
+                        - Status
+                        - Redeem Service Fee
+                        - Agent Name
+                        - User Name
                     - After selecting the month, choose the type of report you want to generate:
                       - PDF for Recharge
                       - Excel for Recharge
