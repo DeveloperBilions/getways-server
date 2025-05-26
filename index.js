@@ -231,7 +231,6 @@ scheduleTask();
     }
   });
   if (process.env.NODE_ENV === "production") {
-
   cron.schedule("59 23 * * *", async () => {
     try {
       await Parse.Cloud.run("sendDailyTransactionEmail");
@@ -242,11 +241,10 @@ scheduleTask();
   }, {
     timezone: "UTC" // Ensure it runs in UTC timezone
 });
-
   }
   if (process.env.NODE_ENV === "production") {
 
-cron.schedule("59 23 * * * *", async () => {  // runs every 2 minutes
+cron.schedule("59 23 * * *", async () => {  // runs every 2 minutes
       try {
         await Parse.Cloud.run("sendWalletAuditReportEmail");
         console.log("Daily transaction email sent successfully.");
