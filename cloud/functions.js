@@ -101,6 +101,34 @@ Parse.Cloud.define("createUser", async (request) => {
     const relation = role.relation("users");
     relation.add(user);
     await role.save(null, { useMasterKey: true });
+    if (roleName === "Agent") {
+      const RechargeMethod = Parse.Object.extend("RechargeMethod");
+      const rechargeMethods = await new Parse.Query(RechargeMethod)
+        .find({ useMasterKey: true });
+    
+      for (const method of rechargeMethods) {
+        const methodName = method.get("name").toLowerCase();
+        const settingsKey = `allowedAgentsFor_${methodName}`;
+    
+        const settingsQuery = new Parse.Query("Settings");
+        settingsQuery.equalTo("type", settingsKey);
+        let settingsObj = await settingsQuery.first({ useMasterKey: true });
+    
+        if (!settingsObj) {
+          const Settings = Parse.Object.extend("Settings");
+          settingsObj = new Settings();
+          settingsObj.set("type", settingsKey);
+          settingsObj.set("settings", []);
+        }
+    
+        const currentAgents = settingsObj.get("settings") || [];
+        if (!currentAgents.includes(user.id)) {
+          currentAgents.push(user.id);
+          settingsObj.set("settings", currentAgents);
+          await settingsObj.save(null, { useMasterKey: true });
+        }
+      }
+    }    
 
     return { code:200,success: true, message: "User created successfully!" };
   } catch (error) {
@@ -1144,70 +1172,46 @@ Parse.Cloud.define("excelUserUpdate", async (request) => {
 });
 
 Parse.Cloud.define("getUsersByRole", async (request) => {
-  const { roleName, currentusr } = request.params;
+  const { roleName: roleNames, currentusr } = request.params;
 
-  if (!Array.isArray(roleName) || roleName.length === 0) {
+  if (!Array.isArray(roleNames) || roleNames.length === 0) {
     throw new Parse.Error(400, "Role names array is required and must not be empty");
   }
 
   try {
-    // Query the Role class for roles with the specified names
-    const roleQuery = new Parse.Query(Parse.Role);
-    roleQuery.containedIn("name", roleName);
-    const roles = await roleQuery.find({ useMasterKey: true });
+    const usersMap = new Map();
 
-    if (roles.length === 0) {
-      throw new Parse.Error(404, "No matching roles found");
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.containedIn("roleName", roleNames);
+    if (currentusr) {
+      userQuery.equalTo("userParentId", currentusr);
     }
 
-    let usersMap = new Map(); // To store unique users across multiple roles
+    const users = await userQuery.findAll({ useMasterKey: true });
 
-    // Fetch users related to each role
-    for (const role of roles) {
-      const roleName = role.get("name");
-      const userRelation = role.relation("users");
-      const usersQuery = userRelation.query();
-
-      // If currentusr is provided, filter users by userParentId
-      if (currentusr) {
-        usersQuery.equalTo("userParentId", currentusr);
+    users.forEach((user) => {
+      const userId = user.id;
+      if (!usersMap.has(userId)) {
+        usersMap.set(userId, {
+          id: userId,
+          name: user.get("name"),
+          role: user.get("roleName"),
+        });
+      } else {
+        usersMap.get(userId).roles.push(user.get("roleName"));
       }
+    });
 
-      const users = await usersQuery.find({ useMasterKey: true });
-
-      // Store users in a map to avoid duplicates
-      users.forEach((user) => {
-        if (!usersMap.has(user.id)) {
-          usersMap.set(user.id, {
-            id: user.id,
-            name: user.get("name"),
-            role: roleName, // Store roles as an array
-          });
-        } else {
-          usersMap.get(user.id).roles.push(roleName);
-        }
-      });
-    }
-
-    // Convert map values to an array
     return Array.from(usersMap.values());
   } catch (error) {
-    // Handle errors
-    if (error instanceof Parse.Error) {
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "An unexpected error occurred.",
+    };
   }
 });
+
 
 
 Parse.Cloud.define("referralUserCheck", async (request) => {
@@ -2398,5 +2402,43 @@ Parse.Cloud.define("sendCheckbookPayment", async (request) => {
       success: false,
       message: error.message || "Something went wrong." 
     };
+  }
+});
+
+Parse.Cloud.define("countRecentLoggedInPlayers", async (request) => {
+  try {
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+
+    // Step 1: Query recent _Session entries
+    const sessionQuery = new Parse.Query("_Session");
+    sessionQuery.greaterThanOrEqualTo("updatedAt", twoMonthsAgo);
+    sessionQuery.include("user");
+    sessionQuery.limit(100000); // increase or paginate as needed
+
+    const sessions = await sessionQuery.find({ useMasterKey: true });
+
+    const userMap = new Map();
+
+    for (const session of sessions) {
+      const user = session.get("user");
+
+      if (
+        user &&
+        user.get("roleName") === "Player" &&
+        !user.get("walletAddr")
+      ) {
+        userMap.set(user.id, user.get("username"));
+      }
+    }
+
+    // Prepare result
+    return {
+      count: userMap.size,
+      users: Array.from(userMap.values()),
+    };
+
+  } catch (error) {
+    throw new Error("Error counting recently logged-in players: " + error.message);
   }
 });
