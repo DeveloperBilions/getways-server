@@ -206,8 +206,7 @@ const chatbotDescription = (role = "Player") => {
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
-            - Note:
-              - Can not export or generate any Summary Report.
+            - **Note**: Exporting or generating any Summary Report is **not a Option** in this section. The data is strictly view-only
             - View a detailed summary with date-wise filtering.
             - Search for specific Agents or Players under you by name.
             - Summary includes:
@@ -306,8 +305,7 @@ const chatbotDescription = (role = "Player") => {
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
-            - Note:
-              - Can not export or generate any Summary Report.
+            - **Note**: Exporting or generating any Summary Report is **not a Option** in this section. The data is strictly view-only
             - View a detailed summary with date-wise filtering.
             - Search for specific Players under you by name.
             - Summary includes:
