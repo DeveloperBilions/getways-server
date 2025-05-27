@@ -181,7 +181,8 @@ const chatbotDescription = (role = "Player") => {
               - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
-              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
+              - If **Status is Pending Confirmation** or Confirmed Pending Confirmation:
+                - Rejection is strictly not a option when the status is Pending Confirmation. The Master agent must never attempt to reject in this state.
                 - The **Action** button will show a **Copy** button.
                 - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
               - If **Status is Confirmed** or Confirmed Coin Credit:
@@ -205,6 +206,8 @@ const chatbotDescription = (role = "Player") => {
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
+            - Note:
+              - Can not export or generate any Summary Report.
             - View a detailed summary with date-wise filtering.
             - Search for specific Agents or Players under you by name.
             - Summary includes:
@@ -277,9 +280,11 @@ const chatbotDescription = (role = "Player") => {
               - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
-              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
+              - Agent can not Reject Pending Confirmation Recharge.
+              - If **Status is Pending Confirmation** or Confirmed Pending Confirmation:
+                - Rejection is strictly not a option when the status is Pending Confirmation. The agent must never attempt to reject in this state.
                 - The **Action** button will show a **Copy** button.
-                - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
+                - Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
               - If **Status is Confirmed** or Confirmed Coin Credit:
                 - The **Action** button will show a **Coin Credit** button.
                 - Clicking this will open a confirmation dialog:
@@ -301,6 +306,8 @@ const chatbotDescription = (role = "Player") => {
                 - Clicking ❌ will **reject** the Redeem request and update the status accordingly.
 
           - Summary:
+            - Note:
+              - Can not export or generate any Summary Report.
             - View a detailed summary with date-wise filtering.
             - Search for specific Players under you by name.
             - Summary includes:
@@ -308,7 +315,7 @@ const chatbotDescription = (role = "Player") => {
               - Total Recharges
               - Total Redeems 
               - Pending Recharges 
-              - Failed Redeems 
+              - Failed Redeems
 
               Profile Options:
             - Access the following options by selecting the profile icon in the top right:
@@ -386,9 +393,10 @@ const chatbotDescription = (role = "Player") => {
               - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
-              - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
+              - If **Status is Pending Confirmation** or Confirmed Pending Confirmation:
+                - Rejection is strictly not a option when the status is Pending Confirmation. The Super-User must never attempt to reject in this state.
                 - The **Action** button will show a **Copy** button.
-                - Master Agent must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
+                - Super User must click **Copy** to copy the recharge confirmation URL and manually confirm the recharge for the Player.
               - If **Status is Confirmed** or Confirmed Coin Credit:
                 - The **Action** button will show a **Coin Credit** button.
                 - Clicking this will open a confirmation dialog:
