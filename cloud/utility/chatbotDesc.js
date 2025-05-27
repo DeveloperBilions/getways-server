@@ -226,7 +226,7 @@ const chatbotDescription = (role = "Player") => {
 
           - Additional Information:
             - Master Agent Balance is Shown near on top right side near to Profile icon
-              The balance displayed reflects the combined balance of all Agents under you and all Players under those Agents.
+              The balance displayed reflects the combined balance all Players under them.
             - Flow - User Management (Tab) 
               -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete. for agent and 
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
