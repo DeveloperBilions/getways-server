@@ -31,7 +31,7 @@ const getLatestUSDCTransaction = async (walletAddress) => {
         amountUSDC: valueInUSDC,
         txHash: latestIncomingTx.hash,
         timestamp,
-        txs:latestIncomingTx
+        txs: latestIncomingTx,
       };
     } else {
       return {
@@ -92,7 +92,20 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
           useMasterKey: true,
         });
         if (alreadyExists) {
-          console.log(`Transaction hash already verified: ${transactionHash}`);
+          const now = new Date();
+          const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
+
+          if (txAgeInMinutes > 45) {
+            tx.set("status", 9); // Expired
+            await tx.save(null, { useMasterKey: true });
+            console.log(
+              `Expired duplicate transaction after timeout: ${tx.id}`
+            );
+          } else {
+            console.log(
+              `Transaction hash already verified: ${transactionHash}`
+            );
+          }
           continue;
         }
 
@@ -105,12 +118,12 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
         await tx.save(null, { useMasterKey: true });
-        const parentUserId = await getParentUserId(userId)
-        await updatePotBalance(parentUserId, result?.amountUSDC,"recharge");
-        
+        const parentUserId = await getParentUserId(userId);
+        await updatePotBalance(parentUserId, result?.amountUSDC, "recharge");
+
         verifiedCount++;
         //}
-      }else {
+      } else {
         const now = new Date();
         const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
@@ -127,7 +140,6 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
 
   return { message: `Verified ${verifiedCount} USDC transactions.` };
 });
-
 
 Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
   const TransactionRecords = Parse.Object.extend("TransactionRecords");
@@ -148,13 +160,13 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
     if (!userId || !txAmount) continue;
 
     const userQuery = new Parse.Query(Parse.User);
-userQuery.equalTo("objectId", userId);
-const user = await userQuery.first({ useMasterKey: true });
+    userQuery.equalTo("objectId", userId);
+    const user = await userQuery.first({ useMasterKey: true });
 
-if (!user) {
-  console.warn(`User not found for ID: ${userId}`);
-  continue;
-}
+    if (!user) {
+      console.warn(`User not found for ID: ${userId}`);
+      continue;
+    }
     const walletAddr = user.get("walletAddr");
     if (!walletAddr) continue;
 
@@ -177,6 +189,13 @@ if (!user) {
           useMasterKey: true,
         });
         if (alreadyExists) {
+          const now = new Date();
+          const txAgeInMinutes = (now - txDate) / 60000;
+
+          if (txAgeInMinutes > 45) {
+            tx.set("status", 9); // expired
+            await tx.save(null, { useMasterKey: true });
+          }
           console.log(`Transaction hash already verified: ${transactionHash}`);
           continue;
         }
@@ -190,20 +209,18 @@ if (!user) {
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
         await tx.save(null, { useMasterKey: true });
-        const parentUserId = await getParentUserId(userId)
-        await updatePotBalance(parentUserId, result?.amountUSDC,"recharge");
-        
+        const parentUserId = await getParentUserId(userId);
+        await updatePotBalance(parentUserId, result?.amountUSDC, "recharge");
+
         verifiedCount++;
         //}
-      }
-      else {
+      } else {
         const now = new Date();
         const txAgeInMinutes = (now - txDate) / 60000;
 
         if (txAgeInMinutes > 45) {
           tx.set("status", 9); // expired
           await tx.save(null, { useMasterKey: true });
-          expiredCount++;
         }
       }
     } catch (err) {
@@ -215,7 +232,6 @@ if (!user) {
 });
 
 const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
-
   const url = `https://api.etherscan.io/v2/api`;
   const params = {
     module: "account",
@@ -223,7 +239,7 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
     address: walletAddress,
     // contractaddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
     sort: "desc",
-    chainid:8453,
+    chainid: 8453,
     apikey: process.env.ETHERSCAN_API_KEY,
   };
 
@@ -231,7 +247,9 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
     const response = await axios.get(url, { params });
     const txs = response.data.result;
     const latestIncomingTx = txs.find(
-      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase() && tx.tokenSymbol === 'USDC'
+      (tx) =>
+        tx.to.toLowerCase() === walletAddress.toLowerCase() &&
+        tx.tokenSymbol === "USDC"
     );
     if (latestIncomingTx) {
       const valueInUSDC = parseFloat(latestIncomingTx.value) / 1e6;
@@ -243,7 +261,7 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
         amountUSDC: valueInUSDC,
         txHash: latestIncomingTx.hash,
         timestamp,
-        txs:latestIncomingTx
+        txs: latestIncomingTx,
       };
     } else {
       return {
@@ -256,7 +274,6 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
     return { confirmed: false, error: err.message };
   }
 };
-
 
 // Parse.Cloud.define("getUserUSDCBalances", async (request) => {
 //   const limit = request.params.limit || 1000;
@@ -313,8 +330,6 @@ const getLatestUSDCTransactionFromEtherV2 = async (walletAddress) => {
 //   }
 // };
 
-
-
 Parse.Cloud.define("getUserBaseBalances", async (request) => {
   const limit = request.params.limit || 1000;
   const skip = request.params.skip || 0;
@@ -354,7 +369,7 @@ Parse.Cloud.define("getUserBaseBalances", async (request) => {
       });
 
       const balances = response?.data?.result || [];
-      console.log(balances,"balances")
+      console.log(balances, "balances");
       for (const entry of balances) {
         const wallet = entry.account?.toLowerCase();
         const userId = addressToUserMap[wallet];
