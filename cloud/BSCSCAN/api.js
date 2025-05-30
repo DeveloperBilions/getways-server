@@ -114,7 +114,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         const now = new Date();
         const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
-        if (txAgeInMinutes > 15) {
+        if (txAgeInMinutes > 45) {
           tx.set("status", 9); // Expired
           await tx.save(null, { useMasterKey: true });
           continue;
