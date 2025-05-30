@@ -52,14 +52,14 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
   txQuery.equalTo("status", 1);
   txQuery.equalTo("portal", "Stripe");
   txQuery.limit(100000);
-  txQuery.descending("transactionDate"); // Sort by latest first
+  txQuery.descending("createdAt"); // Sort by latest first
   const pendingTxs = await txQuery.find({ useMasterKey: true });
 
   let verifiedCount = 0;
   for (const tx of pendingTxs) {
     const userId = tx.get("userId");
     const txAmount = parseFloat(tx.get("transactionAmount"));
-    const txDate = tx.get("transactionDate");
+    const txDate = tx.get("createdAt");
 
     if (!userId || !txAmount) continue;
 
@@ -131,14 +131,14 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
   txQuery.equalTo("status", 1);
   txQuery.equalTo("portal", "Coinbase");
   txQuery.limit(100000);
-  txQuery.descending("transactionDate"); // Sort by latest first
+  txQuery.descending("createdAt"); // Sort by latest first
   const pendingTxs = await txQuery.find({ useMasterKey: true });
 
   let verifiedCount = 0;
   for (const tx of pendingTxs) {
     const userId = tx.get("userId");
     const txAmount = parseFloat(tx.get("transactionAmount"));
-    const txDate = tx.get("transactionDate");
+    const txDate = tx.get("createdAt");
 
     if (!userId || !txAmount) continue;
 
