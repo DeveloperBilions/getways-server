@@ -64,7 +64,12 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
     if (!userId || !txAmount) continue;
 
     const userQuery = new Parse.Query(Parse.User);
-    const user = await userQuery.get(userId, { useMasterKey: true });
+    userQuery.equalTo("objectId", userId);
+    const user = await userQuery.first({ useMasterKey: true });
+    if (!user) {
+      console.warn(`User not found for ID: ${userId}`);
+      continue;
+    }
     const walletAddr = user.get("walletAddr");
     if (!walletAddr) continue;
 
@@ -143,7 +148,13 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
     if (!userId || !txAmount) continue;
 
     const userQuery = new Parse.Query(Parse.User);
-    const user = await userQuery.get(userId, { useMasterKey: true });
+userQuery.equalTo("objectId", userId);
+const user = await userQuery.first({ useMasterKey: true });
+
+if (!user) {
+  console.warn(`User not found for ID: ${userId}`);
+  continue;
+}
     const walletAddr = user.get("walletAddr");
     if (!walletAddr) continue;
 
