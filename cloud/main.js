@@ -13,6 +13,7 @@ async function loadModule() {
     await import('./CoinBaseOnRamp/CoinBase.js')
     await import('./parse.js')
     await import('./Triggers/transaction.js')
+    await import('./PayArc/payarc.js')
 
 }
 

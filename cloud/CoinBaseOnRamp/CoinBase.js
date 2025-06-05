@@ -14,12 +14,17 @@ const _sodium = require("libsodium-wrappers");
 // const COINBASE_KEY_SECRET = "vR0v/RHfQ6FsOaqLjC56q3dktb4//2EtkCnl1mPLOEEddM+Tnu2CY/8h5R1CruT/+2YEXTuEQHVPu/F7eP/ICg==";
 
 //Latest
-const COINBASE_KEY_NAME = "16201d2e-a55f-4634-8327-631dfe30fab2";
-const COINBASE_KEY_SECRET = "x8SK4xATTzrZ48M06sRUUQtGpR4aglcUQcFoFbWcJhH7ih0RPFB480vP2bvmG4QW6SGXFL4iQvr31G01JC5Ytw==";
+// const COINBASE_KEY_NAME = "16201d2e-a55f-4634-8327-631dfe30fab2";
+// const COINBASE_KEY_SECRET = "x8SK4xATTzrZ48M06sRUUQtGpR4aglcUQcFoFbWcJhH7ih0RPFB480vP2bvmG4QW6SGXFL4iQvr31G01JC5Ytw==";
 
 //Latest Live
 // const COINBASE_KEY_NAME = "49c0e3d1-bff5-40c2-a83a-0317bc6dbf1b";
 // const COINBASE_KEY_SECRET = "dmZSS6vukAVz5DS70Y9sa8QLIi3FlvXACL+1rWTr5HRw1pRRYNqwdvkCtjz0XZGTYjmJJyMAIAjJWuITnRMfeQ==";
+
+
+//Latest
+const COINBASE_KEY_NAME = "ee0ba784-4ad7-4b47-acb5-9d6007db5d07";
+const COINBASE_KEY_SECRET = "u8aHDLVT54n1PVPsI7AvhzZDPFQ5/otC1y2IJTfK6/ypv+F5/BdQp6gu4xOxAP9c4hcj9OeWv61wgzXbvCq6EQ==";
 
 
 Parse.Cloud.define("generateCoinbaseSessionToken", async (request) => {
