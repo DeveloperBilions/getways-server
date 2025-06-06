@@ -1,6 +1,7 @@
 const axios = require('axios');
 const qs = require('querystring');
 const { getParentUserId, updatePotBalance } = require('../utility/utlis');
+const https = require('follow-redirects').https;
 
 Parse.Cloud.define("createPayarcOrder", async (request) => {
   try {
@@ -97,3 +98,37 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
   log.info(`✅ Verified ${verifiedCount} Payarc recharges.`);
   log.info(`🕒 Marked ${expiredCount} as expired.`);
 });
+
+
+Parse.Cloud.define("createPayarcCharge", async (request) => {
+    const { token_id, amount, currency = "usd", description = "Recharge" } = request.params;
+  
+    const PAYARC_API_KEY = process.env.PAYARC_API_KEY; // ✅ Secure this in your .env or server config
+  
+    try {
+      const response = await axios.post(
+        "https://api.payarc.net/v1/charges",
+        qs.stringify({
+          amount: String(amount),
+          currency,
+          statement_description: description,
+          token_id,
+          capture: '1'
+        }),
+        {
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Bearer ${PAYARC_API_KEY}`
+          },
+          maxRedirects: 20
+        }
+      );
+        console.log( " ✅ ✅ ✅ ",response.data)
+      return response.data; // ✅ Forward the charge response to client
+    } catch (error) {
+      console.error("PayArc charge error:", error.response?.data || error.message);
+      throw new Parse.Error(500, "PayArc charge failed: " + (error.response?.data?.message || error.message));
+    }
+  });
+  
