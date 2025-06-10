@@ -130,7 +130,10 @@ ParseServer.createLiveQueryServer(httpServer);
      await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
      await Parse.Cloud.run("verifyRechargeForPayarc"); // Checks and updates transaction statuses from Stripe.
      await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
-//     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("expiredTransactionStripe"); // Checks and updates transaction statuses from Stripe.
+
+     
+     //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
 
 
     //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.

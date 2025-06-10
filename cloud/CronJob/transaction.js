@@ -88,6 +88,7 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
+    query.equalTo("portal", "Stripe"); // Filter by status=1
     query.descending("updatedAt");
     query.limit(10000);
 
