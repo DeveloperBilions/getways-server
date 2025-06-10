@@ -14,6 +14,7 @@ async function loadModule() {
     await import('./parse.js')
     await import('./Triggers/transaction.js')
     await import('./PayArc/payarc.js')
+    await import('./Stripe/stripeCheckout.js')
 
 }
 

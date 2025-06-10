@@ -6,6 +6,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Filter by status=1
+    query.equalTo("portal", "Stripe"); // Filter by status=1
     query.limit(10000);
     const now = new Date();
     const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago in milliseconds

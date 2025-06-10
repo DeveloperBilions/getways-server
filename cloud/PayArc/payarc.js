@@ -61,9 +61,9 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
         }
       );
       console.log(res?.data?.data,"❌statusss❌")
-      const status = res?.data?.status?.toLowerCase();
+      const status = res?.data?.data?.status?.toLowerCase();
 
-      if (status === "completed") {
+      if (status === "success") {
         const amount = res?.data?.amount || tx.get("transactionAmount");
 
         tx.set("status", 2); // completed
