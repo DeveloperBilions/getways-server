@@ -24,13 +24,16 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       return; // Exit if no records are found
     }
 
-    const data = results.map((record) => record.toJSON());
+    const data = results;
 
     for (const record of data) {
+      const transactionId = record.get("transactionIdFromStripe");
+
       try {
         const session = await stripe.checkout.sessions.retrieve(
-          record.transactionIdFromStripe
+          transactionId
         );
+        console.log(session)
         if (session.status === "complete") {
           record.status = 2; // Assuming 2 represents 'completed'
         } else if (session.status === "pending" || session.status === "open") {
