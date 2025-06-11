@@ -6,13 +6,13 @@ Parse.Cloud.define("createStripeCheckoutSession", async (request) => {
   const {
     amount,
     currency = "usd",
-    productName = "Recharge",
+    priceID,
     returnBaseUrl,
     remark = "",
   } = request.params;
 
-  if (!amount || !returnBaseUrl) {
-    throw new Error("Missing required parameters: amount or returnBaseUrl or userId");
+  if (!priceID || !returnBaseUrl ) {
+    throw new Error("Missing required parameters: priceID or returnBaseUrl or userId");
   }
 
   const user = await request.user?.fetch({ useMasterKey: true });
@@ -26,22 +26,12 @@ Parse.Cloud.define("createStripeCheckoutSession", async (request) => {
       ui_mode: 'embedded',
       line_items: [
         {
-          price_data: {
-            currency,
-            product_data: {
-              name: productName,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
+          price:priceID,
           quantity: 1,
         },
       ],
       mode: 'payment',
-      return_url: `${returnBaseUrl}?session_id={CHECKOUT_SESSION_ID}`,
-      metadata: {
-        userId: user.id,
-        username: user.get("username")
-      }
+      return_url: `${returnBaseUrl}?session_id={CHECKOUT_SESSION_ID}`
     });
 
     // Step 2: Create Transaction Record in Parse
