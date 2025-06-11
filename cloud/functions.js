@@ -2288,6 +2288,72 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   
 })
 
+Parse.Cloud.define("purchaseGiftCardExternal", async (request) => {
+  const {
+    orderId,
+    price,
+    productId,
+    productImage,
+    externalUserId,
+    externalUserFirstName,
+    externalUserLastName,
+    externalUserEmail,
+  } = request.params;
+
+  const method = "POST";
+  const path = `/purchaseimmediate`;
+  const bodyData = JSON.stringify({
+    orderId,
+    price,
+    productId,
+    externalUserId,
+    externalUserFirstName,
+    externalUserLastName,
+    externalUserEmail,
+    platform
+  });
+
+  const signature = generateSignature(method, path, bodyData);
+
+  const apiUrl = `${process.env.REACT_APP_Xremit_API_URL}${path}`;
+  const headers = {
+    "API-Key": process.env.REACT_APP_Xremit_API,
+    signature: signature,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await axios.post(apiUrl, bodyData, { headers });
+  
+    if (response.data) {
+      const Transaction = Parse.Object.extend("Transactions");
+      const txn = new Transaction();
+
+      txn.set("status", 12);
+      txn.set("userId", externalUserId);
+      txn.set("type", "redeem");
+      txn.set("transactionAmount", parseFloat(price));
+      txn.set("transactionDate", new Date());
+      txn.set("transactionIdFromStripe", orderId);
+      txn.set("paymentMode", "GiftCard");
+      txn.set("platform", platform)
+
+      await txn.save(null, { useMasterKey: true });
+
+    }
+  
+    // Returning response data and status
+    return { result: response.data, status: "success" };
+  } catch (error) {
+    // Log the error and return a specific error message for easier debugging
+    console.error("Request Error:", error.response.data.error || error.message.data.error);
+    return { error: error.response.data.error || error.message.data.error || "Failed Purchasing gift card " , status: "Failed" };
+
+    //throw new Parse.Error(500, `Failed to complete purchase: ${error.response.data.error || error.message.data.error }`);
+  }
+  
+})
+
 Parse.Cloud.define("xRemitGiftCardCallback", async (request) => {
   const callbackData = request.params; // This contains the POST data sent by xRemit
 
