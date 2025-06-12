@@ -124,13 +124,13 @@ ParseServer.createLiveQueryServer(httpServer);
   setInterval(async () => {
     try {
      // console.log("Running cloud function every 30 seconds...");
-      ///await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
-    //  await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyRechargeForPayarc"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("expiredTransactionStripe"); // Checks and updates transaction statuses from Stripe.
+      /await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
+     await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyRechargeForPayarc"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("expiredTransactionStripe"); // Checks and updates transaction statuses from Stripe.
 
      
      //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
