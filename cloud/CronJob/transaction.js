@@ -55,7 +55,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
             const parentUserId = await getParentUserId(record.userId);
             await updatePotBalance(
               parentUserId,
-              record.transactionAmount,
+              record.get("transactionAmount"),
               "recharge"
             );
           }
@@ -121,6 +121,14 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
             }
             record.set("status", newStatus);
             await record.save();
+            if (newStatus === 2) {
+            const parentUserId = await getParentUserId(record.userId);
+            await updatePotBalance(
+              parentUserId,
+              record.get("transactionAmount"),
+              "recharge"
+            );
+          }
             console.log(
               `Updated transaction record ${record.id} to status ${newStatus}`
             );
