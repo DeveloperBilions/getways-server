@@ -896,3 +896,55 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
     }`;
   }
 });
+
+// In your cloud code file (e.g., main.js or PlatformService.js)
+
+Parse.Cloud.define("updatePotBalance", async (request) => {
+  const { userId, amount, type } = request.params;
+
+  try {
+    if (!userId || !amount || amount <= 0 || !type) {
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        "Missing or invalid parameters"
+      );
+    }
+
+    const userQuery = new Parse.Query(Parse.User);
+    userQuery.equalTo("objectId", userId);
+    userQuery.select("potBalance");
+
+    const user = await userQuery.first({ useMasterKey: true });
+
+    if (!user) {
+      throw new Parse.Error(404, `User not found: ${userId}`);
+    }
+
+    const currentPotBalance = user.get("potBalance") || 0;
+    const potChangeAmount = Math.floor(amount * 0.15);
+
+    let newPotBalance;
+
+    if (type === "redeem") {
+      newPotBalance = Math.max(0, currentPotBalance - amount);
+    } else if (type === "recharge") {
+      newPotBalance = currentPotBalance + (amount - potChangeAmount);
+    } else {
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        `Invalid transaction type: ${type}`
+      );
+    }
+
+    user.set("potBalance", newPotBalance);
+    await user.save(null, { useMasterKey: true });
+
+    return {
+      status: "success",
+      newPotBalance,
+    };
+  } catch (error) {
+    console.error(`updatePotBalance failed:`, error);
+    throw error;
+  }
+});
