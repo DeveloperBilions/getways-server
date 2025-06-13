@@ -4,8 +4,9 @@ Parse.Cloud.beforeSave("TransactionRecords", async (request) => {
     const useWallet = transaction.get("useWallet");
     const userId = transaction.get("userId");
     const amount = transaction.get("transactionAmount");
-  
-    if (useWallet && userId && amount) {
+    const status = transaction.get("status");
+
+    if (useWallet && userId && amount && status === 1) {
       const walletQuery = new Parse.Query("Wallet");
       walletQuery.equalTo("userID", userId);
       const wallet = await walletQuery.first({ useMasterKey: true });
