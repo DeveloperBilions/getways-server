@@ -928,7 +928,7 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     if (type === "redeem") {
       newPotBalance = Math.max(0, currentPotBalance - amount);
     } else if (type === "recharge") {
-      newPotBalance = currentPotBalance + (amount - potChangeAmount);
+      newPotBalance = currentPotBalance + amount - potChangeAmount;
     } else {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,

@@ -52,7 +52,7 @@ const getParentUserId = async (userId) => {
           newPotBalance = currentPotBalance - amount;
         }
       } else if (type === "recharge") {
-        newPotBalance = currentPotBalance + (amount - potChangeAmount);
+        newPotBalance = currentPotBalance + amount;
       } else {
         return { success: false, message: `Invalid transaction type: ${type}` };
       }

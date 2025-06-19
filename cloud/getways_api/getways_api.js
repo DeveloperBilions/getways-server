@@ -108,3 +108,24 @@ Parse.Cloud.define("WithdrawTransaction", async (request) => {
 	)(response)
 	return response;
 });
+
+Parse.Cloud.define("sumRechargeTransactions", async (req) => {
+	const Transaction = Parse.Object.extend("TransactionRecords"); // replace with your actual class name
+	const query = new Parse.Query(Transaction);
+  
+	query.contains("transactionIdFromStripe", "txn-");
+	query.containedIn("status", [2, 3]);
+	query.equalTo("type", "recharge");
+  
+	query.limit(1000000); // Parse limit is 1000 by default
+  
+	const results = await query.find({ useMasterKey: true });
+  
+	const total = results.reduce((sum, record) => {
+	  const amount = record.get("transactionAmount") || 0;
+	  return sum + amount;
+	}, 0);
+  
+	return { total };
+  });
+  
