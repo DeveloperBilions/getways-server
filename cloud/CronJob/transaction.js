@@ -927,9 +927,11 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
 
     if (type === "redeem") {
       newPotBalance = Math.max(0, currentPotBalance - amount);
-    } else if (type === "recharge") {
-      newPotBalance = currentPotBalance + amount - potChangeAmount;
-    } else {
+    }else if (type === "recharge") {
+      // Add 85% of recharge amount to potBalance (deduct 15%)
+      const creditedAmount = amount * 0.85;
+      newPotBalance = currentPotBalance + creditedAmount;
+    }  else {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
         `Invalid transaction type: ${type}`

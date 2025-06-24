@@ -236,8 +236,9 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
       { $match: { userId } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ], { useMasterKey: true });
-
-    const totalRecharge = stats.totalRechargeAmount?.[0]?.total || 0;
+    const rawRecharge = stats.totalRechargeAmount?.[0]?.total || 0;
+    const totalRecharge = rawRecharge * 0.85; // 15% deduction
+    //const totalRecharge = stats.totalRechargeAmount?.[0]?.total || 0;
     const totalRedeem = stats.totalRedeemAmount?.[0]?.total || 0;
     const totalAccountPaid = drawer?.[0]?.total || 0;
     const totalRedeemFee = stats.totalRedeemServiceFee?.[0]?.total || 0;
@@ -245,8 +246,8 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
     const potBalance = totalRecharge - totalRedeem - totalAccountPaid;
 
     // Save potBalance to agent user record
-    agent.set("potBalance", potBalance);
-    await agent.save(null, { useMasterKey: true });
+    //agent.set("potBalance", potBalance);
+   // await agent.save(null, { useMasterKey: true });
 
     // Add to summary list
     allSummaries.push({
