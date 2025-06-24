@@ -2314,8 +2314,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
     
       const mailOptions = {
         from: process.env.EMAIL,
-        to:"priti@thebilions.com",
-        //to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
+        to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
         subject: "Gift Card Purchase Failed – Insufficient Balance",
         html: emailContent,
       };
