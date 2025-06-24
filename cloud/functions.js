@@ -2278,12 +2278,64 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
   
     // Returning response data and status
     return { result: response.data, status: "success" };
-  } catch (error) {
-    // Log the error and return a specific error message for easier debugging
-    console.error("Request Error:", error.response.data.error || error.message.data.error);
-    return { error: error.response.data.error || error.message.data.error || "Failed Purchasing gift card " , status: "Failed" };
-
-    //throw new Parse.Error(500, `Failed to complete purchase: ${error.response.data.error || error.message.data.error }`);
+  }catch (error) {
+    const errorMsg =
+      error?.response?.data?.error ||
+      error?.message?.data?.error ||
+      "Failed Purchasing gift card";
+  
+    console.error("Request Error:", errorMsg);
+  
+    if (
+      errorMsg ===
+      "Not enough balance in the account to request this order"
+    ) {
+      const nodemailer = require("nodemailer");
+  
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.PASSWORD,
+        },
+      });
+  
+      const emailContent = `
+      <div style="font-family: Arial, sans-serif; background-color: #ffffff; color: #000000; padding: 20px; border: 1px solid #ddd;">
+        <h2 style="color: #000000; border-bottom: 2px solid #000; padding-bottom: 5px;"> Gift Card Purchase Failed</h2>
+        
+        <p><strong>User:</strong> ${externalUserFirstName} ${externalUserLastName} <br/>
+        <a href="mailto:${externalUserEmail}" style="color: #000000;">${externalUserEmail}</a></p>
+    
+        <p><strong>Order ID:</strong> <span style="color: #333;">${orderId}</span></p>
+        <p><strong>Amount:</strong> <span style="color: #333;">$${price}</span></p>
+        <p><strong>Reason:</strong> <span style="color: red;">Not enough balance in the account to request this order</span></p>
+    
+        <hr style="margin: 20px 0; border-top: 1px solid #000000;" />
+    
+        <p style="font-size: 14px; color: #666;">
+          This is an automated alert from the system. Please take necessary action.
+        </p>
+      </div>
+    `;
+    
+  
+      const mailOptions = {
+        from: process.env.EMAIL,
+        to: ["priti@thebilions.com"],
+        subject: "Gift Card Purchase Failed – Insufficient Balance",
+        html: emailContent,
+      };
+  
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log("Alert email sent.");
+      } catch (emailError) {
+        console.error("Failed to send alert email:", emailError);
+      }
+    }
+  
+    return { error: errorMsg, status: "Failed" };
   }
   
 })

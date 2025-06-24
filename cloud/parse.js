@@ -169,6 +169,7 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
   // ── Step 1: Fetch all agents ──────────────────────────────
   const agents = await new Parse.Query(Parse.User)
     .equalTo("roleName", "Agent")
+    .equalTo("userParentName", "TYBD")
     .limit(batchLimit)
     .find({ useMasterKey: true });
 
@@ -180,7 +181,7 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
     const username = agent.get("username");
 
     // Get list of player userIds under this agent
-    const playerList = await fetchPlayerList(userId); // This must be defined elsewhere
+    const playerList = await fetchPlayerList(userId); // You must define this function elsewhere
 
     // Aggregate transaction stats
     const result = await new Parse.Query("TransactionRecords").aggregate([
@@ -217,9 +218,9 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
                     $multiply: [
                       "$transactionAmount",
                       { $divide: ["$redeemServiceFee", 100] },
-                    ]
-                  }
-                }                
+                    ],
+                  },
+                },
               },
             },
             { $group: { _id: null, total: { $sum: "$feeAmount" } } },
@@ -236,14 +237,26 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ], { useMasterKey: true });
 
-    // Push to data array
+    const totalRecharge = stats.totalRechargeAmount?.[0]?.total || 0;
+    const totalRedeem = stats.totalRedeemAmount?.[0]?.total || 0;
+    const totalAccountPaid = drawer?.[0]?.total || 0;
+    const totalRedeemFee = stats.totalRedeemServiceFee?.[0]?.total || 0;
+
+    const potBalance = totalRecharge - totalRedeem - totalAccountPaid;
+
+    // Save potBalance to agent user record
+    agent.set("potBalance", potBalance);
+    await agent.save(null, { useMasterKey: true });
+
+    // Add to summary list
     allSummaries.push({
       agentId: userId,
       username,
-      totalRecharge: stats.totalRechargeAmount?.[0]?.total || 0,
-      totalRedeem: stats.totalRedeemAmount?.[0]?.total || 0,
-      totalAccountPaid: drawer?.[0]?.total || 0,
-      totalRedeemFee: stats.totalRedeemServiceFee?.[0]?.total || 0,
+      totalRecharge,
+      totalRedeem,
+      totalAccountPaid,
+      totalRedeemFee,
+      potBalance,
     });
   }
 
@@ -256,6 +269,7 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
       "totalRedeem",
       "totalAccountPaid",
       "totalRedeemFee",
+      "potBalance",
     ],
   });
 
@@ -277,7 +291,6 @@ Parse.Cloud.define("exportAgentTransactionSummary", async () => {
     rowCount: allSummaries.length,
   };
 });
-
   
 async function fetchPlayerList  (userid)  {
   try {
