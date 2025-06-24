@@ -2283,15 +2283,12 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
       error?.response?.data?.error ||
       error?.message?.data?.error ||
       "Failed Purchasing gift card";
-  
+
     console.error("Request Error:", errorMsg);
-  
-    if (
-      errorMsg ===
-      "Not enough balance in the account to request this order"
-    ) {
+
+    if (errorMsg === "Not enough balance in the account to request this order") {
       const nodemailer = require("nodemailer");
-  
+    
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -2299,42 +2296,75 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
           pass: process.env.PASSWORD,
         },
       });
-  
+    
       const emailContent = `
-      <div style="font-family: Arial, sans-serif; background-color: #ffffff; color: #000000; padding: 20px; border: 1px solid #ddd;">
-        <h2 style="color: #000000; border-bottom: 2px solid #000; padding-bottom: 5px;"> Gift Card Purchase Failed</h2>
-        
-        <p><strong>User:</strong> ${externalUserFirstName} ${externalUserLastName} <br/>
-        <a href="mailto:${externalUserEmail}" style="color: #000000;">${externalUserEmail}</a></p>
+        <div style="font-family: Arial, sans-serif; background-color: #ffffff; color: #000000; padding: 20px; border: 1px solid #ddd;">
+          <h2 style="color: #000000; border-bottom: 2px solid #000; padding-bottom: 5px;"> Gift Card Purchase Failed</h2>
+          <p><strong>User:</strong> ${externalUserFirstName} ${externalUserLastName} <br/>
+          <a href="mailto:${externalUserEmail}" style="color: #000000;">${externalUserEmail}</a></p>
+          <p><strong>Order ID:</strong> <span style="color: #333;">${orderId}</span></p>
+          <p><strong>Amount:</strong> <span style="color: #333;">$${price}</span></p>
+          <p><strong>Reason:</strong> <span style="color: red;">Not enough balance in the account to request this order</span></p>
+          <hr style="margin: 20px 0; border-top: 1px solid #000000;" />
+          <p style="font-size: 14px; color: #666;">
+            This is an automated alert from the system. Please take necessary action.
+          </p>
+        </div>
+      `;
     
-        <p><strong>Order ID:</strong> <span style="color: #333;">${orderId}</span></p>
-        <p><strong>Amount:</strong> <span style="color: #333;">$${price}</span></p>
-        <p><strong>Reason:</strong> <span style="color: red;">Not enough balance in the account to request this order</span></p>
-    
-        <hr style="margin: 20px 0; border-top: 1px solid #000000;" />
-    
-        <p style="font-size: 14px; color: #666;">
-          This is an automated alert from the system. Please take necessary action.
-        </p>
-      </div>
-    `;
-    
-  
       const mailOptions = {
         from: process.env.EMAIL,
-        to: ["priti@thebilions.com"],
+        to:"priti@thebilions.com",
+        //to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
         subject: "Gift Card Purchase Failed – Insufficient Balance",
         html: emailContent,
       };
-  
+    
       try {
         await transporter.sendMail(mailOptions);
         console.log("Alert email sent.");
       } catch (emailError) {
         console.error("Failed to send alert email:", emailError);
       }
+    
+      try {
+        const userQuery = new Parse.Query(Parse.User);
+        const user = await userQuery.get(externalUserId, { useMasterKey: true });
+    
+        // 1. Log failed transaction
+        const Transaction = Parse.Object.extend("TransactionRecords");
+        const txn = new Transaction();
+        txn.set("status", 13); // custom code for failure
+        txn.set("userId", user.id);
+        txn.set("username", user.get("username"));
+        txn.set("userParentId", user.get("userParentId") || "");
+        txn.set("type", "redeem");
+        txn.set("transactionAmount", parseFloat(price));
+        txn.set("gameId", "786");
+        txn.set("transactionDate", new Date());
+        txn.set("transactionIdFromStripe", orderId);
+        txn.set("isCashOut", true);
+        txn.set("paymentMode", "GiftCard");
+        txn.set("remark", "Gift card purchase failed due to insufficient balance");
+        await txn.save(null, { useMasterKey: true });
+    
+        // 2. Log failed gift card request
+        const GiftCard = Parse.Object.extend("GiftCardHistory");
+        const giftCardEntry = new GiftCard();
+        giftCardEntry.set("userId", externalUserId);
+        giftCardEntry.set("productId", productId.toString());
+        giftCardEntry.set("productImage", productImage);
+        giftCardEntry.set("price", price);
+        giftCardEntry.set("orderId", orderId);
+        giftCardEntry.set("apiResponse", { error: errorMsg });
+        giftCardEntry.set("status", "failed");
+        await giftCardEntry.save(null, { useMasterKey: true });
+      } catch (saveError) {
+        console.error("Failed to log failed transaction/giftCard:", saveError);
+      }
     }
-  
+    
+
     return { error: errorMsg, status: "Failed" };
   }
   
