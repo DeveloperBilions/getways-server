@@ -5,83 +5,68 @@ const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
-    query.equalTo("status", 1); // Filter by status=1
-    query.equalTo("portal", "Stripe"); // Filter by status=1
+    query.equalTo("status", 1); // status = 1 => pending
+    query.equalTo("portal", "Stripe");
     query.contains("transactionIdFromStripe", "cs_live");
     query.limit(10000);
-    const now = new Date();
-    const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago in milliseconds
-
-    // Add a condition to fetch records updated within the last half hour
-    query.greaterThanOrEqualTo("updatedAt", halfHourAgo);
     query.descending("updatedAt");
 
     const results = await query.find();
 
-    if (results != null && results.length > 0) {
-      console.log("Total Pending records " + results.length);
-    } else {
-      console.log("No transactions found in the last 30 Seconds.");
-      return; // Exit if no records are found
+    if (!results || results.length === 0) {
+      return;
     }
+    const now = new Date();
 
-    const data = results;
-
-    for (const record of data) {
+    for (const record of results) {
       const transactionId = record.get("transactionIdFromStripe");
+      const createdAt = record.get("createdAt");
+
+      const diffMs = now - createdAt; // difference in milliseconds
+      const diffMins = diffMs / (1000 * 60); // convert to minutes
+
+      if (diffMins > 45) {
+        // Expire the transaction due to timeout
+        record.set("status", 9); // 9 = expired
+        await record.save(null, { useMasterKey: true });
+        continue;
+      }
 
       try {
-        const session = await stripe.checkout.sessions.retrieve(
-          transactionId
-        );
-        console.log(session)
+        const session = await stripe.checkout.sessions.retrieve(transactionId);
+
+        let newStatus;
         if (session.status === "complete") {
-          record.status = 2; // Assuming 2 represents 'completed'
+          newStatus = 2;
         } else if (session.status === "pending" || session.status === "open") {
-          record.status = 1; // Pending
+          newStatus = 1;
         } else if (session.status === "expired") {
-          record.status = 9; // Expired
+          newStatus = 9;
         } else {
-          record.status = 10; // Failed or canceled
+          newStatus = 10;
         }
-        const recordObject = results.find((rec) => rec.id === record.objectId);
-        if (recordObject) {
-          recordObject.set("status", record.status);
-          await recordObject.save();
-          if (record.status === 2) {
-            const parentUserId = await getParentUserId(record.get("userId"));
-            await updatePotBalance(
-              parentUserId,
-              record.get("transactionAmount"),
-              "recharge"
-            );
-          }
+
+        record.set("status", newStatus);
+        await record.save(null, { useMasterKey: true });
+
+        if (newStatus === 2) {
+          const parentUserId = await getParentUserId(record.get("userId"));
+          await updatePotBalance(parentUserId, record.get("transactionAmount"), "recharge");
         }
       } catch (error) {
-        console.error(
-          `Error with Stripe API for transactionId ${record.transactionId}:`,
-          error.message
-        );
+        console.error(`Stripe API error for transaction ${transactionId}: ${error.message}`);
       }
     }
   } catch (error) {
-    if (error instanceof Parse.Error) {
-      console.log(`Parse-specific error: ${error.code} - ${error.message}`);
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      console.log(`An unexpected error occurred: ${error.message}`);
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
+    console.error("Error in checkTransactionStatusStripe:", error.message);
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "Unexpected error",
+    };
   }
 });
+
 Parse.Cloud.define("expiredTransactionStripe", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
