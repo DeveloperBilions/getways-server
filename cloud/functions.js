@@ -250,6 +250,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
       const agentQuery = new Parse.Query(Parse.User);
       agentQuery.equalTo("userParentId", user.id);
       agentQuery.equalTo("roleName", "Agent");
+      agentQuery.notEqualTo("isDeleted", true);
       const agents = await agentQuery.findAll({ useMasterKey: true });
     
       // 2. Find Players under all these Agents
@@ -260,6 +261,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
         const playerQuery = new Parse.Query(Parse.User);
         playerQuery.containedIn("userParentId", agentIds);
         playerQuery.equalTo("roleName", "Player");
+        playerQuery.notEqualTo("isDeleted", true);
         players = await playerQuery.findAll({ useMasterKey: true });
       }
     
@@ -292,6 +294,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
       const playerQuery = new Parse.Query(Parse.User);
       playerQuery.equalTo("userParentId", user.id);
       playerQuery.equalTo("roleName", "Player");
+      playerQuery.notEqualTo("isDeleted", true);
       const players = await playerQuery.findAll({ useMasterKey: true });
     
       // Batch soft-delete
