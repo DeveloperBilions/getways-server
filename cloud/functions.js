@@ -227,6 +227,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
     if (!user) {
       throw new Error("User not found.");
     }
+    const roleName = user.get("roleName");
 
     // Soft delete the user by setting isDeleted or deletedAt
     user.set("isDeleted", true);
@@ -243,6 +244,73 @@ Parse.Cloud.define("deleteUser", async (request) => {
     // Delete the user
     // await user.destroy({ useMasterKey: true });
 
+
+    if (roleName === "Master-Agent") {
+      // 1. Find Agents under this Master Agent
+      const agentQuery = new Parse.Query(Parse.User);
+      agentQuery.equalTo("userParentId", user.id);
+      agentQuery.equalTo("roleName", "Agent");
+      const agents = await agentQuery.findAll({ useMasterKey: true });
+    
+      // 2. Find Players under all these Agents
+      const agentIds = agents.map((a) => a.id);
+    
+      let players = [];
+      if (agentIds.length > 0) {
+        const playerQuery = new Parse.Query(Parse.User);
+        playerQuery.containedIn("userParentId", agentIds);
+        playerQuery.equalTo("roleName", "Player");
+        players = await playerQuery.findAll({ useMasterKey: true });
+      }
+    
+      // 3. Collect all users to mark as deleted
+      const usersToSoftDelete = [...agents, ...players];
+    
+      // 4. Mark all as deleted
+      for (const u of usersToSoftDelete) {
+        u.set("isDeleted", true);
+      }
+    
+      // 5. Save all in a single request
+      if (usersToSoftDelete.length > 0) {
+        await Parse.Object.saveAll(usersToSoftDelete, { useMasterKey: true });
+      }
+    
+      // 6. Collect all sessions
+      if (usersToSoftDelete.length > 0) {
+        const sessionQuery = new Parse.Query("_Session");
+        sessionQuery.containedIn("user", usersToSoftDelete);
+        const sessions = await sessionQuery.find({ useMasterKey: true });
+        if (sessions.length > 0) {
+          await Parse.Object.destroyAll(sessions, { useMasterKey: true });
+        }
+      }
+    }
+    
+    // If Agent: delete their Players
+    if (roleName === "Agent") {
+      const playerQuery = new Parse.Query(Parse.User);
+      playerQuery.equalTo("userParentId", user.id);
+      playerQuery.equalTo("roleName", "Player");
+      const players = await playerQuery.findALL({ useMasterKey: true });
+    
+      // Batch soft-delete
+      for (const p of players) {
+        p.set("isDeleted", true);
+      }
+      if (players.length > 0) {
+        await Parse.Object.saveAll(players, { useMasterKey: true });
+    
+        // Batch destroy sessions
+        const sessionQuery = new Parse.Query("_Session");
+        sessionQuery.containedIn("user", players);
+        const sessions = await sessionQuery.find({ useMasterKey: true });
+        if (sessions.length > 0) {
+          await Parse.Object.destroyAll(sessions, { useMasterKey: true });
+        }
+      }
+    }
+    
     // Fetch remaining users
     const remainingUsersQuery = new Parse.Query(Parse.User);
     const remainingUsers = await remainingUsersQuery.find({
