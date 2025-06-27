@@ -292,7 +292,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
       const playerQuery = new Parse.Query(Parse.User);
       playerQuery.equalTo("userParentId", user.id);
       playerQuery.equalTo("roleName", "Player");
-      const players = await playerQuery.findALL({ useMasterKey: true });
+      const players = await playerQuery.findAll({ useMasterKey: true });
     
       // Batch soft-delete
       for (const p of players) {
