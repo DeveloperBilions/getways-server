@@ -88,6 +88,9 @@ Parse.Cloud.define("createUser", async (request) => {
     user.set("userParentId", userParentId);
     user.set("userParentName", userParentName);
     user.set("roleName", roleName);
+    if(roleName === "Agent"){
+      user.set("tier", "S");
+    }
     user.set("userReferralCode", userReferralCode);
     if (redeemService) {
       user.set("redeemService", redeemService);
