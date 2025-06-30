@@ -16,7 +16,7 @@ async function loadModule() {
     await import('./PayArc/payarc.js')
     await import('./Stripe/stripeCheckout.js')
     await import('./PlarformService/PlatformService.js')
-
+    await import('./paynearme.js')
 }
 
 loadModule();
