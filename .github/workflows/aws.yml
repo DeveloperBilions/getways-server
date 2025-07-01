@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: getways-server
 
     steps:
     - name: Checkout code
@@ -28,6 +30,6 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
           cd /var/www/html/Production/getways-server
-          npm install
+          sudo npm install
           pm2 restart all || pm2 start index.js --name "getways-server"
         EOF
