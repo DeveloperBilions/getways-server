@@ -1,0 +1,33 @@
+name: Deploy Node.js App to EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+    - name: Rsync files to EC2
+      run: |
+        rsync -avz --delete \
+          -e "ssh -o StrictHostKeyChecking=no" \
+          ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/html/Production/getways-server/
+
+    - name: Install dependencies and restart app
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd /var/www/html/Production/getways-server
+          npm install
+          pm2 restart all || pm2 start index.js --name "getways-server"
+        EOF
