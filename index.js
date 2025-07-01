@@ -124,12 +124,12 @@ ParseServer.createLiveQueryServer(httpServer);
   setInterval(async () => {
     try {
      // console.log("Running cloud function every 30 seconds...");
-    //   await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
-    //  await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("verifyRechargeForPayarc"); // Checks and updates transaction statuses from Stripe.
-    //  await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
+      await Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"); 
+     await Parse.Cloud.run("checkRecentPendingWertTransactions"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyCryptoRecharge"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyCryptoRechargeForCoinBase"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("verifyRechargeForPayarc"); // Checks and updates transaction statuses from Stripe.
+     await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
     // //  await Parse.Cloud.run("expiredTransactionStripe"); // Checks and updates transaction statuses from Stripe.
 
      
@@ -156,16 +156,16 @@ ParseServer.createLiveQueryServer(httpServer);
   // }, process.env.expiredTransactionStripe); // 10 minutes interval.
 
   // // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
-  // setTimeout(async () => {
-  //   try {
-  //     //console.log("Update The Status of blank or 0 status to 1...");
-  //     // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
-  //    // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
-  //     ///await Parse.Cloud.run("migration")
-  //   } catch (error) {
-  //     console.error("Error running cloud function:", error);
-  //   }
-  // }, 5000); // 5 seconds after initialization.
+  setTimeout(async () => {
+    try {
+      //console.log("Update The Status of blank or 0 status to 1...");
+      await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+     // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
+      ///await Parse.Cloud.run("migration")
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, 5000); // 5 seconds after initialization.
 
   // Helper function to get the current time in a specific timezone
   function getCurrentTimeInTimezone(timezone) {
@@ -217,7 +217,7 @@ ParseServer.createLiveQueryServer(httpServer);
   }
 
   // Call the function to schedule the cron task
-//scheduleTask();
+scheduleTask();
 
 //   cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
 //     try {
@@ -227,39 +227,39 @@ ParseServer.createLiveQueryServer(httpServer);
 //     }
 //   });
 
-//   cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
-//     try {
-//       await Parse.Cloud.run("expireRedeemRequest");
-//     } catch (error) {
-//       console.error("Error executing cloud function:", error);
-//     }
-//   });
-//   if (process.env.NODE_ENV === "production") {
-//   cron.schedule("59 23 * * *", async () => {
-//     try {
-//       await Parse.Cloud.run("sendDailyTransactionEmail");
-//       console.log("Daily transaction email sent successfully.");
-//     } catch (error) {
-//       console.error("Error executing cloud function:", error);
-//     }
-//   }, {
-//     timezone: "UTC" // Ensure it runs in UTC timezone
-// });
-//   }
-//   if (process.env.NODE_ENV === "production") {
+  cron.schedule(process.env.EXPIRE_REDEEM_REQUEST_CRON, async () => {
+    try {
+      await Parse.Cloud.run("expireRedeemRequest");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  });
+  if (process.env.NODE_ENV === "production") {
+  cron.schedule("59 23 * * *", async () => {
+    try {
+      await Parse.Cloud.run("sendDailyTransactionEmail");
+      console.log("Daily transaction email sent successfully.");
+    } catch (error) {
+      console.error("Error executing cloud function:", error);
+    }
+  }, {
+    timezone: "UTC" // Ensure it runs in UTC timezone
+});
+  }
+  if (process.env.NODE_ENV === "production") {
 
-// cron.schedule("59 23 * * *", async () => {  // runs every 2 minutes
-//       try {
-//         await Parse.Cloud.run("sendWalletAuditReportEmail");
-//         console.log("Daily transaction email sent successfully.");
-//       } catch (error) {
-//         console.error("Error executing cloud function:", error);
-//       }
-//     }, {
-//       timezone: "UTC" // Ensure it runs in UTC timezone
-//   });
+cron.schedule("59 23 * * *", async () => {  // runs every 2 minutes
+      try {
+        await Parse.Cloud.run("sendWalletAuditReportEmail");
+        console.log("Daily transaction email sent successfully.");
+      } catch (error) {
+        console.error("Error executing cloud function:", error);
+      }
+    }, {
+      timezone: "UTC" // Ensure it runs in UTC timezone
+  });
   
-//     }
+    }
 
 }
 
