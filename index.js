@@ -49,8 +49,8 @@ duration: 30,
     ],
     users: [
       {
-        user: "admin",
-        pass: "password",
+        user: process.env.PARSE_SERVER_USERNAME,
+        pass: process.env.PARSE_SERVER_PASSWORD,
       },
     ],
     // Allow insecure HTTP (for development only)
