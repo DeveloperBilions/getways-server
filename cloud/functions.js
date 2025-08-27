@@ -2762,3 +2762,82 @@ Parse.Cloud.define("chatbot", async (request) => {
     };
   }
 });
+
+
+
+// cloud/backfillUserParentId.js
+// Register this file in your Parse Server cloud code entry.
+
+Parse.Cloud.define("backfillTransactionUserParentId", async (request) => {
+  const { params, message } = request;
+  const BATCH_READ = Number(params?.batchRead || 500);   // how many transactions to scan per loop
+  const BATCH_SAVE = Number(params?.batchSave || 100);   // saveAll chunk size
+  const DRY_RUN    = !!params?.dryRun;                   // if true, don't write changes
+
+  let loops = 0, scanned = 0, updated = 0, skipped = 0, missingUser = 0;
+
+  message?.(`Starting backfill (dryRun=${DRY_RUN}, read=${BATCH_READ}, save=${BATCH_SAVE})`);
+
+  while (true) {
+    // Find a page of transactions missing userParentId
+    const qMissing = new Parse.Query("TransactionRecords").doesNotExist("userParentId");
+    const qNull    = new Parse.Query("TransactionRecords").equalTo("userParentId", null);
+    const qEmpty   = new Parse.Query("TransactionRecords").equalTo("userParentId", "");
+    const q = Parse.Query.or(qMissing, qNull, qEmpty);
+
+    q.limit(BATCH_READ);
+    q.select("userId"); // only need userId to compute parent
+    const txs = await q.find({ useMasterKey: true });
+
+    if (!txs.length) break;
+
+    loops += 1;
+    scanned += txs.length;
+
+    // Collect userIds and load users (with their userParentId)
+    const userIds = [...new Set(txs.map(t => t.get("userId")).filter(Boolean))];
+    let users = [];
+    if (userIds.length) {
+      const uQ = new Parse.Query(Parse.User);
+      uQ.containedIn("objectId", userIds);
+      uQ.select("userParentId");
+      users = await uQ.find({ useMasterKey: true });
+    }
+
+    const userToParent = new Map(users.map(u => [u.id, u.get("userParentId") || ""]));
+
+    // Prepare updates
+    const toSave = [];
+    for (const t of txs) {
+      const uid = t.get("userId");
+      if (!uid) { skipped++; continue; }
+
+      const parentId = userToParent.get(uid);
+      if (parentId && typeof parentId === "string" && parentId.trim() !== "") {
+        t.set("userParentId", parentId);
+        toSave.push(t);
+      } else {
+        // no user found or user has no parent
+        if (!userToParent.has(uid)) missingUser++;
+        else skipped++;
+      }
+    }
+
+    // Save in chunks
+    if (!DRY_RUN && toSave.length) {
+      for (let i = 0; i < toSave.length; i += BATCH_SAVE) {
+        const chunk = toSave.slice(i, i + BATCH_SAVE);
+        await Parse.Object.saveAll(chunk, { useMasterKey: true });
+      }
+      updated += toSave.length;
+    }
+
+    message?.(
+      `Loop ${loops}: scanned=${scanned}, toUpdate=${toSave.length}, updated=${updated}, skipped=${skipped}, missingUser=${missingUser}`
+    );
+
+    // Continue; next loop will fetch the next set since these are now filled
+  }
+
+  message?.(`Done. scanned=${scanned}, updated=${updated}, skipped=${skipped}, missingUser=${missingUser}`);
+});

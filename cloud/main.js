@@ -17,6 +17,8 @@ async function loadModule() {
     await import('./Stripe/stripeCheckout.js')
     await import('./PlarformService/PlatformService.js')
     await import('./paynearme.js')
+    await import('./click.js')
+
 }
 
 loadModule();
