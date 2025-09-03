@@ -35,8 +35,8 @@ Parse.Cloud.define("createCheckoutSession", async (request) => {
   try {
     const resp = await axios.post("https://api.dev.clkk-api.io/api/partner/checkout/sessions",{
         "amount": amount*100,
-        "success_url": "https://example.com/success",
-        "cancel_url": "https://example.com/cancel",
+        "success_url": "http://localhost:3000/playerDashboard",
+        "cancel_url": "http://localhost:3000/playerDashboard",
         "customer": {
             "id": customerId,
             "name": customerName,
@@ -66,3 +66,36 @@ Parse.Cloud.define("createCheckoutSession", async (request) => {
     );
   }
 }, { requireUser: true }); // extra guard; blocks unauthenticated calls
+
+Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
+  const TransactionRecords = Parse.Object.extend("TransactionRecords");
+  const query = new Parse.Query(TransactionRecords);
+
+  // 30 minutes ago
+  const now = new Date();
+  const halfHourAgo = new Date(now.getTime() - 30 * 60 * 1000);
+  console.log(halfHourAgo,"halfHourAgohalfHourAgo")
+  query.equalTo("portal", "CLK");
+  query.equalTo("status", 1); // Pending
+  query.lessThan("createdAt", halfHourAgo);
+  query.limit(1000); // Max batch size
+
+  try {
+    const results = await query.find({ useMasterKey: true });
+
+    if (results.length === 0) {
+      return `No old CLKK transactions to update.`;
+    }
+
+    for (const txn of results) {
+      txn.set("status", 9); // Mark as expired/failed
+    }
+
+    await Parse.Object.saveAll(results, { useMasterKey: true });
+
+    return `Updated ${results.length} transactions to status 9.`;
+  } catch (error) {
+    console.error("❌ Error updating transactions:", error);
+    throw new Error("Failed to update expired CLKK transactions.");
+  }
+});
