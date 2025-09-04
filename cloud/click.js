@@ -34,7 +34,7 @@ Parse.Cloud.define("createCheckoutSession", async (request) => {
   }
   try {
     const resp = await axios.post("https://api.dev.clkk-api.io/api/partner/checkout/sessions",{
-        "amount": amount*100,
+        "amount": amount,
         "success_url": "http://localhost:3000/playerDashboard",
         "cancel_url": "http://localhost:3000/playerDashboard",
         "customer": {
