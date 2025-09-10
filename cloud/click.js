@@ -33,7 +33,7 @@ Parse.Cloud.define("createCheckoutSession", async (request) => {
     throw new Error("Missing customer name.");
   }
   try {
-    const resp = await axios.post("https://api.dev.clkk-api.io/api/partner/checkout/sessions",{
+    const resp = await axios.post(`${process.env.CLKK_API_URL}api/partner/checkout/sessions`,{
         "amount": amount,
         "success_url": "http://localhost:3000/playerDashboard",
         "cancel_url": "http://localhost:3000/playerDashboard",
@@ -43,7 +43,7 @@ Parse.Cloud.define("createCheckoutSession", async (request) => {
         }
       },{
       headers: {
-        Authorization: 'Bearer ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI',
+        Authorization: `Bearer ${process.env.CLKK_API_KEY}`,
         "Content-Type": "application/json",
       },
     });

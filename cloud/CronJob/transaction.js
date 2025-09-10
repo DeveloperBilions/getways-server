@@ -813,7 +813,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
       const fetchPlayers = async (parentId) => {
         const playerQuery = new Parse.Query(Parse.User);
         playerQuery.equalTo("userParentId", parentId);
-        playerQuery.limit(10000);
+        playerQuery.limit(100000);
         playerQuery.select("objectId");
 
         const results = await playerQuery.find({ useMasterKey: true });
@@ -830,7 +830,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
         rechargeQuery.containedIn("status", [2, 3]);
         rechargeQuery.select("transactionAmount");
 
-        const results = await rechargeQuery.find({ useMasterKey: true });
+        const results = await rechargeQuery.findAll({ useMasterKey: true });
         return results.reduce(
           (sum, trx) => sum + (trx.get("transactionAmount") || 0),
           0
@@ -848,7 +848,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
         redeemQuery.greaterThan("transactionAmount", 0);
         redeemQuery.select("transactionAmount");
 
-        const results = await redeemQuery.find({ useMasterKey: true });
+        const results = await redeemQuery.findAll({ useMasterKey: true });
         return results.reduce(
           (sum, trx) => sum + (trx.get("transactionAmount") || 0),
           0
@@ -858,7 +858,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
       const totalRedeemAmount = await fetchTotalRedeem();
 
       // Step 5: Deduct 15% from total recharges for pot balance (floor value)
-      const potBalance = Math.floor(totalRechargeAmount * 0.15);
+      const potBalance =0;
 
       // Step 6: Calculate balance for the Master-Agent or Agent (floor value)
       const balance = Math.floor(
@@ -866,7 +866,7 @@ Parse.Cloud.define("updateTransactionBalances", async (request) => {
       );
 
       // Step 7: Update balance & potBalance in User table
-      masterAgentOrAgent.set("potBalance", potBalance);
+      masterAgentOrAgent.set("balance", balance);
       await masterAgentOrAgent.save(null, { useMasterKey: true });
 
       console.log(
@@ -906,16 +906,22 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     }
 
     const currentPotBalance = user.get("potBalance") || 0;
+    const currentBalance = user.get("balance") || 0;
     const potChangeAmount = Math.floor(amount * 0.15);
 
     let newPotBalance;
+    let newBalance;
 
     if (type === "redeem") {
       newPotBalance = Math.max(0, currentPotBalance - amount);
+      newBalance = currentBalance - amount;
+
     }else if (type === "recharge") {
       // Add 85% of recharge amount to potBalance (deduct 15%)
       const creditedAmount = amount * 0.85;
       newPotBalance = currentPotBalance + creditedAmount;
+      newBalance = currentBalance + amount;
+
     }  else {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
@@ -924,6 +930,7 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     }
 
     user.set("potBalance", newPotBalance);
+    user.set("balance", newBalance);
     await user.save(null, { useMasterKey: true });
 
     return {

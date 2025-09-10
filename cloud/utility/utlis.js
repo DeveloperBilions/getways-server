@@ -39,10 +39,11 @@ const getParentUserId = async (userId) => {
       }
   
       const currentPotBalance = user.get("potBalance") || 0;
+      const currentBalance = user.get("balance") || 0;
       const potChangeAmount = Math.floor(amount * 0.15);
   
       let newPotBalance;
-  
+      let newBalance;
       if (type === "redeem") {
         if (currentPotBalance < amount) {
           return { success: false, message: "Insufficient balance to approve transactions." };
@@ -50,16 +51,21 @@ const getParentUserId = async (userId) => {
           return { success: false, message: "Your balance is too low to approve transactions." };
         } else {
           newPotBalance = currentPotBalance - amount;
+          newBalance = currentBalance - amount;
         }
       } else if (type === "recharge") {
         // Add 85% of recharge amount to potBalance (deduct 15%)
         const creditedAmount = amount * 0.85;
         newPotBalance = currentPotBalance + creditedAmount;
+        newBalance = currentBalance + amount;
+
       }  else {
         return { success: false, message: `Invalid transaction type: ${type}` };
       }
   
       user.set("potBalance", newPotBalance);
+      user.set("balance", newBalance);
+
       await user.save(null, { useMasterKey: true });
   
       console.log(`Updated potBalance for user ${userId}: ${newPotBalance} (${type})`);
