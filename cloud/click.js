@@ -41,8 +41,8 @@ Parse.Cloud.define(
         `${process.env.CLKK_API_URL}api/partner/checkout/sessions`,
         {
           amount: amount * 100,
-          success_url: "http://localhost:3000/playerDashboard",
-          cancel_url: "http://localhost:3000/playerDashboard",
+          success_url: "https://skynbliss.co/playerDashboard",
+          cancel_url: "https://skynbliss.co/playerDashboard",
           customer: {
             id: customerId,
             name: customerName,
@@ -369,8 +369,8 @@ Parse.Cloud.define("initiateClkkCardSetup", async (request) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      success_url: `http://localhost:3000/clkk-cashout?amount=${amount}&description=${description}&recipient_id=${recipientId}`,
-      cancel_url: "http://localhost:3000/cancel",
+      success_url: `https://skynbliss.co/clkk-cashout?amount=${amount}&description=${description}&recipient_id=${recipientId}`,
+      cancel_url: "https://skynbliss.co/cancel",
       recipient: { recipient_id: recipientId, name, email, phone },
       recipient_id: recipientId,
       allowed_methods: ["card"],
