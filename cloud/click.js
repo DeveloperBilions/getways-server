@@ -41,8 +41,8 @@ Parse.Cloud.define(
         `${process.env.CLKK_API_URL}api/partner/checkout/sessions`,
         {
           amount: amount * 100,
-          success_url: "https://skynbliss.co/playerDashboard",
-          cancel_url: "https://skynbliss.co/playerDashboard",
+          success_url: "http://localhost:3000/playerDashboard",
+          cancel_url: "http://localhost:3000/playerDashboard",
           customer: {
             id: customerId,
             name: customerName,
@@ -109,10 +109,10 @@ Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
     throw new Error("Failed to update expired CLKK transactions.");
   }
 });
+const API_KEY = process.env.CLKK_API_KEY;
+const BASE_URL = `https://api.staging.clkk-api.io/api/partner`;
 
 Parse.Cloud.define("checkClkkPayments", async (request) => {
-  const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-  const BASE_URL = "https://api.dev.clkk-api.io/api/partner";
 
   const Transaction = Parse.Object.extend("TransactionRecords");
   const query = new Parse.Query(Transaction);
@@ -171,8 +171,6 @@ Parse.Cloud.define("createClkkPayout", async (request) => {
     throw new Error("Missing required fields");
   }
 
-  const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-  const BASE_URL = "https://api.dev.clkk-api.io/api/partner";
   const CLKK = Parse.Object.extend("CLKK");
   const clkkQuery = new Parse.Query(CLKK);
   clkkQuery.equalTo("apiResponse.recipientId", recipientId);
@@ -213,7 +211,7 @@ Parse.Cloud.define("createClkkPayout", async (request) => {
         },
       }
     );
-
+      console.log(methodRes,"methodResmethodResmethodResmethodResmethodRes")
     if (!methodRes.data) {
       throw new Error("Failed to add payment method");
     }
@@ -254,6 +252,7 @@ Parse.Cloud.define("createClkkPayout", async (request) => {
       "Content-Type": "application/json",
     },
   });
+  console.log(payoutRes, "payoutResultpayoutResult");
 
   const payoutResult = payoutRes.data;
   console.log(payoutResult, "payoutResultpayoutResult");
@@ -310,21 +309,26 @@ Parse.Cloud.define("createClkkPayout", async (request) => {
 
 Parse.Cloud.define("saveClkkRecipient", async (request) => {
   const { name, email, phone, metadata } = request.params;
-
   try {
     const response = await fetch(
-      "https://api.dev.clkk-api.io/api/partner/recipients",
+      `${BASE_URL}/recipients`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI`, // ⚠️ Move to env
+          Authorization: `Bearer ${API_KEY}`, // ⚠️ Move to env
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, email, phone, metadata }),
-      }
+        body: JSON.stringify({
+          name,
+          email,
+          phone: phone.toString(),
+          metadata,
+        }),
+              }
     );
-
     const data = await response.json();
+    console.log(data,"datadata", response)
+
     if (!response.ok) throw new Error(data.message || "Failed");
 
     const CLKK = Parse.Object.extend("CLKK");
@@ -359,9 +363,6 @@ Parse.Cloud.define("initiateClkkCardSetup", async (request) => {
     throw new Error("Missing required fields for card setup");
   }
 
-  const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-  const BASE_URL = "https://api.dev.clkk-api.io/api/partner";
-
   const response = await fetch(`${BASE_URL}/recipients/setup-sessions`, {
     method: "POST",
     headers: {
@@ -369,8 +370,8 @@ Parse.Cloud.define("initiateClkkCardSetup", async (request) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      success_url: `https://skynbliss.co/clkk-cashout?amount=${amount}&description=${description}&recipient_id=${recipientId}`,
-      cancel_url: "https://skynbliss.co/cancel",
+      success_url: `http://localhost:3000/clkk-cashout?amount=${amount}&description=${description}&recipient_id=${recipientId}`,
+      cancel_url: "http://localhost:3000/cancel",
       recipient: { recipient_id: recipientId, name, email, phone },
       recipient_id: recipientId,
       allowed_methods: ["card"],
@@ -392,10 +393,6 @@ Parse.Cloud.define("pushClkkCardPayment", async (request) => {
   if (!recipientId || !amount || !description) {
     throw new Error("Missing required fields for payment");
   }
-
-  const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-  const BASE_URL = "https://api.dev.clkk-api.io/api/partner";
-
   try {
     // ----------------------------------------
     // 1. Trigger CLKK Push-to-Card API
@@ -494,9 +491,6 @@ Parse.Cloud.define("pushClkkCardPayment", async (request) => {
 
 Parse.Cloud.define("verifyClkkCard", async (request) => {
   const { recipientId } = request.params;
-  const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-  const BASE_URL = "https://api.dev.clkk-api.io/api/partner";
-
   try {
     const res = await axios.get(
       `${BASE_URL}/recipients/${recipientId}/payment-methods`,
