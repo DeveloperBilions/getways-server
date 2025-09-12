@@ -40,7 +40,7 @@ Parse.Cloud.define(
       const resp = await axios.post(
         `${process.env.CLKK_API_URL}api/partner/checkout/sessions`,
         {
-          amount: amount * 100,
+          amount: amount,
           success_url: "https://skynbliss.co/playerDashboard",
           cancel_url: "https://skynbliss.co/playerDashboard",
           customer: {
