@@ -30,11 +30,6 @@ Parse.Cloud.define(
     const customerId = String(objectId).trim();
 
     const customerName = String(username).trim();
-
-    // Type & presence checks
-    if (!Number.isInteger(amount) || amount <= 0) {
-      throw new Error("Invalid amount: must be a positive integer.");
-    }
     if (!customerId) {
       throw new Error("Missing customer id.");
     }
