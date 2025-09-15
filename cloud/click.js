@@ -13,12 +13,17 @@ Parse.Cloud.define(
       );
     }
 
+    if (typeof amount === "string") {
+      amount = parseFloat(amount);
+    }
+    
+    // 🔹 Validate
     if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
       throw new Parse.Error(
         Parse.Error.INVALID_JSON,
         "Invalid amount: must be a positive number."
       );
-    }    
+    }
 
     const objectId = request.user.id;
     const username = request.user.get("username") || "User";
