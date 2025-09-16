@@ -112,6 +112,9 @@ Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
 const API_KEY = process.env.CLKK_API_KEY;
 const BASE_URL = `https://api.staging.clkk-api.io/api/partner`;
 
+// const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
+// const BASE_URL = `https://api.dev.clkk-api.io/api/partner`;
+
 Parse.Cloud.define("checkClkkPayments", async (request) => {
 
   const Transaction = Parse.Object.extend("TransactionRecords");
@@ -157,162 +160,216 @@ Parse.Cloud.define("checkClkkPayments", async (request) => {
 });
 
 Parse.Cloud.define("createClkkPayout", async (request) => {
-  const { recipientId, method, amount, description, orderId, userId } =
-    request.params;
+  try {
+    const { recipientId, method, amount, description, orderId, userId } = request.params;
 
-  if (
-    !recipientId ||
-    !method ||
-    !amount ||
-    !description ||
-    !orderId ||
-    !userId
-  ) {
-    throw new Error("Missing required fields");
-  }
-
-  const CLKK = Parse.Object.extend("CLKK");
-  const clkkQuery = new Parse.Query(CLKK);
-  clkkQuery.equalTo("apiResponse.recipientId", recipientId);
-  const clkkRecord = await clkkQuery.first({ useMasterKey: true });
-
-  if (!clkkRecord) throw new Error("Recipient not found in CLKK table");
-
-  const existingMethods = clkkRecord.get("methods") || [];
-  const userEmail = clkkRecord.get("email");
-  const userPhone = clkkRecord.get("phone");
-  const addPaymentMethodIfMissing = async () => {
-    if (existingMethods.includes(method.toUpperCase())) return;
-
-    let setupBody = {};
-    if (method === "paypal") {
-      setupBody = {
-        method: "PAYPAL",
-        email: userEmail,
-        metadata: { notes: "Primary PayPal account" },
-      };
-    } else if (method === "venmo") {
-      setupBody = {
-        method: "VENMO",
-        phone: userPhone,
-        metadata: { notes: "Venmo account for quick payments" },
-      };
-    } else {
-      throw new Error("Unsupported method");
+    if (!recipientId || !method || !amount || !description || !orderId || !userId) {
+      throw new Error("Missing required fields");
     }
 
-    const methodRes = await axios.post(
-      `${BASE_URL}/recipients/${recipientId}/payment-methods`,
-      setupBody,
-      {
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-        },
+    const CLKK = Parse.Object.extend("CLKK");
+    const clkkQuery = new Parse.Query(CLKK);
+    clkkQuery.equalTo("apiResponse.recipientId", recipientId);
+    const clkkRecord = await clkkQuery.first({ useMasterKey: true });
+
+    if (!clkkRecord) throw new Error("Recipient not found in CLKK table");
+
+    const existingMethods = clkkRecord.get("methods") || [];
+    const metadata = clkkRecord.get("metadata") || {};
+
+    // ✅ Pull method-specific identifiers
+    const venmoEmail = metadata.venmoEmail || "";
+    const venmoPhone = metadata.venmoPhone || "";
+    const paypalEmail = metadata.paypalEmail || "";
+    const paypalPhone = metadata.paypalPhone || "";
+
+    const addPaymentMethodIfMissing = async () => {
+      if (existingMethods.includes(method.toUpperCase())) return;
+
+      let setupBody = {};
+      if (method === "paypal") {
+        setupBody = {
+          method: "PAYPAL",
+          email: paypalEmail || clkkRecord.get("email"), // fallback
+          phone: paypalPhone || clkkRecord.get("phone"), // fallback
+          metadata: { notes: "PayPal account" },
+        };
+      } else if (method === "venmo") {
+        setupBody = {
+          method: "VENMO",
+          email: venmoEmail || clkkRecord.get("email"), // fallback
+          phone: venmoPhone || clkkRecord.get("phone"), // fallback
+          metadata: { notes: "Venmo account" },
+        };
+      } else {
+        throw new Error("Unsupported method");
       }
-    );
-      console.log(methodRes,"methodResmethodResmethodResmethodResmethodRes")
-    if (!methodRes.data) {
-      throw new Error("Failed to add payment method");
+
+      const methodRes = await axios.post(
+        `${BASE_URL}/recipients/${recipientId}/payment-methods`,
+        setupBody,
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!methodRes.data) {
+        throw new Error("Failed to add payment method");
+      }
+
+      clkkRecord.set("methods", [...existingMethods, method.toUpperCase()]);
+      await clkkRecord.save(null, { useMasterKey: true });
+
+      return methodRes.data;
+    };
+
+    await addPaymentMethodIfMissing();
+
+    // -------------------------------
+    // 2. Payout request
+    // -------------------------------
+    let payoutURL = "",
+      payoutBody = {};
+    if (method === "venmo") {
+      payoutURL = `${BASE_URL}/payouts/venmo`;
+      payoutBody = { recipientId, amount, description, metadata: { orderId } };
+    } else if (method === "paypal") {
+      payoutURL = `${BASE_URL}/payouts/paypal`;
+      payoutBody = { recipientId, amount, description, metadata: { invoiceId: orderId } };
+    } else {
+      throw new Error("Invalid payout method. Use 'venmo' or 'paypal'");
     }
 
-    // Update methods array in CLKK table
-    clkkRecord.set("methods", [...existingMethods, method.toUpperCase()]);
-    await clkkRecord.save(null, { useMasterKey: true });
+    const payoutRes = await axios.post(payoutURL, payoutBody, {
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-    return methodRes.data;
-  };
+    const payoutResult = payoutRes.data;
+    if (!payoutResult) throw new Error("Payout failed");
 
-  await addPaymentMethodIfMissing();
+    // -------------------------------
+    // 3. Save transaction
+    // -------------------------------
+    const userQuery = new Parse.Query(Parse.User);
+    const user = await userQuery.get(userId, { useMasterKey: true });
+    if (!user) throw new Error("User not found");
 
-  let payoutURL = "",
-    payoutBody = {};
-  if (method === "venmo") {
-    payoutURL = `${BASE_URL}/payouts/venmo`;
-    payoutBody = {
-      recipientId,
-      amount,
-      description,
-      metadata: { orderId },
+    const Transaction = Parse.Object.extend("TransactionRecords");
+    const txn = new Transaction();
+
+    txn.set("status", 11);
+    txn.set("userId", user.id);
+    txn.set("username", user.get("username"));
+    txn.set("userParentId", user.get("userParentId") || "");
+    txn.set("type", "redeem");
+    txn.set("transactionAmount", parseFloat(amount));
+    txn.set("gameId", "786"); // static placeholder
+    txn.set("transactionDate", new Date());
+    txn.set("transactionIdFromStripe", payoutResult?.transactionId);
+    txn.set("isCashOut", true);
+    txn.set("paymentMode", `CLKK-${method.toUpperCase()}`);
+
+    await txn.save(null, { useMasterKey: true });
+
+    // -------------------------------
+    // 4. Update Wallet
+    // -------------------------------
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    const wallet = await walletQuery
+      .equalTo("userID", user.id)
+      .first({ useMasterKey: true });
+
+    if (!wallet) throw new Error("Wallet not found");
+
+    const currentBalance = wallet.get("balance") || 0;
+    const newBalance = currentBalance - parseFloat(amount);
+
+    if (newBalance < 0) {
+      return { error: "Insufficient balance.", status: "Failed" };
+    }
+
+    wallet.set("balance", newBalance);
+    await wallet.save(null, { useMasterKey: true });
+
+    return {
+      payout: payoutResult,
+      transactionId: txn.id,
+      newBalance,
     };
-  } else if (method === "paypal") {
-    payoutURL = `${BASE_URL}/payouts/paypal`;
-    payoutBody = {
-      recipientId,
-      amount,
-      description,
-      metadata: { invoiceId: orderId },
-    };
-  } else {
-    throw new Error("Invalid payout method. Use 'venmo' or 'paypal'");
+  } catch (err) {
+    throw new Error("CLKK Payout Error: " + err.message);
   }
-  const payoutRes = await axios.post(payoutURL, payoutBody, {
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-    },
-  });
-  console.log(payoutRes, "payoutResultpayoutResult");
-
-  const payoutResult = payoutRes.data;
-  console.log(payoutResult, "payoutResultpayoutResult");
-  if (!payoutResult) throw new Error("Payout failed");
-
-  const userQuery = new Parse.Query(Parse.User);
-  const user = await userQuery.get(userId, { useMasterKey: true });
-  if (!user) throw new Error("User not found");
-
-  const Transaction = Parse.Object.extend("TransactionRecords");
-  const txn = new Transaction();
-
-  txn.set("status", 11);
-  txn.set("userId", user.id);
-  txn.set("username", user.get("username"));
-  txn.set("userParentId", user.get("userParentId") || "");
-  txn.set("type", "redeem");
-  txn.set("transactionAmount", parseFloat(amount));
-  txn.set("gameId", "786"); // static placeholder
-  txn.set("transactionDate", new Date());
-  txn.set("transactionIdFromStripe", payoutResult?.transactionId);
-  txn.set("isCashOut", true);
-  txn.set("paymentMode", `CLKK-${method.toUpperCase()}`);
-
-  await txn.save(null, { useMasterKey: true });
-
-  // -------------------------------
-  // 6. Update Wallet balance
-  // -------------------------------
-  const Wallet = Parse.Object.extend("Wallet");
-  const walletQuery = new Parse.Query(Wallet);
-  const wallet = await walletQuery
-    .equalTo("userID", user.id)
-    .first({ useMasterKey: true });
-
-  if (!wallet) throw new Error("Wallet not found");
-
-  const currentBalance = wallet.get("balance") || 0;
-  const newBalance = currentBalance - parseFloat(amount);
-
-  if (newBalance < 0) {
-    return { error: "Insufficient balance.", status: "Failed" };
-  }
-
-  wallet.set("balance", newBalance);
-  await wallet.save(null, { useMasterKey: true });
-
-  return {
-    payout: payoutResult,
-    transactionId: txn.id,
-    newBalance,
-  };
 });
 
+
 Parse.Cloud.define("saveClkkRecipient", async (request) => {
-  const { name, email, phone, metadata } = request.params;
+  const { recipientId, name, venmoEmail, venmoPhone, paypalEmail, paypalPhone, metadata } =
+    request.params;
+
   try {
-    const response = await fetch(
-      `${BASE_URL}/recipients`,
-      {
+    // Build metadata with Venmo & PayPal identifiers
+    const enrichedMetadata = {
+      ...metadata,
+      venmoEmail,
+      venmoPhone,
+      paypalEmail,
+      paypalPhone,
+    };
+
+    let data;
+
+    if (recipientId) {
+      // -----------------------------
+      // UPDATE EXISTING RECIPIENT
+      // -----------------------------
+      const response = await fetch(`${BASE_URL}/recipients/${recipientId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`, // ⚠️ Move to env
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email: venmoEmail || paypalEmail || "",
+          phone: venmoPhone || paypalPhone || "",
+          metadata: enrichedMetadata,
+        }),
+      });
+
+      data = await response.json();
+      console.log(data, "CLKK update response");
+
+      if (!response.ok) throw new Error(data.message || "Failed to update recipient");
+
+      // Update CLKK table record
+      const CLKK = Parse.Object.extend("CLKK");
+      const query = new Parse.Query(CLKK);
+      query.equalTo("apiResponse.recipientId", recipientId);
+      const existing = await query.first({ useMasterKey: true });
+
+      if (existing) {
+        existing.set("name", name);
+        existing.set("metadata", enrichedMetadata);
+        existing.set("apiResponse", data);
+        existing.set("venmoEmail", venmoEmail || "");
+        existing.set("venmoPhone", venmoPhone || "");
+        existing.set("paypalEmail", paypalEmail || "");
+        existing.set("paypalPhone", paypalPhone || "");
+        await existing.save(null, { useMasterKey: true });
+      }
+
+    } else {
+      // -----------------------------
+      // CREATE NEW RECIPIENT
+      // -----------------------------
+      const response = await fetch(`${BASE_URL}/recipients`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${API_KEY}`, // ⚠️ Move to env
@@ -320,40 +377,42 @@ Parse.Cloud.define("saveClkkRecipient", async (request) => {
         },
         body: JSON.stringify({
           name,
-          email,
-          phone: phone.toString(),
-          metadata,
+          email: venmoEmail || paypalEmail || "",
+          phone: venmoPhone || paypalPhone || "",
+          metadata: enrichedMetadata,
         }),
-              }
-    );
-    const data = await response.json();
-    console.log(data,"datadata", response)
+      });
 
-    if (!response.ok) throw new Error(data.message || "Failed");
+      data = await response.json();
+      console.log(data, "CLKK create response");
 
-    const CLKK = Parse.Object.extend("CLKK");
-    const obj = new CLKK();
+      if (!response.ok) throw new Error(data.message || "Failed to create recipient");
 
-    // Save recipient details
-    obj.set("name", name);
-    obj.set("email", email);
-    obj.set("phone", phone);
-    obj.set("metadata", metadata);
-    obj.set("apiResponse", data);
+      // Save new record in CLKK table
+      const CLKK = Parse.Object.extend("CLKK");
+      const obj = new CLKK();
+      obj.set("name", name);
+      obj.set("metadata", enrichedMetadata);
+      obj.set("apiResponse", data);
+      obj.set("venmoEmail", venmoEmail || "");
+      obj.set("venmoPhone", venmoPhone || "");
+      obj.set("paypalEmail", paypalEmail || "");
+      obj.set("paypalPhone", paypalPhone || "");
 
-    // Save user info (if logged in)
-    if (request.user) {
-      obj.set("user", request.user); // pointer to _User
-      obj.set("userId", request.user.id); // raw userId string (optional)
+      if (request.user) {
+        obj.set("user", request.user); // pointer to _User
+        obj.set("userId", request.user.id);
+      }
+
+      await obj.save(null, { useMasterKey: true });
     }
-
-    await obj.save(null, { useMasterKey: true });
 
     return data;
   } catch (err) {
     throw new Error("CLKK Save Error: " + err.message);
   }
 });
+
 
 Parse.Cloud.define("initiateClkkCardSetup", async (request) => {
   const { recipientId, name, email, phone, vendorId, amount, description } =
