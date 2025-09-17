@@ -23,6 +23,7 @@ const getParentUserId = async (userId) => {
   };
   
   async function updatePotBalance(userId, amount, type) {
+  console.log(userId, amount, type,"userId, amount, typeuserId, amount, typeuserId, amount, typekjuiou")
     try {
       if (!userId || !amount || amount <= 0 || !type) {
         return { success: false, message: "Invalid input parameters." };
@@ -31,6 +32,7 @@ const getParentUserId = async (userId) => {
       const userQuery = new Parse.Query(Parse.User);
       userQuery.equalTo("objectId", userId);
       userQuery.select("potBalance");
+      userQuery.select("balance")
   
       const user = await userQuery.first({ useMasterKey: true });
   
