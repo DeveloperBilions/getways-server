@@ -24,10 +24,11 @@ async function startParseServer() {
     serverURL: process.env.SERVER_URL,
     appId: process.env.APP_ID,
     masterKey: process.env.MASTER_KEY,
+    readOnlyMasterKey: process.env.READONLY_MASTER_KEY,
     encodeParseObjectInCloudFunction: false, 
     accountLockout: {
       threshold: 5,
-duration: 30,  
+      duration: 30,  
     }
   });
 
@@ -45,12 +46,19 @@ duration: 30,
         appId: process.env.APP_ID,
         masterKey: process.env.MASTER_KEY,
         appName: process.env.APP_NAME, 
+        readOnlyMasterKey: process.env.READONLY_MASTER_KEY, 
       },
     ],
     users: [
       {
-        user: "admin",
-        pass: "password",
+        user: process.env.PARSE_SERVER_USERNAME,
+        pass: process.env.PARSE_SERVER_PASSWORD,
+        "readOnly": true,
+        "apps": [{"appId": process.env.APP_ID}]
+      },
+      {
+        user: process.env.PARSE_SERVER_USERNAME2,
+        pass: process.env.PARSE_SERVER_PASSWORD2,
       },
     ],
     // Allow insecure HTTP (for development only)
