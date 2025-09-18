@@ -898,7 +898,7 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", userId);
     userQuery.select("potBalance");
-
+    userQuery.select("balance");
     const user = await userQuery.first({ useMasterKey: true });
 
     if (!user) {
@@ -906,16 +906,19 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     }
 
     const currentPotBalance = user.get("potBalance") || 0;
+    const currentBalance = user.get("balance") || 0;
     const potChangeAmount = Math.floor(amount * 0.15);
 
     let newPotBalance;
-
+    let newBalance;
     if (type === "redeem") {
       newPotBalance = Math.max(0, currentPotBalance - amount);
+      newBalance = currentBalance - amount;
     }else if (type === "recharge") {
       // Add 85% of recharge amount to potBalance (deduct 15%)
       const creditedAmount = amount * 0.85;
       newPotBalance = currentPotBalance + creditedAmount;
+      newBalance = currentBalance + amount;
     }  else {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
@@ -924,6 +927,7 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     }
 
     user.set("potBalance", newPotBalance);
+    user.set("balance", newBalance);
     await user.save(null, { useMasterKey: true });
 
     return {
