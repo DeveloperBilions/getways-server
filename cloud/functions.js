@@ -1569,6 +1569,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("rechargeLimit");
     query.select("isReedeemZeroAllowed");
     query.select("potBalance");
+    query.select("balance")
     query.select("rechargeDisabled")
     query.equalTo("objectId", userId);
 
@@ -1584,7 +1585,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
-      potBalance:user.get("potBalance"),
+      potBalance:user.get("balance"),
       rechargeDisabled:user.get("rechargeDisabled") || false
     };
   } catch (error) {
