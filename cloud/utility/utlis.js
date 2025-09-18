@@ -47,9 +47,9 @@ const getParentUserId = async (userId) => {
       let newPotBalance;
       let newBalance;
       if (type === "redeem") {
-        if (currentPotBalance < amount) {
+        if (currentBalance < amount) {
           return { success: false, message: "Insufficient balance to approve transactions." };
-        } else if (currentPotBalance < 500) {
+        } else if (currentBalance < 500) {
           return { success: false, message: "Your balance is too low to approve transactions." };
         } else {
           newPotBalance = currentPotBalance - amount;
