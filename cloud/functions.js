@@ -114,8 +114,7 @@ Parse.Cloud.define("createUser", async (request) => {
       const RechargeMethod = Parse.Object.extend("RechargeMethod");
       const rechargeMethods = await new Parse.Query(RechargeMethod)
         .find({ useMasterKey: true });
-    
-      for (const method of rechargeMethods) {
+          for (const method of rechargeMethods) {
         const methodName = method.get("name").toLowerCase();
         const settingsKey = `allowedAgentsFor_${methodName}`;
     
@@ -137,7 +136,28 @@ Parse.Cloud.define("createUser", async (request) => {
           await settingsObj.save(null, { useMasterKey: true });
         }
       }
-    }    
+    
+      // ✅ Ensure giftcard is enabled for cashout by default
+      const cashoutSettingsKey = "allowedCashoutAgentsFor_giftcard";
+      const cashoutQuery = new Parse.Query("Settings");
+      cashoutQuery.equalTo("type", cashoutSettingsKey);
+      let cashoutSettingsObj = await cashoutQuery.first({ useMasterKey: true });
+    
+      if (!cashoutSettingsObj) {
+        const Settings = Parse.Object.extend("Settings");
+        cashoutSettingsObj = new Settings();
+        cashoutSettingsObj.set("type", cashoutSettingsKey);
+        cashoutSettingsObj.set("settings", []);
+      }
+    
+      const cashoutAgents = cashoutSettingsObj.get("settings") || [];
+      if (!cashoutAgents.includes(user.id)) {
+        cashoutAgents.push(user.id);
+        cashoutSettingsObj.set("settings", cashoutAgents);
+        await cashoutSettingsObj.save(null, { useMasterKey: true });
+      }
+    }
+     
 
     return { code:200,success: true, message: "User created successfully!" };
   } catch (error) {
