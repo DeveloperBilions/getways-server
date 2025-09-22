@@ -1569,6 +1569,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     query.select("rechargeLimit");
     query.select("isReedeemZeroAllowed");
     query.select("potBalance");
+    query.select("balance")
     query.select("rechargeDisabled")
     query.equalTo("objectId", userId);
 
