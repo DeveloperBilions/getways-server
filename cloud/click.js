@@ -310,9 +310,8 @@ Parse.Cloud.define("createClkkPayout", async (request) => {
 
 
 Parse.Cloud.define("saveClkkRecipient", async (request) => {
-  const { recipientId, name, venmoEmail, venmoPhone, paypalEmail, paypalPhone, metadata } =
+  const { recipientId, name, venmoEmail, venmoPhone, paypalEmail, paypalPhone, metadata,cardEmail,cardPhone ,payoutMethod} =
     request.params;
-
   try {
     // Build metadata with Venmo & PayPal identifiers
     const enrichedMetadata = {
@@ -321,9 +320,26 @@ Parse.Cloud.define("saveClkkRecipient", async (request) => {
       venmoPhone,
       paypalEmail,
       paypalPhone,
+      cardEmail,
+      cardPhone
     };
 
     let data;
+
+    let email = "";
+    let phone = "";
+
+    if (payoutMethod === "venmo") {
+      email = venmoEmail || "";
+      phone = venmoPhone || "";
+    } else if (payoutMethod === "paypal") {
+      email = paypalEmail || "";
+      phone = paypalPhone || "";
+    } else if (payoutMethod === "card") {
+      email = cardEmail || "";
+      phone = cardPhone || "";
+    }
+
 
     if (recipientId) {
       // -----------------------------
@@ -337,8 +353,8 @@ Parse.Cloud.define("saveClkkRecipient", async (request) => {
         },
         body: JSON.stringify({
           name,
-          email: venmoEmail || paypalEmail || "",
-          phone: venmoPhone || paypalPhone || "",
+          email,
+          phone,
           metadata: enrichedMetadata,
         }),
       });
@@ -377,8 +393,8 @@ Parse.Cloud.define("saveClkkRecipient", async (request) => {
         },
         body: JSON.stringify({
           name,
-          email: venmoEmail || paypalEmail || "",
-          phone: venmoPhone || paypalPhone || "",
+          email,
+          phone,
           metadata: enrichedMetadata,
         }),
       });
