@@ -30,8 +30,7 @@ const getParentUserId = async (userId) => {
     
         const userQuery = new Parse.Query(Parse.User);
         userQuery.equalTo("objectId", userId);
-        userQuery.select("potBalance");
-        userQuery.select("balance")
+        userQuery.select(["potBalance", "balance"]);
     
         const user = await userQuery.first({ useMasterKey: true });
     
