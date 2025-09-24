@@ -1,5 +1,5 @@
 // cloud/main.js
-import axios from "axios";
+const axios = require("axios");
 
 Parse.Cloud.define(
   "createCheckoutSession",
