@@ -18,6 +18,7 @@ async function loadModule() {
     await import('./PlarformService/PlatformService.js')
     await import('./paynearme.js')
     await import('./click.js')
+    await import('./Triggers/user.js')
 
 }
 
