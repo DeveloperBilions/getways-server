@@ -116,6 +116,9 @@ Parse.Cloud.define("createUser", async (request) => {
         .find({ useMasterKey: true });
           for (const method of rechargeMethods) {
         const methodName = method.get("name").toLowerCase();
+        if (methodName !== "stripe") {
+          continue;
+        }
         const settingsKey = `allowedAgentsFor_${methodName}`;
     
         const settingsQuery = new Parse.Query("Settings");
