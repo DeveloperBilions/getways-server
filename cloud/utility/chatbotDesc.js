@@ -146,7 +146,6 @@ const chatbotDescription = (role = "Player") => {
               - **Password**
               - **Confirm Password**
             - For Agents under you (accessible by clicking the "Actions" button in the table):
-              - Disable Recharge - Can Disable the Recharge for the Selected Agent.
               - Recharge Limits - Can Set monthly and Daily Recharge Limits for agent.
               - Password Permission - Allow Agents to set or reset their Players' passwords.
               - Allow Creation Permission - Allow the Agent to create new Players.
@@ -165,10 +164,9 @@ const chatbotDescription = (role = "Player") => {
           - Recharge Records:
             - View a list of all Recharge Records for Agents and Players under you.
             - Columns include: **Action**, **Accounts**, **Recharged**, **Remark**, **Status**, **Failed Reason**, **Parent**, **Recharge Date**.
-            - Filter by Search By, Status, and Mode.
+            - Filter by Search By and Status.
               - Search By options include: Account, Recharge, Remark, Parent Name.
               - Statuses include: Pending Referral, Pending Confirmation, Confirmed, Coin Credit, Expired, Failed Transaction.
-              - Modes include: WERT, Link, Coinbase, AOG, Transfi, Wallet, and Stripe.
             - Export data in PDF and Excel formats.
             - Recharge Action Logic:
               - If **Status is Pending Confirmation** or Confirmed or Rejected Pending Confirmation:
@@ -216,7 +214,7 @@ const chatbotDescription = (role = "Player") => {
             - Master Agent Balance is Shown near on top right side near to Profile icon
               The balance displayed reflects the combined balance of all Agents under you and all Players under those Agents.
             - Flow - User Management (Tab) 
-              -> Add new user, Actions (Button in the Table) can perform actions like Disable Recharge, Recharge Limits, Allow Creation Permission, Edit, Delete. for agent and 
+              -> Add new user, Actions (Button in the Table) can perform actions like Recharge Limits, Allow Creation Permission, Edit, Delete. for agent and 
               -> for players Redeem, Recharge, Wallet, View Key, BaseScan, EtherScan, Edit, Delete.
           `;
   } else if (role === "Agent") {
@@ -335,7 +333,6 @@ const chatbotDescription = (role = "Player") => {
               - Role: Player, Agents, Master Agents, or Super User.
 
             - Actions for each Agent and Master Agent (accessible by clicking the "Actions" button in the table):
-              - Disable Recharge: Opens a dialog with the message "Are you sure you want to disable recharge for user ?" and two buttons: "Disable" and "Cancel".
               - Recharge Limit: Opens a dialog with a toggle to enable/disable Recharge Limit Restriction. If enabled, fields for Monthly Recharge Limit and Daily Recharge Limit are available. Includes two buttons: "Save" and "Cancel".
               - Redeem Service Fee: Opens a dialog to set the Redeem Service Fee for the Agent, with toggles for "Allow Agent to change Redeem Service?" and "Allow Agent to Add 0 Redeem Service?". Includes two buttons: "Confirm" and "Cancel".
               - Password Permission: Opens a dialog with a checkbox for "Allow the Agent to set or reset their Player's password." Includes two buttons: "Save Changes" and "Cancel".
@@ -561,20 +558,24 @@ const chatbotDescription = (role = "Player") => {
 
               - Profile Options
                 - Access the following options by selecting the profile icon in the top-right corner:
-                - Global Recharge & Cashout Settings:
+                1. Global Recharge & Cashout Settings:
                   - Enable Recharge (Global): Toggle switch to enable or disable recharges for all Agents and Players globally.
                   - Enable Cashout (Global): Toggle switch to enable or disable cashouts for all Agents and Players globally.
                   - Note: If a Super User disables Recharge and Cashout for a specific Agent, the Recharge and Cashout functionality is also disabled for all Players under that Agent.
-                - Manage Payment Methods:
+                2. Recharge Method Agent Access:
+                  - In this you can enable or disable the recharge methods for the particular agent.
+                  - You can also specify the allowed payment methods for each recharge method.\
+                  - Note: Only for Agents
+                3. Manage Payment Methods:
                   - Displays a list of payment methods (e.g., CashApp, PayPal, Venmo, Zelle).
                   - Each method has a toggle switch.
                   - Super User can enable or disable each payment method using the toggle switch.
-                - Manage Emergency Messages:
+                4. Manage Emergency Messages:
                   - Super User can compose multiple emergency messages in a text area.
                   - Messages are sent to all Agents and Master Agents under the Super User.
-                - Help Videos:
+                5. Help Videos:
                   - Watch videos to learn about Login and Sign-Up processes.
-                - Logout:
+                6. Logout:
                   - Log out of the Master Agent account.
           `;
   }
