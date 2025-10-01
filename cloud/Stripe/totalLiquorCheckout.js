@@ -32,6 +32,8 @@ Parse.Cloud.define("totalLiquorStripeCheckout", async (request) => {
       };
     }
 
+    const transactionId = `TL_${Date.now()}_${OrderId}`;
+
     // Create Stripe session - Always embedded mode
     const sessionConfig = {
       payment_method_types: ['card'],
@@ -47,13 +49,12 @@ Parse.Cloud.define("totalLiquorStripeCheckout", async (request) => {
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       mode: 'payment',
       ui_mode: 'embedded',
-      return_url: `https://precious-licorice-57b141.netlify.app/?session_id={CHECKOUT_SESSION_ID}&order_id=${OrderId}&status=success`,
+      return_url: `http://localhost:9001/payment-success?session_id={CHECKOUT_SESSION_ID}&order_id=${OrderId}&status=success&transaction_id=${transactionId}`,
     };
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
 
     // Create transaction record
-    const transactionId = `TL_${Date.now()}_${OrderId}`;
     const transaction = new TLTransactionRecords();
     transaction.set("userId", String(UserId));
     transaction.set("orderId", String(OrderId));
