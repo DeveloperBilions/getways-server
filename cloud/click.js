@@ -115,6 +115,50 @@ const BASE_URL = `https://api.staging.clkk-api.io/api/partner`;
 // const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
 // const BASE_URL = `https://api.dev.clkk-api.io/api/partner`;
 
+Parse.Cloud.define("checkClkkPaymentsRecharge", async (request) => {
+
+  const Transaction = Parse.Object.extend("TransactionRecords");
+  const query = new Parse.Query(Transaction);
+
+  query.equalTo("status", 1); // pending
+  query.exists("transactionIdFromStripe"); // must have txn id
+  query.contains("portal", "CLK"); // ensure CLKK cashout
+  query.limit(50); // process in batches
+
+  try {
+    const txns = await query.find({ useMasterKey: true });
+    console.log(`🔎 Found ${txns.length} pending transactions`);
+
+    for (const txn of txns) {
+      const paymentId = txn.get("transactionIdFromStripe");
+
+      try {
+        // 1. Fetch payment status from CLKK API
+        const res = await axios.get(`${BASE_URL}/payments/${paymentId}`, {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        const payment = res.data;
+        console.log(`Txn ${paymentId} → CLKK Status: ${payment.status}`);
+
+        // 2. If completed, update transaction
+        if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
+          txn.set("status", 2); // mark as completed
+          await txn.save(null, { useMasterKey: true });
+          console.log(`✅ Updated txn ${txn.id} to status 12`);
+        }
+      } catch (err) {
+        console.error(`❌ Error fetching payment ${paymentId}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("❌ Cron job failed:", err.message);
+  }
+});
+
 Parse.Cloud.define("checkClkkPayments", async (request) => {
 
   const Transaction = Parse.Object.extend("TransactionRecords");
