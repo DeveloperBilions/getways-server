@@ -13,17 +13,17 @@ router.post(
   '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
-    console.log("recieved:webhook:✅✅✅✅")
-
-    const signature = req.headers['svix-signature'];
-    const timestamp = req.headers['svix-timestamp'];
-    const msgId = req.headers['svix-id'];
-
-    if (!verifyWebhookSignature(req.body, signature, timestamp, msgId)) {
-            console.log("Invalid signature")
-
-      return res.status(401).send('Invalid signature');
-    }
+    console.log("recieved:webhook:✅✅✅✅",req.body )
+	
+const isValid = verifyWebhook(
+    req.body.toString(),
+    req.headers,
+    process.env.WEBHOOK_SECRET
+  );
+  
+  if (!isValid) {
+    return res.status(401).send('Invalid signature');
+  }
     const event = JSON.parse(req.body.toString());
     console.log("Body",event)
 
@@ -48,25 +48,33 @@ router.post(
     }
   }
 );
+function verifyWebhook(body, headers, secret) {
 
-// --- Verify Signature ---
-function verifyWebhookSignature(body, signature, timestamp, msgId) {
-  const secret = process.env.WEBHOOK_SECRET;
-  const toSign = `${msgId}.${timestamp}.${body.toString()}`;
+  // Extract headers
+  const timestamp = headers['svix-timestamp'];
+  const msgId = headers['svix-id'];
+  const signature = headers['svix-signature'];
+  
+  // Create signed content
+  const toSign = msgId + '.' + timestamp + '.' + body;
+  console.log("verifyingg signature:✅✅✅✅",signature )
 
+  // Generate expected signature
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(toSign)
     .digest('base64');
-
+  
+  // Compare signatures
   const signatures = signature.split(' ');
   for (const sig of signatures) {
-    const [version, sigData] = sig.split('=');
-    if (version === 'v1' && sigData === expectedSignature) {
-      return true;
+    const [version, signatureData] = sig.split('=');
+    if (version === 'v1' && signatureData === expectedSignature) {
+console.log("Hello :verified")      
+return true;
     }
   }
-
+  
   return false;
 }
 
