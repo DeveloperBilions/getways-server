@@ -4,12 +4,10 @@ const Parse = require('parse/node');
 
 const router = express.Router();
 
-// Setup Parse (if not globally initialized already)
 Parse.initialize(process.env.APP_ID, process.env.MASTER_KEY);
 Parse.masterKey = process.env.MASTER_KEY;
 Parse.serverURL = process.env.SERVER_URL;
 
-// Raw body parser must be used in the main app before this router
 router.post(
   '/',
   express.raw({ type: 'application/json' }),
@@ -81,7 +79,6 @@ return true;
   return false;
 }
 
-// --- Handle Payment Succeeded ---
 async function handlePaymentSucceeded(event) {
   const {  transaction } = event;
   const orderId = transaction?.metadata?.checkoutSessionId;
@@ -89,7 +86,7 @@ async function handlePaymentSucceeded(event) {
   const TransactionRecords = Parse.Object.extend("TransactionRecords");
   const txnQuery = new Parse.Query(TransactionRecords);
   txnQuery.equalTo("transactionIdFromStripe", orderId);
-  txnQuery.equalTo("status", 1); // pending
+  txnQuery.equalTo("status", 1);
   txnQuery.equalTo("portal", "CLK");
 
   const txn = await txnQuery.first({ useMasterKey: true });
@@ -105,12 +102,29 @@ async function handlePaymentSucceeded(event) {
 
   console.log(`✅ Transaction ${txn.id} marked as PAID`);
 }
-
-// Optional
 async function handlePaymentFailed(event) {
-  const { payment_id } = event;
+    const {  transaction } = event;
+  const orderId = transaction?.metadata?.checkoutSessionId;
+
+  const TransactionRecords = Parse.Object.extend("TransactionRecords");
+  const txnQuery = new Parse.Query(TransactionRecords);
+  txnQuery.equalTo("transactionIdFromStripe", orderId);
+  txnQuery.equalTo("status", 1);
+  txnQuery.equalTo("portal", "CLK");
+
+  const txn = await txnQuery.first({ useMasterKey: true });
+
+  if (!txn) {
+    console.warn(`⚠️ Transaction not found for ID ${orderId}`);
+    return;
+  }
+
+  txn.set("status", 10);
+
+  await Parse.Object.saveAll([txn], { useMasterKey: true });
+
+  console.log(`✅ Transaction ${txn.id} marked as PAID`);
   console.log(`❌ Payment ${payment_id} failed`);
-  // Add any desired logic (mark as failed, notify user, etc.)
 }
 
 module.exports = router;
