@@ -5,8 +5,9 @@ const Parse = require('parse/node');
 const router = express.Router();
 
 // Setup Parse (if not globally initialized already)
-Parse.initialize(process.env.PARSE_APP_ID, process.env.PARSE_JS_KEY || '', process.env.PARSE_MASTER_KEY);
-Parse.serverURL = process.env.PARSE_SERVER_URL;
+Parse.initialize(process.env.APP_ID, process.env.MASTER_KEY);
+Parse.masterKey = process.env.MASTER_KEY;
+Parse.serverURL = process.env.SERVER_URL;
 
 // Raw body parser must be used in the main app before this router
 router.post(
