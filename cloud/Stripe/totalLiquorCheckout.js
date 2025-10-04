@@ -49,7 +49,7 @@ Parse.Cloud.define("totalLiquorStripeCheckout", async (request) => {
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       mode: 'payment',
       ui_mode: 'embedded',
-      return_url: `http://localhost:9001/payment-success?session_id={CHECKOUT_SESSION_ID}&order_id=${OrderId}&status=success&transaction_id=${transactionId}`,
+      return_url: `https://precious-licorice-57b141.netlify.app/payment-success?session_id={CHECKOUT_SESSION_ID}&order_id=${OrderId}&status=success&transaction_id=${transactionId}`,
     };
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
