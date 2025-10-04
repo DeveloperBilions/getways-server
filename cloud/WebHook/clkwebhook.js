@@ -14,7 +14,7 @@ router.post(
   express.raw({ type: 'application/json' }),
   async (req, res) => {
     
-    console.log("recieved:webhook:✅✅✅✅", req.body.data.transaction , req.body.data.transaction.webhook_metadata);
+    console.log("recieved:webhook:✅✅✅✅", req.body.data.transaction , req.body.data.webhook_metadata);
 	
 const isValid = verifyWebhook(
     req.body.toString(),
