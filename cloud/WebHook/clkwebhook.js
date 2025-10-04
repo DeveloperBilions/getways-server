@@ -16,26 +16,23 @@ router.post(
     
     console.log("recieved:webhook:✅✅✅✅", req.body , req.body.data.object.transaction , req.body.data.object.webhook_metadata);
 	
-const isValid = verifyWebhook(
+    const isValid = verifyWebhook(
     req.body.toString(),
     req.headers,
     process.env.WEBHOOK_SECRET
   );
   
-  if (!isValid) {
-    return res.status(401).send('Invalid signature');
-  }
-    const event = JSON.parse(req.body.toString());
+    const event = req.body
     console.log("Body",event)
 
     try {
-      switch (event.event_type) {
+      switch (event.type) {
         case 'payment.succeeded':
-          await handlePaymentSucceeded(event);
+          await handlePaymentSucceeded(event.data.object);
           break;
 
         case 'payment.failed':
-          await handlePaymentFailed(event); // Optional
+          await handlePaymentFailed(event.data.object); // Optional
           break;
 
         default:
@@ -85,46 +82,25 @@ return true;
 
 // --- Handle Payment Succeeded ---
 async function handlePaymentSucceeded(event) {
-  const { payment_id, amount, transaction } = event;
-  const transactionId = payment_id;
-  const orderId = transaction?.metadata?.order_id;
-
-  // Check for already processed webhook
-  const existing = await new Parse.Query("ProcessedWebhooks")
-    .equalTo("eventId", transactionId)
-    .first({ useMasterKey: true });
-
-  if (existing) {
-    console.log(`🔁 Event ${transactionId} already processed`);
-    return;
-  }
+  const {  transaction } = event;
+  const orderId = transaction?.metadata?.checkoutSessionId;
 
   const TransactionRecords = Parse.Object.extend("TransactionRecords");
   const txnQuery = new Parse.Query(TransactionRecords);
-  txnQuery.equalTo("transactionIdFromStripe", transactionId);
+  txnQuery.equalTo("transactionIdFromStripe", orderId);
   txnQuery.equalTo("status", 1); // pending
   txnQuery.equalTo("portal", "CLK");
 
   const txn = await txnQuery.first({ useMasterKey: true });
 
   if (!txn) {
-    console.warn(`⚠️ Transaction not found for ID ${transactionId}`);
+    console.warn(`⚠️ Transaction not found for ID ${orderId}`);
     return;
   }
 
-  // Save processed webhook + update transaction
-  const ProcessedWebhooks = Parse.Object.extend("ProcessedWebhooks");
-  const webhook = new ProcessedWebhooks();
-  webhook.set("eventId", transactionId);
-  webhook.set("eventType", event.event_type);
-  webhook.set("processedAt", new Date());
-
   txn.set("status", 2);
-  txn.set("paidAmount", parseFloat(amount));
-  txn.set("paidAt", new Date(transaction.completedAt));
-  txn.set("paymentMethod", transaction.payment_method);
 
-  await Parse.Object.saveAll([webhook, txn], { useMasterKey: true });
+  await Parse.Object.saveAll([txn], { useMasterKey: true });
 
   console.log(`✅ Transaction ${txn.id} marked as PAID`);
 }
