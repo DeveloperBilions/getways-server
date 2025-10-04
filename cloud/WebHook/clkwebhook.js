@@ -13,7 +13,11 @@ router.post(
   '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
-    console.log("recieved:webhook:✅✅✅✅",JSON.parse(req.body.toString()) )
+    let parsed;
+
+    parsed = JSON.parse(req.body.toString('utf8')); // safe parse
+
+    console.log("recieved:webhook:✅✅✅✅", JSON.stringify(parsed, null, 2));
 	
 const isValid = verifyWebhook(
     req.body.toString(),
