@@ -13,7 +13,7 @@ router.post(
   '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
-    console.log("recieved:webhook:✅✅✅✅",req.body )
+    console.log("recieved:webhook:✅✅✅✅",req.body.toString() )
 	
 const isValid = verifyWebhook(
     req.body.toString(),
@@ -68,7 +68,7 @@ function verifyWebhook(body, headers, secret) {
   // Compare signatures
   const signatures = signature.split(' ');
   for (const sig of signatures) {
-    const [version, signatureData] = sig.split('=');
+    const [version, signatureData] = sig.split(',');
     if (version === 'v1' && signatureData === expectedSignature) {
 console.log("Hello :verified")      
 return true;
