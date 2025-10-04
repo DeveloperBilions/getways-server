@@ -10,9 +10,11 @@ Parse.serverURL = process.env.PARSE_SERVER_URL;
 
 // Raw body parser must be used in the main app before this router
 router.post(
-  '/webhook',
+  '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
+    console.log("recieved:webhook:✅✅✅✅")
+
     const signature = req.headers['svix-signature'];
     const timestamp = req.headers['svix-timestamp'];
     const msgId = req.headers['svix-id'];
