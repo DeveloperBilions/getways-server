@@ -81,6 +81,7 @@ return true;
 
 async function handlePaymentSucceeded(event) {
   const {  transaction } = event;
+  console.log(transaction,"transaction^^^^^^^^^^")
   const orderId = transaction?.metadata?.checkoutSessionId;
 
   const TransactionRecords = Parse.Object.extend("TransactionRecords");
@@ -97,7 +98,7 @@ async function handlePaymentSucceeded(event) {
   }
 
   txn.set("status", 2);
-
+  txn.set("transactionIdFromStripe", transaction?.id);
   await Parse.Object.saveAll([txn], { useMasterKey: true });
 
   console.log(`✅ Transaction ${txn.id} marked as PAID`);
