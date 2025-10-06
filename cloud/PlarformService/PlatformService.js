@@ -155,7 +155,7 @@ Parse.Cloud.afterSave("Transactions", async (request) => {
   const original = request.original; // undefined on create
   const status = tx.get("status");
 
-//   if (status !== 2) return;
+  if (status !== 2) return;
 //   if (original && original.get("status") === 2) return;
 
   const platformName = tx.get("platform");
