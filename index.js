@@ -145,7 +145,11 @@ ParseServer.createLiveQueryServer(httpServer);
      
     await Parse.Cloud.run("expireOldCLKKTransactions"); 
     await Parse.Cloud.run("checkClkkPayments"); 
-    await Parse.Cloud.run("checkClkkPaymentsRecharge"); 
+    await Parse.Cloud.run("checkClkkPaymentsRecharge");
+    
+    // Authorize.Net cron jobs
+    await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
+    await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge"); 
 
     
      //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.

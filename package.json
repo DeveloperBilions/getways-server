@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@wert-io/widget-sc-signer": "^2.0.1",
+    "authorizenet": "^1.0.10",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.9",
     "base64url": "^3.0.1",
@@ -25,6 +26,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.16",
     "nodemon": "^3.1.4",
+    "openai": "^6.1.0",
     "parse": "^5.1.0",
     "parse-dashboard": "^5.4.0",
     "parse-server": "^7.0.0",
