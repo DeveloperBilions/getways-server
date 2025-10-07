@@ -143,6 +143,10 @@ ParseServer.createLiveQueryServer(httpServer);
     await Parse.Cloud.run("expireOldCLKKTransactions"); 
     await Parse.Cloud.run("checkClkkPayments"); 
 
+    // Authorize.Net cron jobs
+    await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
+    await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge");
+
     // Total Liquor payment status check
     await Parse.Cloud.run("checkTotalLiquorTransactionStatus"); // Checks and updates Total Liquor Stripe payments
 

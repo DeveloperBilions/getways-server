@@ -943,3 +943,60 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
     throw error;
   }
 });
+
+
+// Check Authorize.Net transaction status
+Parse.Cloud.define("checkTransactionStatusAuthorizeNet", async (request) => {
+  try {
+    const query = new Parse.Query("TransactionRecords");
+    query.equalTo("status", 1); // status = 1 => pending
+    query.equalTo("portal", "AuthorizeNet");
+    query.exists("transactionIdFromStripe"); // must have transaction ID
+    query.limit(10000);
+    query.descending("updatedAt");
+
+    const results = await query.find();
+
+    if (!results || results.length === 0) {
+      return;
+    }
+    const now = new Date();
+
+    for (const record of results) {
+      const transactionId = record.get("transactionIdFromStripe");
+      const createdAt = record.get("createdAt");
+      const paymentMethod = record.get("paymentMethod");
+
+      const diffMs = now - createdAt; // difference in milliseconds
+      const diffMins = diffMs / (1000 * 60); // convert to minutes
+
+      if (diffMins > 45) {
+        // Expire the transaction due to timeout
+        record.set("status", 9); // 9 = expired
+        await record.save(null, { useMasterKey: true });
+        continue;
+      }
+
+      try {
+        // For Authorize.Net direct charges, they are immediately processed
+        // We mainly handle any pending transactions that need pot balance updates
+        if (paymentMethod === "Card Charge") {
+          const parentUserId = await getParentUserId(record.get("userId"));
+          await updatePotBalance(parentUserId, record.get("transactionAmount"), "recharge");
+          
+          record.set("status", 2); // completed
+          await record.save(null, { useMasterKey: true });
+        }
+      } catch (error) {
+        console.error(`Authorize.Net transaction error for ${transactionId}: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkTransactionStatusAuthorizeNet:", error.message);
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "Unexpected error",
+    };
+  }
+});
