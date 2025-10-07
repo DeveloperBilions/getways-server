@@ -109,11 +109,11 @@ Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
     throw new Error("Failed to update expired CLKK transactions.");
   }
 });
-const API_KEY = process.env.CLKK_API_KEY;
-const BASE_URL = `https://api.staging.clkk-api.io/api/partner`;
+// const API_KEY = process.env.CLKK_API_KEY;
+// const BASE_URL = `https://api.staging.clkk-api.io/api/partner`;
 
-// const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
-// const BASE_URL = `https://api.dev.clkk-api.io/api/partner`;
+const API_KEY = "ckpl_wChpcgGHHobBKfSpRx3FHOahkA5lOTJe4bmTD22RafI";
+const BASE_URL = `https://api.dev.clkk-api.io/api/partner`;
 
 Parse.Cloud.define("checkClkkPayments", async (request) => {
 
