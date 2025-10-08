@@ -12,7 +12,7 @@ Parse.Cloud.beforeSave(Parse.User, async (request) => {
   
     const parentQuery = new Parse.Query(Parse.User);
     parentQuery.equalTo("objectId", userParentId);
-    parentQuery.equalTo("username", userParentName);
+    //parentQuery.equalTo("username", userParentName);
     const parentUser = await parentQuery.first({ useMasterKey: true });
   
     if (!parentUser) {

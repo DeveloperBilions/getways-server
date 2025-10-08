@@ -1543,6 +1543,8 @@ Parse.Cloud.define("redeemServiceFeeAgentAll", async (request) => {
     userQuery.equalTo("objectId", userId);
     const user = await userQuery.first({ useMasterKey: true });
     const isMasterAgent = user.get("roleName") === "Master-Agent"; // Check if roleName is "Master-Agent"
+    user.set("redeemService", redeemService);
+    await user.save(null, { useMasterKey: true });
 
     // Step 3: Update user or child users based on role check and `redeemServiceZeroAllowed`
     if (isMasterAgent) {
@@ -1550,7 +1552,7 @@ Parse.Cloud.define("redeemServiceFeeAgentAll", async (request) => {
       const childUserQuery = new Parse.Query(Parse.User);
       childUserQuery.equalTo("userParentId", user.id);
       childUserQuery.equalTo("roleName", "Agent");
-      const childUsers = await childUserQuery.find({ useMasterKey: true });
+      const childUsers = await childUserQuery.findAll({ useMasterKey: true });
 
       // Update child users' data
       for (const childUser of childUsers) {
