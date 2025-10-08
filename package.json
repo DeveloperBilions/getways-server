@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@wert-io/widget-sc-signer": "^2.0.1",
+    "authorizenet": "^1.0.10",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.9",
     "base64url": "^3.0.1",

@@ -22,6 +22,7 @@ async function loadModule() {
     await import('./click.js')
     await import('./CronJob/email.js')
     await import('./Triggers/user.js')
+    await import('./AuthorizeNet.js')
 
 }
 
