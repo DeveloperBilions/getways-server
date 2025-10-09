@@ -158,7 +158,7 @@ Parse.Cloud.define("authorizeNetChargeCard", async (request) => {
               transactionDetails.set("userId", request.user.id);
               transactionDetails.set("transactionDate", new Date());
               transactionDetails.set("transactionAmount", parsedAmount);
-              transactionDetails.set("remark", "Authorize.net Card Charge");
+              transactionDetails.set("remark");
               transactionDetails.set("useWallet", false);
               transactionDetails.set("userParentId", request.user.get("userParentId") || "");
               transactionDetails.set("status", 2); // success
