@@ -1000,3 +1000,33 @@ Parse.Cloud.define("checkTransactionStatusAuthorizeNet", async (request) => {
     };
   }
 });
+
+// Check Fiserv transaction status
+Parse.Cloud.define("checkTransactionStatusFiserv", async (request) => {
+  try {
+    // Call the main Fiserv payment check function
+    return await Parse.Cloud.run("checkFiservPaymentsRecharge");
+  } catch (error) {
+    console.error("Error in checkTransactionStatusFiserv:", error.message);
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "Unexpected error",
+    };
+  }
+});
+
+// Check Fiserv Checkout transaction status
+Parse.Cloud.define("checkTransactionStatusFiservCheckout", async (request) => {
+  try {
+    // Call the main Fiserv checkout check function
+    return await Parse.Cloud.run("checkFiservCheckoutsRecharge");
+  } catch (error) {
+    console.error("Error in checkTransactionStatusFiservCheckout:", error.message);
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "Unexpected error",
+    };
+  }
+});
