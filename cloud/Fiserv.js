@@ -38,6 +38,7 @@ const generateFiservHeaders = (body = '') => {
 Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
   const { 
     amount, 
+    remark,
     orderId,
     customerInfo,
     expiryHours = 24 
@@ -160,7 +161,7 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
     transactionDetails.set("userId", user.id);
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parsedAmount);
-    transactionDetails.set("remark",);
+    transactionDetails.set("remark",remark);
     transactionDetails.set("useWallet", false);
     transactionDetails.set("userParentId", user.get("userParentId") || "");
     transactionDetails.set("status", 1); // pending
@@ -390,6 +391,7 @@ Parse.Cloud.define("expireOldFiservTransactions", async (request) => {
 Parse.Cloud.define("fiservCreateCheckout", async (request) => {
   const { 
     amount, 
+    remark,
     currency = "USD", 
     orderId, 
     expiryHours = 24,
@@ -535,6 +537,7 @@ Parse.Cloud.define("fiservCreateCheckout", async (request) => {
     transactionDetails.set("userId", request.user.id);
     transactionDetails.set("transactionAmount", parseFloat(amount));
     transactionDetails.set("transactionDate", new Date());
+    transactionDetails.set("remark", remark);
     transactionDetails.set("status", 1); // pending
     transactionDetails.set("type", "recharge");
     transactionDetails.set("portal", "FiservCheckout");
