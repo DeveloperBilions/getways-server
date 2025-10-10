@@ -283,11 +283,16 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
         }
 
         const fiservData = await response.json();
-        const transactionStatus = fiservData.transactionStatus;
         
-        console.log(`📋 Transaction ${transaction.id} status: ${transactionStatus}`);
+        // Check both transactionStatus and ipgTransactionDetails.transactionStatus
+        const transactionStatus = fiservData.transactionStatus;
+        const ipgTransactionStatus = fiservData.ipgTransactionDetails?.transactionStatus;
+        const approvalCode = fiservData.ipgTransactionDetails?.approvalCode;
+        
+        console.log(`📋 Transaction ${transaction.id} - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}, Approval: ${approvalCode}`);
 
-        if (transactionStatus === "APPROVED") {
+        // Check if payment is approved (both main status and IPG status should be APPROVED)
+        if (transactionStatus === "APPROVED" && ipgTransactionStatus === "APPROVED") {
           // Payment successful - update balance and transaction status
           const userId = transaction.get("userId");
           const amount = transaction.get("transactionAmount");
@@ -298,20 +303,27 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
           
           transaction.set("status", 2); // completed
           transaction.set("fiservTransactionStatus", transactionStatus);
+          transaction.set("fiservIpgStatus", ipgTransactionStatus);
+          transaction.set("fiservApprovalCode", approvalCode);
           transaction.set("completedAt", new Date());
           await transaction.save(null, { useMasterKey: true });
           
-          console.log(`✅ Transaction ${transaction.id} completed successfully`);
+          console.log(`✅ Transaction ${transaction.id} completed successfully with approval code: ${approvalCode}`);
           successCount++;
-        } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus)) {
+        } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
+                   ["FAILED", "DECLINED", "FRAUD"].includes(ipgTransactionStatus)) {
           // Payment failed
           transaction.set("status", 9); // failed
           transaction.set("fiservTransactionStatus", transactionStatus);
+          transaction.set("fiservIpgStatus", ipgTransactionStatus);
           transaction.set("failedAt", new Date());
           await transaction.save(null, { useMasterKey: true });
           
-          console.log(`❌ Transaction ${transaction.id} failed with status: ${transactionStatus}`);
+          console.log(`❌ Transaction ${transaction.id} failed - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
           failedCount++;
+        } else {
+          // Payment still in progress (INITIATED, WAITING, etc.)
+          console.log(`⏳ Transaction ${transaction.id} still in progress - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
         }
 
         processedCount++;
@@ -782,6 +794,105 @@ Parse.Cloud.define("expireOldFiservCheckoutTransactions", async (request) => {
       Parse.Error.SCRIPT_FAILED,
       error.message || "Failed to expire Fiserv checkout transactions"
     );
+  }
+});
+
+// Fiserv Webhook Handler
+Parse.Cloud.define("fiservWebhookHandler", async (request) => {
+  try {
+    console.log("🔔 Fiserv webhook received:", JSON.stringify(request.params, null, 2));
+    
+    const webhookData = request.params;
+    
+    // Validate webhook data
+    if (!webhookData || !webhookData.paymentLinkId) {
+      console.warn("⚠️ Invalid webhook data received");
+      return { success: false, error: "Invalid webhook data" };
+    }
+
+    const { 
+      paymentLinkId, 
+      transactionStatus, 
+      ipgTransactionDetails,
+      merchantTransactionId,
+      approvedAmount 
+    } = webhookData;
+
+    // Find the transaction record
+    const TransactionRecords = Parse.Object.extend("TransactionRecords");
+    const query = new Parse.Query(TransactionRecords);
+    query.equalTo("transactionIdFromStripe", paymentLinkId);
+    query.equalTo("portal", "Fiserv");
+    
+    const transaction = await query.first({ useMasterKey: true });
+    
+    if (!transaction) {
+      console.warn(`⚠️ No transaction found for payment link: ${paymentLinkId}`);
+      return { success: false, error: "Transaction not found" };
+    }
+
+    console.log(`🔄 Processing webhook for transaction ${transaction.id}`);
+
+    // Check if payment is successful
+    const ipgStatus = ipgTransactionDetails?.transactionStatus;
+    const approvalCode = ipgTransactionDetails?.approvalCode;
+    
+    if (transactionStatus === "APPROVED" && ipgStatus === "APPROVED") {
+      // Payment successful
+      const userId = transaction.get("userId");
+      const amount = transaction.get("transactionAmount");
+
+      // Update pot balance
+      const parentUserId = await getParentUserId(userId);
+      await updatePotBalance(parentUserId, amount, "recharge");
+      
+      transaction.set("status", 2); // completed
+      transaction.set("fiservTransactionStatus", transactionStatus);
+      transaction.set("fiservIpgStatus", ipgStatus);
+      transaction.set("fiservApprovalCode", approvalCode);
+      transaction.set("webhookProcessedAt", new Date());
+      await transaction.save(null, { useMasterKey: true });
+      
+      console.log(`✅ Webhook processed: Transaction ${transaction.id} completed successfully`);
+      
+      return { 
+        success: true, 
+        message: "Payment processed successfully",
+        transactionId: transaction.id
+      };
+    } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
+               ["FAILED", "DECLINED", "FRAUD"].includes(ipgStatus)) {
+      // Payment failed
+      transaction.set("status", 9); // failed
+      transaction.set("fiservTransactionStatus", transactionStatus);
+      transaction.set("fiservIpgStatus", ipgStatus);
+      transaction.set("webhookProcessedAt", new Date());
+      await transaction.save(null, { useMasterKey: true });
+      
+      console.log(`❌ Webhook processed: Transaction ${transaction.id} failed`);
+      
+      return { 
+        success: true, 
+        message: "Payment failure processed",
+        transactionId: transaction.id
+      };
+    } else {
+      // Payment still in progress
+      console.log(`⏳ Webhook processed: Transaction ${transaction.id} still in progress`);
+      
+      return { 
+        success: true, 
+        message: "Payment status updated",
+        transactionId: transaction.id
+      };
+    }
+
+  } catch (error) {
+    console.error("Fiserv webhook processing error:", error);
+    return { 
+      success: false, 
+      error: error.message || "Failed to process webhook" 
+    };
   }
 });
 
