@@ -125,6 +125,35 @@ Parse.Cloud.define("authorizeNetChargeCard", async (request) => {
         if (!apiResponse) {
           const apiError = ctrl.getError();
           console.error('❌ Authorize.net Charge Card API Error:', apiError);
+          
+          // Save API failure to database
+          try {
+            const TransactionDetails = Parse.Object.extend("TransactionRecords");
+            const transactionDetails = new TransactionDetails();
+
+            transactionDetails.set("type", "recharge");
+            transactionDetails.set("gameId", "786");
+            transactionDetails.set("username", request.user.get("username") || "");
+            transactionDetails.set("userId", request.user.id);
+            transactionDetails.set("transactionDate", new Date());
+            transactionDetails.set("transactionAmount", parsedAmount);
+            transactionDetails.set("remark", remark || "");
+            transactionDetails.set("useWallet", false);
+            transactionDetails.set("userParentId", request.user.get("userParentId") || "");
+            transactionDetails.set("status", 10); // failed
+            transactionDetails.set("portal", "AuthorizeNet");
+            transactionDetails.set("transactionIdFromStripe", `no_response_${Date.now()}`);
+            transactionDetails.set("authCode", "");
+            transactionDetails.set("paymentMethod", "Card Charge");
+            transactionDetails.set("errorMessage", "No response received from Authorize.Net API");
+            transactionDetails.set("responseCode", "NO_RESPONSE");
+
+            await transactionDetails.save(null, { useMasterKey: true });
+            console.log('📝 No API response transaction saved to database');
+          } catch (dbError) {
+            console.error('❌ Failed to save no response transaction to database:', dbError);
+          }
+          
           reject(new Parse.Error(
             Parse.Error.INTERNAL_SERVER_ERROR,
             'Failed to process card charge'
@@ -136,63 +165,99 @@ Parse.Cloud.define("authorizeNetChargeCard", async (request) => {
         const transactionResponse = response.getTransactionResponse();
         
         if (response.getMessages().getResultCode() === ApiContracts.MessageTypeEnum.OK) {
-          if (transactionResponse && transactionResponse.getMessages()) {
-            const transactionId = transactionResponse.getTransId();
-            const authCode = transactionResponse.getAuthCode();
-            const responseCode = transactionResponse.getResponseCode();
-            
-            console.log('✅ Card Charge successful:', {
-              transactionId,
-              authCode,
-              responseCode,
-              amount: parsedAmount
-            });
+          // resultCode = "Ok" - Request handled successfully, now check transaction responseCode
+          const transactionId = transactionResponse?.getTransId() || "";
+          const authCode = transactionResponse?.getAuthCode() || "";
+          const responseCode = transactionResponse?.getResponseCode() || "3";
+          
+          // Determine status based on responseCode (1=Approved, 2=Declined, 3=Error, 4=Held for Review)
+          let transactionStatus;
+          let shouldUpdatePotBalance = false;
+          let isSuccess = false;
+          
+          switch(responseCode) {
+            case "1": // Approved
+              transactionStatus = 2; // success
+              shouldUpdatePotBalance = true;
+              isSuccess = true;
+              break;
+            case "2": // Declined
+              transactionStatus = 10; // failed
+              break;
+            case "3": // Error
+              transactionStatus = 10; // failed
+              break;
+            case "4": // Held for Review
+              transactionStatus = 1; // pending
+              break;
+            default:
+              transactionStatus = 10; // failed
+          }
+          
+          // Get error message if transaction failed
+          const errorMessage = transactionResponse?.getErrors()?.getError()?.[0]?.getErrorText() || "";
+          const successMessage = transactionResponse?.getMessages()?.getMessage()?.[0]?.getDescription() || "";
+          
+          console.log(`📊 Transaction processed - responseCode: ${responseCode}, status: ${transactionStatus}`);
+          
+          // Save ALL transactions to database
+          try {
+            const TransactionDetails = Parse.Object.extend("TransactionRecords");
+            const transactionDetails = new TransactionDetails();
 
-            // Save transaction to database and update pot balance
-            try {
-              const TransactionDetails = Parse.Object.extend("TransactionRecords");
-              const transactionDetails = new TransactionDetails();
-
-              transactionDetails.set("type", "recharge");
-              transactionDetails.set("gameId", "786");
-              transactionDetails.set("username", request.user.get("username") || "");
-              transactionDetails.set("userId", request.user.id);
-              transactionDetails.set("transactionDate", new Date());
-              transactionDetails.set("transactionAmount", parsedAmount);
+            transactionDetails.set("type", "recharge");
+            transactionDetails.set("gameId", "786");
+            transactionDetails.set("username", request.user.get("username") || "");
+            transactionDetails.set("userId", request.user.id);
+            transactionDetails.set("transactionDate", new Date());
+            transactionDetails.set("transactionAmount", parsedAmount);
               transactionDetails.set("remark",remark);
-              transactionDetails.set("useWallet", false);
-              transactionDetails.set("userParentId", request.user.get("userParentId") || "");
-              transactionDetails.set("status", 2); // success
-              transactionDetails.set("portal", "AuthorizeNet");
-              transactionDetails.set("transactionIdFromStripe", transactionId);
-              transactionDetails.set("authCode", authCode);
-              transactionDetails.set("paymentMethod", "Card Charge");
+            transactionDetails.set("useWallet", false);
+            transactionDetails.set("userParentId", request.user.get("userParentId") || "");
+            transactionDetails.set("status", transactionStatus);
+            transactionDetails.set("portal", "AuthorizeNet");
+            transactionDetails.set("transactionIdFromStripe", transactionId || `response_${responseCode}_${Date.now()}`);
+            transactionDetails.set("authCode", authCode);
+            transactionDetails.set("paymentMethod", "Card Charge");
+            transactionDetails.set("responseCode", responseCode);
+            
+            // Store appropriate message
+            if (errorMessage) {
+              transactionDetails.set("errorMessage", errorMessage);
+            } else if (successMessage) {
+              transactionDetails.set("errorMessage", successMessage);
+            }
 
-              await transactionDetails.save(null, { useMasterKey: true });
-              
-              // Update pot balance for successful charge
+            await transactionDetails.save(null, { useMasterKey: true });
+            
+            // Update pot balance only for approved transactions
+            if (shouldUpdatePotBalance) {
               const parentUserId = await getParentUserId(request.user.id);
               await updatePotBalance(parentUserId, parsedAmount, "recharge");
-              
-              console.log('✅ Transaction saved to database and pot balance updated');
-            } catch (dbError) {
-              console.error('❌ Failed to save transaction or update pot balance:', dbError);
+              console.log('✅ Approved transaction saved and pot balance updated');
+            } else {
+              console.log(`📝 Transaction saved - ${responseCode === "2" ? "Declined" : responseCode === "3" ? "Error" : responseCode === "4" ? "Held for Review" : "Unknown"}`);
             }
             
+          } catch (dbError) {
+            console.error('❌ Failed to save transaction to database:', dbError);
+          }
+          
+          // Return response based on success
+          if (isSuccess) {
             resolve({
               success: true,
               transactionId: transactionId,
               authCode: authCode,
               responseCode: responseCode,
               amount: parsedAmount,
-              message: transactionResponse.getMessages().getMessage()[0].getDescription()
+              message: successMessage
             });
           } else {
-            const errorMessage = transactionResponse?.getErrors()?.getError()?.[0]?.getErrorText() || 'Transaction failed';
-            console.error('❌ Transaction failed:', errorMessage);
-            reject(new Parse.Error(Parse.Error.OTHER_CAUSE, errorMessage));
+            reject(new Parse.Error(Parse.Error.OTHER_CAUSE, errorMessage || `Transaction ${responseCode === "2" ? "declined" : responseCode === "3" ? "error" : responseCode === "4" ? "held for review" : "failed"}`));
           }
         } else {
+          // API response not OK - SAVE TO DB
           const errorMessage = response.getMessages().getMessage()[0].getText();
           const errorCode = response.getMessages().getMessage()[0].getCode();
           
@@ -200,6 +265,34 @@ Parse.Cloud.define("authorizeNetChargeCard", async (request) => {
             errorCode,
             errorMessage
           });
+          
+          // Save API error to database
+          try {
+            const TransactionDetails = Parse.Object.extend("TransactionRecords");
+            const transactionDetails = new TransactionDetails();
+
+            transactionDetails.set("type", "recharge");
+            transactionDetails.set("gameId", "786");
+            transactionDetails.set("username", request.user.get("username") || "");
+            transactionDetails.set("userId", request.user.id);
+            transactionDetails.set("transactionDate", new Date());
+            transactionDetails.set("transactionAmount", parsedAmount);
+            transactionDetails.set("remark", remark || "");
+            transactionDetails.set("useWallet", false);
+            transactionDetails.set("userParentId", request.user.get("userParentId") || "");
+            transactionDetails.set("status", 10); // failed
+            transactionDetails.set("portal", "AuthorizeNet");
+            transactionDetails.set("transactionIdFromStripe", `api_error_${Date.now()}`);
+            transactionDetails.set("authCode", "");
+            transactionDetails.set("paymentMethod", "Card Charge");
+            transactionDetails.set("errorMessage", errorMessage);
+            transactionDetails.set("responseCode", errorCode);
+
+            await transactionDetails.save(null, { useMasterKey: true });
+            console.log('📝 API error transaction saved to database');
+          } catch (dbError) {
+            console.error('❌ Failed to save API error transaction to database:', dbError);
+          }
           
           reject(new Parse.Error(
             Parse.Error.OTHER_CAUSE,
@@ -211,6 +304,35 @@ Parse.Cloud.define("authorizeNetChargeCard", async (request) => {
 
   } catch (error) {
     console.error('❌ Authorize.net Card Charge Integration Error:', error);
+    
+    // Save exception to database
+    try {
+      const TransactionDetails = Parse.Object.extend("TransactionRecords");
+      const transactionDetails = new TransactionDetails();
+
+      transactionDetails.set("type", "recharge");
+      transactionDetails.set("gameId", "786");
+      transactionDetails.set("username", request.user.get("username") || "");
+      transactionDetails.set("userId", request.user.id);
+      transactionDetails.set("transactionDate", new Date());
+      transactionDetails.set("transactionAmount", parsedAmount);
+      transactionDetails.set("remark", remark || "");
+      transactionDetails.set("useWallet", false);
+      transactionDetails.set("userParentId", request.user.get("userParentId") || "");
+      transactionDetails.set("status", 10); // failed
+      transactionDetails.set("portal", "AuthorizeNet");
+      transactionDetails.set("transactionIdFromStripe", `exception_${Date.now()}`);
+      transactionDetails.set("authCode", "");
+      transactionDetails.set("paymentMethod", "Card Charge");
+      transactionDetails.set("errorMessage", error.message || 'Card charge processing error');
+      transactionDetails.set("responseCode", "EXCEPTION");
+
+      await transactionDetails.save(null, { useMasterKey: true });
+      console.log('📝 Exception transaction saved to database');
+    } catch (dbError) {
+      console.error('❌ Failed to save exception transaction to database:', dbError);
+    }
+    
     throw new Parse.Error(
       Parse.Error.INTERNAL_SERVER_ERROR,
       error.message || 'Card charge processing error'
