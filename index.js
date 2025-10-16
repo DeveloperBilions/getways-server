@@ -149,7 +149,8 @@ ParseServer.createLiveQueryServer(httpServer);
   
     await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
     await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge");
-    
+    await Parse.Cloud.run("cellpayBtcTxnStatus");
+
      //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
 
 
@@ -176,7 +177,7 @@ ParseServer.createLiveQueryServer(httpServer);
   setTimeout(async () => {
     try {
       //console.log("Update The Status of blank or 0 status to 1...");
-      await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+      //await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
      // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
       ///await Parse.Cloud.run("migration")
     } catch (error) {
