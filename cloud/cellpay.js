@@ -9,7 +9,7 @@ const BASE_URL =
 
 Parse.Cloud.define("cellpayRefill", async (request) => {
   try {
-    const { mobileNumber, amount } = request.params;
+    const { mobileNumber, amount, vp_username, vp_email } = request.params;
 
     // Get current date in CST (America/Chicago) timezone, format m-d-Y
     const dateCST = moment().tz("America/Chicago").format("MM-DD-YYYY");
@@ -33,8 +33,8 @@ Parse.Cloud.define("cellpayRefill", async (request) => {
         "carrierId":333424,             
         "planId":"erc20usdt",	
         "amount":amount,                 
-        "vp_username":"testuser",      
-        "vp_email":"testuser@test.com",  
+        "vp_username":vp_username,      
+        "vp_email":vp_email,  
         "successURL" : process.env.FRONTEND_URL,
         "cancelURL" :  process.env.FRONTEND_URL,         
         "reference_id":Date.now()        
