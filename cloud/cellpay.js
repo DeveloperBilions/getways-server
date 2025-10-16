@@ -31,7 +31,7 @@ Parse.Cloud.define("cellpayRefill", async (request) => {
     const payload = {
         "phone":mobileNumber,            	
         "carrierId":333424,             
-        "planId":"erc20usdt",	
+        "planId":"trc20usdt",	
         "amount":amount,                 
         "vp_username":vp_username,      
         "vp_email":vp_email,  
@@ -62,7 +62,7 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
     try {
       const query = new Parse.Query("TransactionRecords");
       query.equalTo("status", 1); // Pending only
-      query.notEqualTo("portal", "CellPay");
+      query.notEqualTo("portal", "GetPay");
       query.limit(10000);
   
       const pendingTransactions = await query.find({ useMasterKey: true });

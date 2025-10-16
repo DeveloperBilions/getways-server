@@ -277,10 +277,10 @@ Parse.Cloud.define("cardPayout", async (request) => {
     transaction.set("useWallet", true);
     transaction.set("userParentId", user.get("userParentId") || "");
     transaction.set("status", result.status === "PAID" ? 12 : 11); // 12=completed, 11=pending
-    transaction.set("portal", "CellPayCard");
+    transaction.set("portal", "GetPayCard");
     transaction.set("transactionIdFromStripe", result.transactionId);
     transaction.set("isCashOut", true);
-    transaction.set("paymentMode", "CELLPAY-CARD");
+    transaction.set("paymentMode", "GETPAY-CARD");
     transaction.set("remark", description || `Card payout for ${name}`);
     
     // Store additional payout-specific data
@@ -392,10 +392,10 @@ Parse.Cloud.define("cryptoPayout", async (request) => {
     transaction.set("useWallet", true);
     transaction.set("userParentId", user.get("userParentId") || "");
     transaction.set("status", result.status === "PAID" ? 12 : 11); // 12=completed, 11=pending
-    transaction.set("portal", "CellPayCrypto");
+    transaction.set("portal", "GetPayCrypto");
     transaction.set("transactionIdFromStripe", result.transactionId);
     transaction.set("isCashOut", true);
-    transaction.set("paymentMode", `CELLPAY-${cryptoType.toUpperCase()}`);
+    transaction.set("paymentMode", `GetPAY-${cryptoType.toUpperCase()}`);
     transaction.set("remark", description || `Crypto payout to ${cryptoType} wallet`);
     
     // Store additional crypto-specific data
