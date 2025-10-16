@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import axios from "axios";
 import moment from "moment-timezone";
-import { updatePotBalance } from "./utility/utlis";
+const { updatePotBalance } = require('./utility/utlis');
 const CLIENT_ID = process.env.CELLPAY_CLIENT_ID
 const SECRET = process.env.CELLPAY_SECRET
 const BASE_URL =
