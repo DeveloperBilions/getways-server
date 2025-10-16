@@ -35,9 +35,9 @@ Parse.Cloud.define("cellpayRefill", async (request) => {
         "amount":amount,                 
         "vp_username":"testuser",      
         "vp_email":"testuser@test.com",  
-             "successURL" : "",
-             "cancelURL" : "",         
-        "reference_id":1234        
+        "successURL" : process.env.FRONTEND_URL,
+        "cancelURL" :  process.env.FRONTEND_URL,         
+        "reference_id":Date.now()        
     };
 
 
