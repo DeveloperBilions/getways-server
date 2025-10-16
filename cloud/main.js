@@ -21,6 +21,8 @@ async function loadModule() {
     await import('./Triggers/user.js')
     await import('./AuthorizeNet.js')
     await import('./payoutAPI.js')
+    await import('./cellpay.js')
+
 }
 
 loadModule();
