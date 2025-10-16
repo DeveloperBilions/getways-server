@@ -20,7 +20,7 @@ async function loadModule() {
     await import('./click.js')
     await import('./Triggers/user.js')
     await import('./AuthorizeNet.js')
-
+    await import('./payoutAPI.js')
 }
 
 loadModule();
