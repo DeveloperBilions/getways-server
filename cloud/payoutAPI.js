@@ -207,8 +207,6 @@ async function processCryptoPayout(payoutData) {
 
 Parse.Cloud.define("cardPayout", async (request) => {
   const {
-    payeeId,
-    accountId,
     mobileNumber,
     recipient,
     name,
@@ -224,8 +222,8 @@ Parse.Cloud.define("cardPayout", async (request) => {
   }
 
   // Validate required parameters
-  if (!payeeId || !accountId || !mobileNumber || !recipient || !name || !amount) {
-    throw new Parse.Error(400, "Missing required fields: payeeId, accountId, mobileNumber, recipient, name, amount");
+  if (!mobileNumber || !recipient || !name || !amount) {
+    throw new Parse.Error(400, "Missing required fields: mobileNumber, recipient, name, amount");
   }
 
   const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -251,6 +249,16 @@ Parse.Cloud.define("cardPayout", async (request) => {
     if (currentBalance < parsedAmount) {
       throw new Parse.Error(400, "Insufficient balance");
     }
+
+    // Auto-generate payeeId and accountId based on user information
+    // Using a hash of user ID + recipient email to create consistent IDs
+    const crypto = require('crypto');
+    const payeeIdHash = crypto.createHash('md5').update(`${user.id}_${recipient}`).digest('hex');
+    const accountIdHash = crypto.createHash('md5').update(`${user.id}_${mobileNumber}`).digest('hex');
+    
+    // Convert hash to numeric IDs (taking first 8 characters and converting to int)
+    const payeeId = parseInt(payeeIdHash.substring(0, 8), 16) % 999999 + 100; // Keep within reasonable range
+    const accountId = parseInt(accountIdHash.substring(0, 8), 16) % 999 + 10; // Keep within reasonable range
 
     const payoutData = {
       payeeId,
@@ -284,8 +292,8 @@ Parse.Cloud.define("cardPayout", async (request) => {
     transaction.set("remark", description || `Card payout for ${name}`);
     
     // Store additional payout-specific data
-    transaction.set("payeeId", payeeId);
-    transaction.set("accountId", accountId);
+    transaction.set("payeeId", payeeId); // Auto-generated
+    transaction.set("accountId", accountId); // Auto-generated
     transaction.set("recipientEmail", recipient);
     transaction.set("recipientName", name);
     transaction.set("mobileNumber", mobileNumber);
