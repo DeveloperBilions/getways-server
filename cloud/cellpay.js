@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import axios from "axios";
 import moment from "moment-timezone";
+import { updatePotBalance } from "./utility/utlis";
 const CLIENT_ID = process.env.CELLPAY_CLIENT_ID
 const SECRET = process.env.CELLPAY_SECRET
 const BASE_URL =
@@ -86,6 +87,9 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
       for (const txn of pendingTransactions) {
         try {
           const address = txn.get("transactionIdFromStripe");
+          const amount = txn.get("transactionAmount");
+          const parentId= txn.get("userParentId");
+
           if (!address) continue;
   
           const url = `${BASE_URL}/btcTxnStatus/${address}`;
@@ -96,6 +100,8 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
   
           if (status === "complete") {
             txn.set("status", 2); 
+            await updatePotBalance(parentId, amount, "recharge");
+            
           }
   
           await txn.save(null, { useMasterKey: true });
