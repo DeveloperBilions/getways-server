@@ -28,7 +28,7 @@ Parse.Cloud.define("cellpayRefill", async (request) => {
 
     // Example payload (adjust as per CellPay API doc)
     const payload = {
-        "phone":"8159848908",            	
+        "phone":mobileNumber,            	
         "carrierId":333424,             
         "planId":"erc20usdt",	
         "amount":amount,                 
