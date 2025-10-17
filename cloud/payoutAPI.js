@@ -207,9 +207,9 @@ async function processCryptoPayout(payoutData) {
 
 Parse.Cloud.define("cardPayout", async (request) => {
   const {
+    name,
     mobileNumber,
     recipient,
-    name,
     amount,
     description
   } = request.params;
@@ -222,8 +222,8 @@ Parse.Cloud.define("cardPayout", async (request) => {
   }
 
   // Validate required parameters
-  if (!mobileNumber || !recipient || !name || !amount) {
-    throw new Parse.Error(400, "Missing required fields: mobileNumber, recipient, name, amount");
+  if (!name || !mobileNumber || !recipient || !amount) {
+    throw new Parse.Error(400, "Missing required fields: name, mobileNumber, recipient, amount");
   }
 
   const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -250,76 +250,76 @@ Parse.Cloud.define("cardPayout", async (request) => {
       throw new Parse.Error(400, "Insufficient balance");
     }
 
-    // Auto-generate payeeId and accountId based on user information
-    // Using a hash of user ID + recipient email to create consistent IDs
-    const crypto = require('crypto');
-    const payeeIdHash = crypto.createHash('md5').update(`${user.id}_${recipient}`).digest('hex');
-    const accountIdHash = crypto.createHash('md5').update(`${user.id}_${mobileNumber}`).digest('hex');
-    
-    // Convert hash to numeric IDs (taking first 8 characters and converting to int)
-    const payeeId = parseInt(payeeIdHash.substring(0, 8), 16) % 999999 + 100; // Keep within reasonable range
-    const accountId = parseInt(accountIdHash.substring(0, 8), 16) % 999 + 10; // Keep within reasonable range
-
+    // Prepare simplified payout data (no payeeId/accountId needed)
     const payoutData = {
-      payeeId,
-      accountId,
+      name,
       mobileNumber,
       recipient,
-      name,
       amount: parsedAmount,
       description: description || `Card payout for ${name}`
     };
 
     const result = await processCardPayout(payoutData);
     
-    // Create TransactionRecords entry (matching existing structure)
+    // Always create TransactionRecords entry to store API response (success or failure)
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const transaction = new TransactionRecords();
     
-    transaction.set("type", "redeem");
-    transaction.set("gameId", "786");
-    transaction.set("username", user.get("username") || "");
+    // Common transaction fields
     transaction.set("userId", user.id);
-    transaction.set("transactionDate", new Date());
-    transaction.set("transactionAmount", parsedAmount);
-    transaction.set("useWallet", true);
+    transaction.set("username", user.get("username") || "");
     transaction.set("userParentId", user.get("userParentId") || "");
-    transaction.set("status", result.status === "PAID" ? 12 : 11); // 12=completed, 11=pending
-    transaction.set("portal", "GetPayCard");
-    transaction.set("transactionIdFromStripe", result.transactionId);
+    transaction.set("type", "redeem");
+    transaction.set("transactionAmount", parsedAmount);
+    transaction.set("gameId", "786");
+    transaction.set("transactionDate", new Date());
     transaction.set("isCashOut", true);
     transaction.set("paymentMode", "GETPAY-CARD");
     transaction.set("remark", description || `Card payout for ${name}`);
-    
-    // Store additional payout-specific data
-    transaction.set("payeeId", payeeId); // Auto-generated
-    transaction.set("accountId", accountId); // Auto-generated
     transaction.set("recipientEmail", recipient);
     transaction.set("recipientName", name);
     transaction.set("mobileNumber", mobileNumber);
+    
+    // CellPay API response data
+    transaction.set("cellpayTransactionId", result.id);
+    transaction.set("transactionIdFromStripe", result.id?.toString());
+    transaction.set("cellpayMessage", result.message);
+    transaction.set("cellpayAccountType", result.data?.accountType);
+    transaction.set("cellpayStatusCode", result.data?.statusCode);
+    transaction.set("cellpayStatus", result.data?.status);
+    transaction.set("cellpayCreatedOn", result.data?.createdOn);
+    transaction.set("cellpayUpdatedOn", result.data?.updatedOn);
+    transaction.set("cellpayFullResponse", JSON.stringify(result));
+    
+    // Check if the API response indicates success
+    if (result && result.id && result.message === "Payment successfully completed") {
+      // Mark as successful
+      transaction.set("status", 12); // 12 = completed
+      
+      await transaction.save(null, { useMasterKey: true });
 
-    await transaction.save(null, { useMasterKey: true });
-
-    // Update wallet balance only if payout is successful
-    if (result.status === "PAID") {
+      // Deduct balance only after successful API response
       const newBalance = currentBalance - parsedAmount;
       wallet.set("balance", newBalance);
       await wallet.save(null, { useMasterKey: true });
-    }
 
-    return {
-      success: true,
-      transactionId: transaction.id,
-      payoutId: result.id,
-      payeeName: result.payeeName,
-      accountType: result.accountType,
-      payoutTransactionId: result.transactionId,
-      amount: result.amount,
-      status: result.status,
-      createdOn: result.createdOn,
-      updatedOn: result.updatedOn,
-      message: "Card payout processed successfully"
-    };
+      return {
+        success: true,
+        transactionId: transaction.id,
+        cellpayTransactionId: result.id,
+        payoutId: result.id,
+        amount: parsedAmount,
+        message: result.message || "Card payout processed successfully"
+      };
+    } else {
+      // Mark as failed but still store the record
+      transaction.set("status", 11); // 11 = pending/failed
+      
+      await transaction.save(null, { useMasterKey: true });
+      
+      // DO NOT deduct balance for failed payments
+      throw new Parse.Error(400, result.message || "Payment was not completed successfully");
+    }
   } catch (error) {
     console.error("Card payout function error:", error);
     throw error;
@@ -421,18 +421,18 @@ Parse.Cloud.define("cryptoPayout", async (request) => {
       wallet.set("balance", newBalance);
       await wallet.save(null, { useMasterKey: true });
     }
-
-    return {
-      success: true,
-      transactionId: transaction.id,
-      payoutId: result.id,
-      payoutTransactionId: result.transactionId,
-      amount: result.amount,
-      status: result.status,
-      btcRate: result.btcRate,
-      btcFee: result.btcFee,
-      message: result.message || "Crypto payout processed successfully"
-    };
+      
+      return {
+        success: true,
+        transactionId: transaction.id,
+        payoutId: result.id,
+        payoutTransactionId: result.transactionId,
+        amount: result.amount,
+        status: result.status,
+        btcRate: result.btcRate,
+        btcFee: result.btcFee,
+        message: result.message || "Crypto payout processed successfully"
+      };
   } catch (error) {
     console.error("Crypto payout function error:", error);
     throw error;
