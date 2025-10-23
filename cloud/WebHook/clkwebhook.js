@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const Parse = require('parse/node');
+const { updatePotBalance } = require('../utility/utlis');
 
 const router = express.Router();
 
@@ -100,7 +101,8 @@ async function handlePaymentSucceeded(event) {
   txn.set("status", 2);
   txn.set("transactionIdFromStripe", transaction?.id);
   await Parse.Object.saveAll([txn], { useMasterKey: true });
-
+  await updatePotBalance(txn.get("userParentId"), txn.get("transactionAmount"), "recharge");
+  
   console.log(`✅ Transaction ${txn.id} marked as PAID`);
 }
 async function handlePaymentFailed(event) {

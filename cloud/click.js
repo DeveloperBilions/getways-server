@@ -1,5 +1,6 @@
 // cloud/main.js
 const axios = require("axios");
+const { updatePotBalance } = require("./utility/utlis");
 
 Parse.Cloud.define(
   "createCheckoutSession",
@@ -142,12 +143,12 @@ Parse.Cloud.define("checkClkkPaymentsRecharge", async (request) => {
         });
 
         const payment = res.data;
-        console.log(`Txn ${paymentId} → CLKK Status: ${payment.status}`);
-
-        // 2. If completed, update transaction
         if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
-          txn.set("status", 2); // mark as completed
+          txn.set("status", 2);
           await txn.save(null, { useMasterKey: true });
+          const parentUserId = txn.get("userParentId")
+          await updatePotBalance(parentUserId, txn.get("transactionAmount"), "recharge");
+          
           console.log(`✅ Updated txn ${txn.id} to status 12`);
         }
       } catch (err) {
