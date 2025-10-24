@@ -293,12 +293,12 @@ Parse.Cloud.define("cardPayout", async (request) => {
     
     // Check if the API response indicates success
     if (result && result.id && result.message === "Payment successfully completed") {
-      // Mark as successful
-      transaction.set("status", 12); // 12 = completed
+      // Mark as pending (11) initially - will be updated by cron job
+      transaction.set("status", 11); // 11 = pending (waiting for settlement)
       
       await transaction.save(null, { useMasterKey: true });
 
-      // Deduct balance only after successful API response
+      // Deduct balance immediately after successful API response
       const newBalance = currentBalance - parsedAmount;
       wallet.set("balance", newBalance);
       await wallet.save(null, { useMasterKey: true });
@@ -309,11 +309,11 @@ Parse.Cloud.define("cardPayout", async (request) => {
         cellpayTransactionId: result.id,
         payoutId: result.id,
         amount: parsedAmount,
-        message: result.message || "Card payout processed successfully"
+        message: result.message || "Card payout created successfully - pending settlement"
       };
     } else {
-      // Mark as failed but still store the record
-      transaction.set("status", 11); // 11 = pending/failed
+      // Mark as failed
+      transaction.set("status", 10); // 10 = failed
       
       await transaction.save(null, { useMasterKey: true });
       
@@ -439,9 +439,63 @@ Parse.Cloud.define("cryptoPayout", async (request) => {
   }
 });
 
+async function searchPayments(startDate, endDate) {
+  try {
+    const response = await axios.post(
+      `${PAYOUT_API_CONFIG.baseURL}/payment/search`,
+      {
+        startDate,
+        endDate
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.status === 200) {
+      console.log('Payment search successful:', response.data);
+      return response.data;
+    } else {
+      throw new Error(`Payment search failed with status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Payment search error:', error.message);
+    console.error('Full error response:', error.response?.data);
+    throw new Parse.Error(400, `Payment search failed: ${error.message}`);
+  }
+}
+
+async function getPaymentById(paymentId) {
+  try {
+    const response = await axios.get(
+      `${PAYOUT_API_CONFIG.baseURL}/payment/${paymentId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.status === 200) {
+      console.log('Get payment by ID successful:', response.data);
+      return response.data;
+    } else {
+      throw new Error(`Get payment by ID failed with status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Get payment by ID error:', error.message);
+    console.error('Full error response:', error.response?.data);
+    throw new Parse.Error(400, `Get payment by ID failed: ${error.message}`);
+  }
+}
+
 module.exports = {
   authenticatePayoutAPI,
   processCardPayout,
   processCryptoPayout,
-  getAuthToken
+  getAuthToken,
+  searchPayments,
+  getPaymentById
 };

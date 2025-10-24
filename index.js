@@ -150,6 +150,7 @@ ParseServer.createLiveQueryServer(httpServer);
     await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
     await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge");
     await Parse.Cloud.run("cellpayBtcTxnStatus");
+    await Parse.Cloud.run("updateCellPayPayoutStatuses"); // Update CellPay payout statuses
 
      //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
 
