@@ -4,8 +4,9 @@ const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 const getLatestUSDCTransaction = async (walletAddress) => {
   const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 
-  const url = `https://api.etherscan.io/api`;
+  const url = `https://api.etherscan.io/v2/api`;  //https://api.etherscan.io/api
   const params = {
+    chainid: 1, // Ethereum mainnet
     module: "account",
     action: "tokentx",
     address: walletAddress,
