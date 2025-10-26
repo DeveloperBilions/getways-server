@@ -2,7 +2,7 @@ const axios = require("axios");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
 const getLatestUSDCTransaction = async (walletAddress) => {
-  const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
+  const ETHERSCAN_API_KEY = "F7TE3VRA95UZ8RN4V7V3F94RAQD7968B5X";
 
   const url = `https://api.etherscan.io/v2/api`;  //https://api.etherscan.io/api
   const params = {
