@@ -18,7 +18,7 @@ const getLatestUSDCTransaction = async (walletAddress) => {
   try {
     const response = await axios.get(url, { params });
     const { status, message, result } = response.data;
-    console.log("Main etherscan response :"+JSON.stringify(response.data));
+    //console.log("Main etherscan response :"+JSON.stringify(response.data));
     if (status !== "1" || !Array.isArray(result)) {
       console.warn(
         `⚠️ No valid transaction list for ${walletAddress} — Etherscan says: ${message}`
@@ -39,7 +39,7 @@ const getLatestUSDCTransaction = async (walletAddress) => {
       const timestamp = new Date(
         parseInt(latestIncomingTx.timeStamp) * 1000
       ).toISOString();
-      console.log("Confirmed response :"+walletAddress);
+      //console.log("Confirmed response :"+walletAddress);
       return {
         confirmed: true,
         amountUSDC: valueInUSDC,
