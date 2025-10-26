@@ -4,7 +4,7 @@ const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 const getLatestUSDCTransaction = async (walletAddress) => {
   const ETHERSCAN_API_KEY = "F7TE3VRA95UZ8RN4V7V3F94RAQD7968B5X";
 
-  console.log("Main etherscan called :");
+  //console.log("Main etherscan called :");
 
   const url = `https://api.etherscan.io/v2/api`;  //https://api.etherscan.io/api
   const params = {
@@ -20,7 +20,7 @@ const getLatestUSDCTransaction = async (walletAddress) => {
   try {
     const response = await axios.get(url, { params });
     const { status, message, result } = response.data;
-    console.log("Main etherscan response :"+JSON.stringify(response.data));
+    //console.log("Main etherscan response :"+JSON.stringify(response.data));
     if (status !== "1" || !Array.isArray(result)) {
       console.warn(
         `⚠️ No valid transaction list for ${walletAddress} — Etherscan says: ${message}`
