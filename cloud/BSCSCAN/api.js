@@ -17,9 +17,22 @@ const getLatestUSDCTransaction = async (walletAddress) => {
 
   try {
     const response = await axios.get(url, { params });
-    const txs = response.data.result;
-    const latestIncomingTx = txs.find(
-      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase()
+    const { status, message, result } = response.data;
+
+    if (status !== "1" || !Array.isArray(result)) {
+      console.warn(
+        `⚠️ No valid transaction list for ${walletAddress} — Etherscan says: ${message}`
+      );
+      return {
+        confirmed: false,
+        message: message || "No valid transactions found",
+        rawResponse: response.data,
+      };
+    }
+
+    // Find the latest incoming transaction (to = wallet)
+    const latestIncomingTx = result.find(
+      (tx) => tx.to?.toLowerCase() === walletAddress.toLowerCase()
     );
     if (latestIncomingTx) {
       const valueInUSDC = parseFloat(latestIncomingTx.value) / 1e6;
