@@ -24,6 +24,7 @@ async function loadModule() {
     await import('./Triggers/user.js')
     await import('./AuthorizeNet.js')
     await import('./Fiserv.js')
+    await import('./CommerceHub.js')
 
 }
 

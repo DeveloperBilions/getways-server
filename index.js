@@ -184,7 +184,7 @@ ParseServer.createLiveQueryServer(httpServer);
   setTimeout(async () => {
     try {
       //console.log("Update The Status of blank or 0 status to 1...");
-      await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+      // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
      // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
       ///await Parse.Cloud.run("migration")
     } catch (error) {
@@ -220,7 +220,7 @@ ParseServer.createLiveQueryServer(httpServer);
 
         try {
           // Trigger the Parse Cloud function
-          await Parse.Cloud.run("exportAndEmailPreviousDayTransactions");
+          // await Parse.Cloud.run("exportAndEmailPreviousDayTransactions");
 
           const completedTime = getCurrentTimeInTimezone(timezone);
           console.log(
@@ -242,7 +242,7 @@ ParseServer.createLiveQueryServer(httpServer);
   }
 
   // Call the function to schedule the cron task
-scheduleTask();
+// scheduleTask();
 
 //   cron.schedule(process.env.CLEANUP_REFERRAL_LINK_CRON, async () => {
 //     try {
