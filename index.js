@@ -155,7 +155,7 @@ ParseServer.createLiveQueryServer(httpServer);
     
     // Fiserv Checkout cron jobs
     await Parse.Cloud.run("expireOldFiservCheckoutTransactions");
-    await Parse.Cloud.run("checkFiservCheckoutsRecharge");
+    await Parse.Cloud.run("checkFiservCheckoutRecharge");
 
     // Total Liquor payment status check
     await Parse.Cloud.run("checkTotalLiquorTransactionStatus"); // Checks and updates Total Liquor Stripe payments
