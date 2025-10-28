@@ -77,8 +77,6 @@ const getParentUserId = async (userId) => {
       console.error(`Error updating potBalance for user ${userId}: ${error.message}`);
       return { success: false, error: true, message: error.message };
     }
-  }
-  
   
   // Export the function so it can be used in other files
   module.exports = { getParentUserId , updatePotBalance};

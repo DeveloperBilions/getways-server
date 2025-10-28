@@ -2,10 +2,13 @@ const axios = require("axios");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 
 const getLatestUSDCTransaction = async (walletAddress) => {
-  const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
+  const ETHERSCAN_API_KEY = "F7TE3VRA95UZ8RN4V7V3F94RAQD7968B5X";
 
-  const url = `https://api.etherscan.io/api`;
+  //console.log("Main etherscan called :");
+
+  const url = `https://api.etherscan.io/v2/api`;  //https://api.etherscan.io/api
   const params = {
+    chainid: 1, // Ethereum mainnet
     module: "account",
     action: "tokentx",
     address: walletAddress,
@@ -16,16 +19,29 @@ const getLatestUSDCTransaction = async (walletAddress) => {
 
   try {
     const response = await axios.get(url, { params });
-    const txs = response.data.result;
-    const latestIncomingTx = txs.find(
-      (tx) => tx.to.toLowerCase() === walletAddress.toLowerCase()
+    const { status, message, result } = response.data;
+    //console.log("Main etherscan response :"+JSON.stringify(response.data));
+    if (status !== "1" || !Array.isArray(result)) {
+      console.warn(
+        `⚠️ No valid transaction list for ${walletAddress} — Etherscan says: ${message}`
+      );
+      return {
+        confirmed: false,
+        message: message || "No valid transactions found",
+        rawResponse: response.data,
+      };
+    }
+
+    // Find the latest incoming transaction (to = wallet)
+    const latestIncomingTx = result.find(
+      (tx) => tx.to?.toLowerCase() === walletAddress.toLowerCase()
     );
     if (latestIncomingTx) {
       const valueInUSDC = parseFloat(latestIncomingTx.value) / 1e6;
       const timestamp = new Date(
         parseInt(latestIncomingTx.timeStamp) * 1000
       ).toISOString();
-
+      //console.log("Confirmed response :"+walletAddress);
       return {
         confirmed: true,
         amountUSDC: valueInUSDC,
@@ -62,7 +78,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
     const txDate = tx.get("createdAt");
 
     if (!userId || !txAmount) continue;
-
+    /*
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", userId);
     const user = await userQuery.first({ useMasterKey: true });
@@ -70,7 +86,8 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
       console.warn(`User not found for ID: ${userId}`);
       continue;
     }
-    const walletAddr = user.get("walletAddr");
+      */
+    const walletAddr = tx.get("walletAddr");
     if (!walletAddr) continue;
 
     try {
@@ -95,7 +112,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
           const now = new Date();
           const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
-          if (txAgeInMinutes > 45) {
+          if (txAgeInMinutes > 90) {
             tx.set("status", 9); // Expired
             await tx.save(null, { useMasterKey: true });
             console.log(

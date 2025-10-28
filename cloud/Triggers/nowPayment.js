@@ -430,10 +430,10 @@ archive.set("originalUpdatedAt", record.updatedAt);
       throw error;
     }
   });
-  const Stripe = require("stripe");
-
-
   
+  
+const Stripe = require("stripe");
+
 Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
   const  chargeIds = ["ch_3QwKqrLlUR10IID50C8EOQws",
   "py_3QvSZdLlUR10IID51YStlt5V",
@@ -664,6 +664,156 @@ Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
   console.log(results)
   return results;
 });
+
+Parse.Cloud.define("getUsersFromStripeDisputes", async (request) => {
+  try {
+    let allDisputes = [];
+    let hasMore = true;
+    let startingAfter = null;
+
+    // 🔁 Fetch all disputes using pagination
+    while (hasMore) {
+      const params = { limit: 100 };
+      if (startingAfter) params.starting_after = startingAfter;
+
+      const response = await stripe.disputes.list(params);
+      allDisputes = allDisputes.concat(response.data);
+      hasMore = response.has_more;
+
+      if (hasMore && response.data.length > 0) {
+        startingAfter = response.data[response.data.length - 1].id;
+      }
+    }
+
+    console.log(`Fetched total ${allDisputes.length} disputes from Stripe`);
+    const results = [];
+
+    for (const dispute of allDisputes) {
+      const chargeId = dispute.charge;
+
+      if (!chargeId) {
+        results.push({ disputeId: dispute.id, error: "No charge ID linked to dispute." });
+        continue;
+      }
+
+      try {
+        const charge = await stripe.charges.retrieve(chargeId);
+        const paymentIntentId = charge.payment_intent;
+
+        if (!paymentIntentId) {
+          results.push({ disputeId: dispute.id, chargeId, error: "No payment intent found." });
+          continue;
+        }
+
+        // 🔹 Find checkout session
+        const sessions = await stripe.checkout.sessions.list({
+          payment_intent: paymentIntentId,
+          limit: 1,
+        });
+
+        const session = sessions.data[0];
+        if (!session) {
+          results.push({
+            disputeId: dispute.id,
+            chargeId,
+            paymentIntentId,
+            error: "No checkout session found.",
+          });
+          continue;
+        }
+
+        const checkoutSessionId = session.id;
+
+        // 🔹 Find related Transaction record in Parse
+        const transactionQuery = new Parse.Query("TransactionRecords");
+        transactionQuery.equalTo("transactionIdFromStripe", checkoutSessionId);
+        transactionQuery.limit(1);
+        const transaction = await transactionQuery.first({ useMasterKey: true });
+
+        if (!transaction) {
+          results.push({
+            disputeId: dispute.id,
+            chargeId,
+            checkoutSessionId,
+            error: "Transaction record not found.",
+          });
+          continue;
+        }
+
+        const userId = transaction.get("userId");
+        if (!userId) {
+          results.push({
+            disputeId: dispute.id,
+            chargeId,
+            checkoutSessionId,
+            error: "No userId in transaction record.",
+          });
+          continue;
+        }
+
+        const user = await new Parse.Query(Parse.User).get(userId, { useMasterKey: true });
+
+        // 🔹 Fetch dispute fee (via balance transaction)
+        let feeAmount = null;
+        let feeCurrency = null;
+        let feeDetails = null;
+
+        if (dispute.balance_transaction) {
+          try {
+            const balanceTxn = await stripe.balanceTransactions.retrieve(dispute.balance_transaction);
+            if (balanceTxn && balanceTxn.fee_details) {
+              const disputeFeeDetail = balanceTxn.fee_details.find(
+                (f) => f.description && f.description.toLowerCase().includes("dispute")
+              );
+              if (disputeFeeDetail) {
+                feeAmount = disputeFeeDetail.amount / 100;
+                feeCurrency = disputeFeeDetail.currency || balanceTxn.currency;
+                feeDetails = disputeFeeDetail;
+              } else {
+                feeAmount = balanceTxn.fee / 100;
+                feeCurrency = balanceTxn.currency;
+              }
+            }
+          } catch (feeErr) {
+            console.warn(`Failed to fetch fee for dispute ${dispute.id}:`, feeErr.message);
+          }
+        }
+
+        // ✅ Final Push
+        results.push({
+          disputeId: dispute.id,
+          chargeId,
+          checkoutSessionId,
+          userId,
+          username: user.get("username"),
+          agent: user.get("userParentName"),
+          amount: dispute.amount / 100,
+          gatewayTransactionAmount: transaction.get("transactionAmount"),
+          currency: dispute.currency,
+          reason: dispute.reason,
+          status: dispute.status,
+          created: new Date(dispute.created * 1000),
+          // 👇 Added Fee Info
+          disputeFee: feeAmount,
+          disputeFeeCurrency: feeCurrency,
+          disputeFeeDetails: feeDetails,
+        });
+      } catch (err) {
+        results.push({
+          disputeId: dispute.id,
+          chargeId,
+          error: err.message,
+        });
+      }
+    }
+
+    console.log(`Mapped ${results.length} disputes to users`);
+    return results;
+  } catch (err) {
+    throw new Error(`Failed to fetch all disputes: ${err.message}`);
+  }
+});
+
 
 Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
   try {

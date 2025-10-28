@@ -1,13 +1,14 @@
 const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 const nodemailer = require("nodemailer");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
+const { getPaymentById } = require('../payoutAPI');
 
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // status = 1 => pending
     query.equalTo("portal", "Stripe");
-    query.contains("transactionIdFromStripe", "cs_live");
+    query.contains("transactionIdFromStripe", "cs_");
     query.limit(10000);
     query.descending("updatedAt");
 
@@ -897,8 +898,7 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
 
     const userQuery = new Parse.Query(Parse.User);
     userQuery.equalTo("objectId", userId);
-    userQuery.select("potBalance");
-    userQuery.select("balance")
+    userQuery.select(["potBalance", "balance"]);
 
     const user = await userQuery.first({ useMasterKey: true });
 
@@ -912,17 +912,14 @@ Parse.Cloud.define("updatePotBalance", async (request) => {
 
     let newPotBalance;
     let newBalance;
-
     if (type === "redeem") {
       newPotBalance = Math.max(0, currentPotBalance - amount);
       newBalance = currentBalance - amount;
-
     }else if (type === "recharge") {
       // Add 85% of recharge amount to potBalance (deduct 15%)
       const creditedAmount = amount * 0.85;
       newPotBalance = currentPotBalance + creditedAmount;
       newBalance = currentBalance + amount;
-
     }  else {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,

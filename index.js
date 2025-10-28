@@ -10,10 +10,12 @@ const app = express();
 const setupSwagger = require("./cloud/swagger");
 const http = require("http");
 const httpServer = http.createServer(app);
+const webhookRouter = require('./cloud/WebHook/clkwebhook');
 
 // Add CORS middleware
 app.use(cors());
 app.use(express.json());
+app.use('/webhook', webhookRouter);
 
 setupSwagger(app);
 // Parse Server initialization
@@ -157,6 +159,16 @@ ParseServer.createLiveQueryServer(httpServer);
 
     // Total Liquor payment status check
     await Parse.Cloud.run("checkTotalLiquorTransactionStatus"); // Checks and updates Total Liquor Stripe payments
+=======
+     
+    await Parse.Cloud.run("expireOldCLKKTransactions"); 
+    await Parse.Cloud.run("checkClkkPayments"); 
+    await Parse.Cloud.run("checkClkkPaymentsRecharge"); 
+  
+    await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
+    await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge");
+    await Parse.Cloud.run("cellpayBtcTxnStatus");
+    await Parse.Cloud.run("updateCellPayPayoutStatuses"); // Update CellPay payout statuses
 
      //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
 
@@ -170,21 +182,21 @@ ParseServer.createLiveQueryServer(httpServer);
   }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
 
   // Runs every 10 minutes to handle potentially expired transactions:
-  // setInterval(async () => {
-  //   try {
-  //     console.log("Running cloud function every 10 minutes...");
+  setInterval(async () => {
+    try {
+      console.log("Running cloud function every 10 minutes...");
 
-  //     //await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
-  //   } catch (error) {
-  //     console.error("Error running cloud function:", error);
-  //   }
-  // }, process.env.expiredTransactionStripe); // 10 minutes interval.
+      //await Parse.Cloud.run("expiredTransactionStripe"); // Re-checks for expired transactions periodically.
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, process.env.expiredTransactionStripe); // 10 minutes interval.
 
-  // // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
+  // Executes a single time after 5 seconds to quickly clean up or update any initial state transactions:
   setTimeout(async () => {
     try {
       //console.log("Update The Status of blank or 0 status to 1...");
-      await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
+      //await Parse.Cloud.run("exportAndEmailPreviousDayTransactions")
      // await Parse.Cloud.run("updateTransactionStatusForBlankData"); // Updates or removes transactions with incomplete data.
       ///await Parse.Cloud.run("migration")
     } catch (error) {
