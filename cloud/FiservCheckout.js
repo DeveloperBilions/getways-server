@@ -2,26 +2,21 @@ const crypto = require('crypto');
 const fetch = require('node-fetch');
 const { getParentUserId, updatePotBalance } = require('./utility/utlis');
 
-console.log('🔄 Loading Fiserv.js file...');
+console.log('🔄 Loading FiservCheckout.js file...');
 
-// Utility function to generate unique merchant transaction IDs
 const generateMerchantTransactionId = (userId) => {
   const timestamp = Date.now().toString().slice(-8);
   const shortUserId = userId.slice(-6);
-  return `FISERV-${shortUserId}-${timestamp}`;
+  return `FSCHK-${shortUserId}-${timestamp}`;
 };
 
-// Utility function to generate HMAC signature for Fiserv API
 const generateHmacSignature = (message, secret) => {
   return crypto.createHmac('sha256', secret).update(message).digest('base64');
 };
 
-// Utility function to generate headers for Fiserv API requests
 const generateFiservHeaders = (body = '') => {
   const clientRequestId = crypto.randomUUID();
   const timestamp = Date.now().toString();
-  
-  // Create message for signature
   const message = process.env.FISERV_API_KEY + clientRequestId + timestamp + body;
   const signature = generateHmacSignature(message, process.env.FISERV_SECRET_KEY);
   
@@ -34,59 +29,33 @@ const generateFiservHeaders = (body = '') => {
   };
 };
 
-// Create Fiserv Payment Link
-Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
-  const { 
-    amount, 
-    remark,
-    orderId,
-    customerInfo,
-    expiryHours = 24 
-  } = request.params || {};
+Parse.Cloud.define("fiservCreateCheckout", async (request) => {
+  const { amount, remark, customerInfo } = request.params || {};
 
   if (!request.user) {
-    throw new Parse.Error(
-      Parse.Error.SESSION_MISSING,
-      "Authentication required."
-    );
+    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
   }
 
-  // Validate required fields
   if (!amount) {
-    throw new Parse.Error(
-      Parse.Error.INVALID_JSON,
-      "Amount is required."
-    );
+    throw new Parse.Error(Parse.Error.INVALID_JSON, "Amount is required.");
   }
 
   const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
   if (typeof parsedAmount !== "number" || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-    throw new Parse.Error(
-      Parse.Error.INVALID_JSON,
-      "Invalid amount: must be a positive number."
-    );
+    throw new Parse.Error(Parse.Error.INVALID_JSON, "Invalid amount: must be a positive number.");
   }
 
   try {
     const merchantTransactionId = generateMerchantTransactionId(request.user.id);
-    const finalOrderId = orderId || `ORDER-${Date.now()}`;
+    const orderId = `ORDER-${Date.now()}`;
     
-    // Calculate expiry date
-    const expiryDateTime = new Date();
-    expiryDateTime.setHours(expiryDateTime.getHours() + expiryHours);
-
-    // Validate required environment variables
-    const requiredEnvVars = ['FISERV_STORE_ID', 'FISERV_API_KEY', 'FISERV_SECRET_KEY', 'FISERV_API_URL'];
+    const requiredEnvVars = ['FISERV_STORE_ID', 'FISERV_API_KEY', 'FISERV_SECRET_KEY', 'FISERV_API_URL', 'FRONTEND_URL'];
     for (const envVar of requiredEnvVars) {
       if (!process.env[envVar]) {
-        throw new Parse.Error(
-          Parse.Error.SCRIPT_FAILED,
-          `${envVar} environment variable is required`
-        );
+        throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `${envVar} environment variable is required`);
       }
     }
 
-    // Prepare payment link request body
     const requestBody = {
       storeId: process.env.FISERV_STORE_ID,
       merchantTransactionId: merchantTransactionId,
@@ -97,12 +66,13 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
         currency: "USD"
       },
       order: {
-        orderId: finalOrderId,
+        orderId: orderId,
         ...(customerInfo && {
           billing: {
             person: {
               firstName: customerInfo.firstName || null,
-              lastName: customerInfo.lastName || null
+              lastName: customerInfo.lastName || null,
+              name: customerInfo.name || null
             },
             contact: {
               email: customerInfo.email || null,
@@ -122,18 +92,34 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
       },
       checkoutSettings: {
         locale: "en_US",
-        webHooksUrl: `${process.env.FRONTEND_URL}/api/fiserv-webhook`
+        redirectBackUrls: {
+          successUrl: `${process.env.FRONTEND_URL}/fiserv-checkout-success`,
+          failureUrl: `${process.env.FRONTEND_URL}/fiserv-checkout-failure`
+        },
+        webHooksUrl: `${process.env.FRONTEND_URL}/api/fiserv-checkout-webhook`
       },
-      paymentLinkDetails: {
-        expiryDateTime: expiryDateTime.toISOString()
+      paymentMethodDetails: {
+        cards: {
+          authenticationPreferences: {
+            challengeIndicator: "01",
+            skipTra: false
+          },
+          createToken: {
+            declineDuplicateToken: false,
+            reusable: true,
+            toBeUsedFor: "UNSCHEDULED"
+          },
+          tokenBasedTransaction: {
+            transactionSequence: "FIRST"
+          }
+        }
       }
     };
 
     const bodyString = JSON.stringify(requestBody);
     const headers = generateFiservHeaders(bodyString);
 
-    // Make API call to Fiserv
-    const response = await fetch(`${process.env.FISERV_API_URL}/payment-links`, {
+    const response = await fetch(`${process.env.FISERV_API_URL}/checkouts`, {
       method: 'POST',
       headers: headers,
       body: bodyString
@@ -141,16 +127,12 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Fiserv API Error:', errorData);
-      throw new Parse.Error(
-        Parse.Error.SCRIPT_FAILED,
-        `Fiserv API error: ${response.status} - ${errorData}`
-      );
+      console.error('Fiserv Checkout API Error:', errorData);
+      throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Fiserv API error: ${response.status} - ${errorData}`);
     }
 
     const fiservResponse = await response.json();
     
-    // Save transaction record
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const transactionDetails = new TransactionDetails();
     const user = await request.user.fetch({ useMasterKey: true });
@@ -161,59 +143,47 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
     transactionDetails.set("userId", user.id);
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parsedAmount);
-    transactionDetails.set("remark",remark);
+    transactionDetails.set("remark", remark);
     transactionDetails.set("useWallet", false);
     transactionDetails.set("userParentId", user.get("userParentId") || "");
-    transactionDetails.set("status", 1); // pending
-    transactionDetails.set("portal", "Fiserv");
-    transactionDetails.set("referralLink", fiservResponse.paymentLink?.paymentLinkUrl || "");
-    transactionDetails.set("transactionIdFromStripe", fiservResponse.paymentLink?.paymentLinkId || "");
+    transactionDetails.set("status", 1);
+    transactionDetails.set("portal", "FiservCheckout");
+    transactionDetails.set("referralLink", fiservResponse.checkout?.redirectionUrl || "");
+    transactionDetails.set("transactionIdFromStripe", fiservResponse.checkout?.checkoutId || "");
     transactionDetails.set("merchantTransactionId", merchantTransactionId);
-    transactionDetails.set("fiservOrderId", finalOrderId);
-    transactionDetails.set("fiservCheckoutId", fiservResponse.paymentLink?.checkoutId || "");
+    transactionDetails.set("fiservOrderId", orderId);
+    transactionDetails.set("fiservStoreId", process.env.FISERV_STORE_ID);
 
     await transactionDetails.save(null, { useMasterKey: true });
 
     return {
       success: true,
-      paymentLink: fiservResponse.paymentLink,
+      checkout: fiservResponse.checkout,
       transactionId: transactionDetails.id,
       merchantTransactionId: merchantTransactionId,
-      publicUrl: fiservResponse.paymentLink?.paymentLinkUrl // For iframe
+      redirectionUrl: fiservResponse.checkout?.redirectionUrl
     };
 
   } catch (error) {
-    console.error("Fiserv payment link creation error:", error);
-    throw new Parse.Error(
-      Parse.Error.SCRIPT_FAILED,
-      error.message || "Failed to create Fiserv payment link"
-    );
+    console.error("Fiserv checkout creation error:", error);
+    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, error.message || "Failed to create Fiserv checkout");
   }
 });
 
-// Get Fiserv Payment Link Details
-Parse.Cloud.define("fiservGetPaymentLinkDetails", async (request) => {
-  const { paymentLinkId } = request.params || {};
+Parse.Cloud.define("fiservGetCheckoutDetails", async (request) => {
+  const { checkoutId } = request.params || {};
 
   if (!request.user) {
-    throw new Parse.Error(
-      Parse.Error.SESSION_MISSING,
-      "Authentication required."
-    );
+    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
   }
 
-  if (!paymentLinkId) {
-    throw new Parse.Error(
-      Parse.Error.INVALID_JSON,
-      "Payment Link ID is required."
-    );
+  if (!checkoutId) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, "Checkout ID is required.");
   }
 
   try {
     const headers = generateFiservHeaders();
-
-    // Make API call to get payment link details
-    const response = await fetch(`${process.env.FISERV_API_URL}/payment-links/${paymentLinkId}`, {
+    const response = await fetch(`${process.env.FISERV_API_URL}/checkouts/${checkoutId}`, {
       method: 'GET',
       headers: headers
     });
@@ -221,42 +191,30 @@ Parse.Cloud.define("fiservGetPaymentLinkDetails", async (request) => {
     if (!response.ok) {
       const errorData = await response.text();
       console.error('Fiserv API Error:', errorData);
-      throw new Parse.Error(
-        Parse.Error.SCRIPT_FAILED,
-        `Fiserv API error: ${response.status} - ${errorData}`
-      );
+      throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Fiserv API error: ${response.status} - ${errorData}`);
     }
 
     const fiservResponse = await response.json();
-    
-    return {
-      success: true,
-      paymentLinkDetails: fiservResponse
-    };
+    return { success: true, checkoutDetails: fiservResponse };
 
   } catch (error) {
-    console.error("Fiserv payment link details error:", error);
-    throw new Parse.Error(
-      Parse.Error.SCRIPT_FAILED,
-      error.message || "Failed to get Fiserv payment link details"
-    );
+    console.error("Fiserv checkout details error:", error);
+    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, error.message || "Failed to get Fiserv checkout details");
   }
 });
 
-// Check Fiserv Payment Status and Update Balance
-Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
+Parse.Cloud.define("checkFiservCheckoutRecharge", async (request) => {
   try {
-    console.log("🔄 Starting Fiserv payment status check...");
+    console.log("🔄 Starting Fiserv Checkout status check...");
 
-    // Find all pending Fiserv transactions
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionDetails);
-    query.equalTo("portal", "Fiserv");
-    query.equalTo("status", 1); // pending
+    query.equalTo("portal", "FiservCheckout");
+    query.equalTo("status", 1);
     query.limit(100);
 
     const pendingTransactions = await query.find({ useMasterKey: true });
-    console.log(`📊 Found ${pendingTransactions.length} pending Fiserv transactions`);
+    console.log(`📊 Found ${pendingTransactions.length} pending Fiserv Checkout transactions`);
 
     let processedCount = 0;
     let successCount = 0;
@@ -264,15 +222,14 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
 
     for (const transaction of pendingTransactions) {
       try {
-        const paymentLinkId = transaction.get("transactionIdFromStripe");
-        if (!paymentLinkId) {
-          console.log(`⚠️ No payment link ID for transaction ${transaction.id}`);
+        const checkoutId = transaction.get("transactionIdFromStripe");
+        if (!checkoutId) {
+          console.log(`⚠️ No checkout ID for transaction ${transaction.id}`);
           continue;
         }
 
-        // Get payment link details from Fiserv
         const headers = generateFiservHeaders();
-        const response = await fetch(`${process.env.FISERV_API_URL}/payment-links/${paymentLinkId}`, {
+        const response = await fetch(`${process.env.FISERV_API_URL}/checkouts/${checkoutId}`, {
           method: 'GET',
           headers: headers
         });
@@ -283,28 +240,25 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
         }
 
         const fiservData = await response.json();
-        
-        // Check both transactionStatus and ipgTransactionDetails.transactionStatus
         const transactionStatus = fiservData.transactionStatus;
-        const ipgTransactionStatus = fiservData.ipgTransactionDetails?.transactionStatus;
+        const ipgTransactionStatus = fiservData.ipgTransactionDetails?.transactionResult;
         const approvalCode = fiservData.ipgTransactionDetails?.approvalCode;
+        const ipgTransactionId = fiservData.ipgTransactionDetails?.ipgTransactionId;
         
         console.log(`📋 Transaction ${transaction.id} - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}, Approval: ${approvalCode}`);
 
-        // Check if payment is approved (both main status and IPG status should be APPROVED)
         if (transactionStatus === "APPROVED" && ipgTransactionStatus === "APPROVED") {
-          // Payment successful - update balance and transaction status
           const userId = transaction.get("userId");
           const amount = transaction.get("transactionAmount");
 
-          // Update pot balance using the correct pattern
           const parentUserId = await getParentUserId(userId);
           await updatePotBalance(parentUserId, amount, "recharge");
           
-          transaction.set("status", 2); // completed
+          transaction.set("status", 2);
           transaction.set("fiservTransactionStatus", transactionStatus);
           transaction.set("fiservIpgStatus", ipgTransactionStatus);
           transaction.set("fiservApprovalCode", approvalCode);
+          transaction.set("fiservIpgTransactionId", ipgTransactionId);
           transaction.set("completedAt", new Date());
           await transaction.save(null, { useMasterKey: true });
           
@@ -312,8 +266,7 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
           successCount++;
         } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
                    ["FAILED", "DECLINED", "FRAUD"].includes(ipgTransactionStatus)) {
-          // Payment failed
-          transaction.set("status", 9); // failed
+          transaction.set("status", 9);
           transaction.set("fiservTransactionStatus", transactionStatus);
           transaction.set("fiservIpgStatus", ipgTransactionStatus);
           transaction.set("failedAt", new Date());
@@ -322,7 +275,6 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
           console.log(`❌ Transaction ${transaction.id} failed - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
           failedCount++;
         } else {
-          // Payment still in progress (INITIATED, WAITING, etc.)
           console.log(`⏳ Transaction ${transaction.id} still in progress - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
         }
 
@@ -333,47 +285,38 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
       }
     }
 
-    console.log(`🏁 Fiserv payment check completed: ${processedCount} processed, ${successCount} successful, ${failedCount} failed`);
+    console.log(`🏁 Fiserv Checkout check completed: ${processedCount} processed, ${successCount} successful, ${failedCount} failed`);
     
-    return {
-      success: true,
-      processed: processedCount,
-      successful: successCount,
-      failed: failedCount
-    };
+    return { success: true, processed: processedCount, successful: successCount, failed: failedCount };
 
   } catch (error) {
-    console.error("Fiserv payment status check error:", error);
-    throw new Parse.Error(
-      Parse.Error.SCRIPT_FAILED,
-      error.message || "Failed to check Fiserv payment status"
-    );
+    console.error("Fiserv Checkout status check error:", error);
+    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, error.message || "Failed to check Fiserv Checkout status");
   }
 });
 
-// Expire old Fiserv transactions (45 minutes timeout)
-Parse.Cloud.define("expireOldFiservTransactions", async (request) => {
+Parse.Cloud.define("expireOldFiservCheckoutTransactions", async (request) => {
   try {
-    console.log("🕐 Starting Fiserv transaction expiration check...");
+    console.log("🕐 Starting Fiserv Checkout transaction expiration check...");
 
     const cutoffTime = new Date();
-    cutoffTime.setMinutes(cutoffTime.getMinutes() - 45); // 45 minutes ago
+    cutoffTime.setMinutes(cutoffTime.getMinutes() - 45);
 
     const TransactionDetails = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionDetails);
-    query.equalTo("portal", "Fiserv");
-    query.equalTo("status", 1); // pending
+    query.equalTo("portal", "FiservCheckout");
+    query.equalTo("status", 1);
     query.lessThan("createdAt", cutoffTime);
     query.limit(100);
 
     const expiredTransactions = await query.find({ useMasterKey: true });
-    console.log(`📊 Found ${expiredTransactions.length} expired Fiserv transactions`);
+    console.log(`📊 Found ${expiredTransactions.length} expired Fiserv Checkout transactions`);
 
     let expiredCount = 0;
 
     for (const transaction of expiredTransactions) {
       try {
-        transaction.set("status", 9); // expired
+        transaction.set("status", 9);
         transaction.set("expiredAt", new Date());
         await transaction.save(null, { useMasterKey: true });
         expiredCount++;
@@ -383,89 +326,67 @@ Parse.Cloud.define("expireOldFiservTransactions", async (request) => {
       }
     }
 
-    console.log(`🏁 Fiserv expiration completed: ${expiredCount} transactions expired`);
-    
-    return {
-      success: true,
-      expired: expiredCount
-    };
+    console.log(`🏁 Fiserv Checkout expiration completed: ${expiredCount} transactions expired`);
+    return { success: true, expired: expiredCount };
 
   } catch (error) {
-    console.error("Fiserv transaction expiration error:", error);
-    throw new Parse.Error(
-      Parse.Error.SCRIPT_FAILED,
-      error.message || "Failed to expire Fiserv transactions"
-    );
+    console.error("Fiserv Checkout transaction expiration error:", error);
+    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, error.message || "Failed to expire Fiserv Checkout transactions");
   }
 });
 
-// Fiserv Webhook Handler
-Parse.Cloud.define("fiservWebhookHandler", async (request) => {
+Parse.Cloud.define("fiservCheckoutWebhookHandler", async (request) => {
   try {
-    console.log("🔔 Fiserv webhook received:", JSON.stringify(request.params, null, 2));
+    console.log("🔔 Fiserv Checkout webhook received:", JSON.stringify(request.params, null, 2));
     
     const webhookData = request.params;
     
-    // Validate webhook data
-    if (!webhookData || !webhookData.paymentLinkId) {
+    if (!webhookData || !webhookData.checkoutId) {
       console.warn("⚠️ Invalid webhook data received");
       return { success: false, error: "Invalid webhook data" };
     }
 
-    const { 
-      paymentLinkId, 
-      transactionStatus, 
-      ipgTransactionDetails,
-      merchantTransactionId,
-      approvedAmount 
-    } = webhookData;
+    const { checkoutId, transactionStatus, ipgTransactionDetails } = webhookData;
 
-    // Find the transaction record
     const TransactionRecords = Parse.Object.extend("TransactionRecords");
     const query = new Parse.Query(TransactionRecords);
-    query.equalTo("transactionIdFromStripe", paymentLinkId);
-    query.equalTo("portal", "Fiserv");
+    query.equalTo("transactionIdFromStripe", checkoutId);
+    query.equalTo("portal", "FiservCheckout");
     
     const transaction = await query.first({ useMasterKey: true });
     
     if (!transaction) {
-      console.warn(`⚠️ No transaction found for payment link: ${paymentLinkId}`);
+      console.warn(`⚠️ No transaction found for checkout ID: ${checkoutId}`);
       return { success: false, error: "Transaction not found" };
     }
 
     console.log(`🔄 Processing webhook for transaction ${transaction.id}`);
 
-    // Check if payment is successful
-    const ipgStatus = ipgTransactionDetails?.transactionStatus;
+    const ipgStatus = ipgTransactionDetails?.transactionResult;
     const approvalCode = ipgTransactionDetails?.approvalCode;
+    const ipgTransactionId = ipgTransactionDetails?.ipgTransactionId;
     
     if (transactionStatus === "APPROVED" && ipgStatus === "APPROVED") {
-      // Payment successful
       const userId = transaction.get("userId");
       const amount = transaction.get("transactionAmount");
 
-      // Update pot balance
       const parentUserId = await getParentUserId(userId);
       await updatePotBalance(parentUserId, amount, "recharge");
       
-      transaction.set("status", 2); // completed
+      transaction.set("status", 2);
       transaction.set("fiservTransactionStatus", transactionStatus);
       transaction.set("fiservIpgStatus", ipgStatus);
       transaction.set("fiservApprovalCode", approvalCode);
+      transaction.set("fiservIpgTransactionId", ipgTransactionId);
       transaction.set("webhookProcessedAt", new Date());
       await transaction.save(null, { useMasterKey: true });
       
       console.log(`✅ Webhook processed: Transaction ${transaction.id} completed successfully`);
       
-      return { 
-        success: true, 
-        message: "Payment processed successfully",
-        transactionId: transaction.id
-      };
+      return { success: true, message: "Payment processed successfully", transactionId: transaction.id };
     } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
                ["FAILED", "DECLINED", "FRAUD"].includes(ipgStatus)) {
-      // Payment failed
-      transaction.set("status", 9); // failed
+      transaction.set("status", 9);
       transaction.set("fiservTransactionStatus", transactionStatus);
       transaction.set("fiservIpgStatus", ipgStatus);
       transaction.set("webhookProcessedAt", new Date());
@@ -473,28 +394,15 @@ Parse.Cloud.define("fiservWebhookHandler", async (request) => {
       
       console.log(`❌ Webhook processed: Transaction ${transaction.id} failed`);
       
-      return { 
-        success: true, 
-        message: "Payment failure processed",
-        transactionId: transaction.id
-      };
+      return { success: true, message: "Payment failure processed", transactionId: transaction.id };
     } else {
-      // Payment still in progress
       console.log(`⏳ Webhook processed: Transaction ${transaction.id} still in progress`);
-      
-      return { 
-        success: true, 
-        message: "Payment status updated",
-        transactionId: transaction.id
-      };
+      return { success: true, message: "Payment status updated", transactionId: transaction.id };
     }
 
   } catch (error) {
-    console.error("Fiserv webhook processing error:", error);
-    return { 
-      success: false, 
-      error: error.message || "Failed to process webhook" 
-    };
+    console.error("Fiserv Checkout webhook processing error:", error);
+    return { success: false, error: error.message || "Failed to process webhook" };
   }
 });
 
@@ -503,3 +411,4 @@ module.exports = {
   generateHmacSignature,
   generateFiservHeaders
 };
+
