@@ -155,7 +155,7 @@ Parse.Cloud.afterSave("Transactions", async (request) => {
   const original = request.original; // undefined on create
   const status = tx.get("status");
 
-//   if (status !== 2) return;
+  if (status !== 2) return;
 //   if (original && original.get("status") === 2) return;
 
   const platformName = tx.get("platform");
@@ -193,6 +193,8 @@ Parse.Cloud.afterSave("Transactions", async (request) => {
     transactionIdFromStripe: tx.get("transactionIdFromStripe"),
     createdAt: tx.createdAt,
     updatedAt: tx.updatedAt,
+    sc_coins:tx.get("sc_coins"),
+    gc_coins: tx.get("gc_coins")
   };
 
   // 4️⃣  Optional: sign the body with HMAC-SHA256 so the receiver can verify

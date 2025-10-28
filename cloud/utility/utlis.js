@@ -23,58 +23,59 @@ const getParentUserId = async (userId) => {
   };
   
   async function updatePotBalance(userId, amount, type) {
-      try {
-        if (!userId || !amount || amount <= 0 || !type) {
-          return { success: false, message: "Invalid input parameters." };
-        }
-    
-        const userQuery = new Parse.Query(Parse.User);
-        userQuery.equalTo("objectId", userId);
-        userQuery.select(["potBalance", "balance"]);
-    
-        const user = await userQuery.first({ useMasterKey: true });
-    
-        if (!user) {
-          return { success: false, message: `User not found: ${userId}` };
-        }
-    
-        const currentPotBalance = user.get("potBalance") || 0;
-        const currentBalance = user.get("balance") || 0;
-        const potChangeAmount = Math.floor(amount * 0.15);
-    
-        let newPotBalance;
-        let newBalance;
-        if (type === "redeem") {
-          if (currentBalance < amount) {
-            return { success: false, message: "Insufficient balance to approve transactions." };
-          } else if (currentBalance < 500) {
-            return { success: false, message: "Your balance is too low to approve transactions." };
-          } else {
-            newPotBalance = currentPotBalance - amount;
-            newBalance = currentBalance - amount;
-          }
-        } else if (type === "recharge") {
-          // Add 85% of recharge amount to potBalance (deduct 15%)
-          const creditedAmount = amount * 0.85;
-          newPotBalance = currentPotBalance + creditedAmount;
-          newBalance = currentBalance + amount;
-  
-        }  else {
-          return { success: false, message: `Invalid transaction type: ${type}` };
-        }
-    
-        user.set("potBalance", newPotBalance);
-        user.set("balance", newBalance);
-  
-        await user.save(null, { useMasterKey: true });
-    
-        console.log(`Updated potBalance for user ${userId}: ${newPotBalance} (${type})`);
-    
-        return { success: true, message: "Pot balance updated successfully.", potBalance: newPotBalance };
-      } catch (error) {
-        console.error(`Error updating potBalance for user ${userId}: ${error.message}`);
-        return { success: false, error: true, message: error.message };
+  console.log(userId, amount, type,"userId, amount, typeuserId, amount, typeuserId, amount, typekjuiou")
+    try {
+      if (!userId || !amount || amount <= 0 || !type) {
+        return { success: false, message: "Invalid input parameters." };
       }
+  
+      const userQuery = new Parse.Query(Parse.User);
+      userQuery.equalTo("objectId", userId);
+      userQuery.select("potBalance");
+      userQuery.select("balance")
+  
+      const user = await userQuery.first({ useMasterKey: true });
+  
+      if (!user) {
+        return { success: false, message: `User not found: ${userId}` };
+      }
+  
+      const currentPotBalance = user.get("potBalance") || 0;
+      const currentBalance = user.get("balance") || 0;
+      const potChangeAmount = Math.floor(amount * 0.15);
+  
+      let newPotBalance;
+      let newBalance;
+      if (type === "redeem") {
+        if (currentBalance < amount) {
+          return { success: false, message: "Insufficient balance to approve transactions." };
+        } else if (currentBalance < 500) {
+          return { success: false, message: "Your balance is too low to approve transactions." };
+        } else {
+          newPotBalance = currentPotBalance - amount;
+          newBalance = currentBalance - amount;
+        }
+      } else if (type === "recharge") {
+        // Add 85% of recharge amount to potBalance (deduct 15%)
+        const creditedAmount = amount * 0.85;
+        newPotBalance = currentPotBalance + creditedAmount;
+        newBalance = currentBalance + amount;
+
+      }  else {
+        return { success: false, message: `Invalid transaction type: ${type}` };
+      }
+  
+      user.set("potBalance", newPotBalance);
+      user.set("balance", newBalance);
+
+      await user.save(null, { useMasterKey: true });
+  
+      console.log(`Updated potBalance for user ${userId}: ${newPotBalance} (${type})`);
+  
+      return { success: true, message: "Pot balance updated successfully.", potBalance: newPotBalance };
+    } catch (error) {
+      console.error(`Error updating potBalance for user ${userId}: ${error.message}`);
+      return { success: false, error: true, message: error.message };
     }
   
   // Export the function so it can be used in other files

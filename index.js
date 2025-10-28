@@ -142,6 +142,24 @@ ParseServer.createLiveQueryServer(httpServer);
      await Parse.Cloud.run("checkTransactionStatusStripe"); // Checks and updates transaction statuses from Stripe.
     // //  await Parse.Cloud.run("expiredTransactionStripe"); // Checks and updates transaction statuses from Stripe.
 
+    await Parse.Cloud.run("expireOldCLKKTransactions"); 
+    await Parse.Cloud.run("checkClkkPayments"); 
+
+    // Authorize.Net cron jobs
+    await Parse.Cloud.run("expireOldAuthorizeNetTransactions");
+    await Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge");
+
+    // Fiserv cron jobs
+    await Parse.Cloud.run("expireOldFiservTransactions");
+    await Parse.Cloud.run("checkFiservPaymentsRecharge");
+    
+    // Fiserv Checkout cron jobs
+    await Parse.Cloud.run("expireOldFiservCheckoutTransactions");
+    await Parse.Cloud.run("checkFiservCheckoutsRecharge");
+
+    // Total Liquor payment status check
+    await Parse.Cloud.run("checkTotalLiquorTransactionStatus"); // Checks and updates Total Liquor Stripe payments
+=======
      
     await Parse.Cloud.run("expireOldCLKKTransactions"); 
     await Parse.Cloud.run("checkClkkPayments"); 

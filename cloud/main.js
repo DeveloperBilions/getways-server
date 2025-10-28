@@ -3,6 +3,7 @@ async function loadModule() {
     // Use the imported module
     await import('./getways_api/getways_api.js');
     await import('./CronJob/transaction.js')
+    await import('./CronJob/totalLiquorCron.js')
     await import('./Triggers/triggers.js')
     await import('./Triggers/nowPayment.js')
     await import('./Triggers/transfiPayment.js')
@@ -15,9 +16,12 @@ async function loadModule() {
     await import('./Triggers/transaction.js')
     await import('./PayArc/payarc.js')
     await import('./Stripe/stripeCheckout.js')
+    await import('./Stripe/totalLiquorCheckout.js')
     await import('./PlarformService/PlatformService.js')
     await import('./paynearme.js')
     await import('./click.js')
+    await import('./CronJob/email.js')
+    await import('./Fiserv.js')
     await import('./Triggers/user.js')
     await import('./AuthorizeNet.js')
     await import('./payoutAPI.js')

@@ -82,7 +82,7 @@ Parse.Cloud.define("createUser", async (request) => {
     if (!role) {
       throw new Parse.Error(404, "Role not found");
     }
-    
+
     // Create a new Parse User
     const user = new Parse.User();
     user.set("username", username);
@@ -114,25 +114,24 @@ Parse.Cloud.define("createUser", async (request) => {
       const RechargeMethod = Parse.Object.extend("RechargeMethod");
       const rechargeMethods = await new Parse.Query(RechargeMethod)
         .find({ useMasterKey: true });
-    
       for (const method of rechargeMethods) {
         const methodName = method.get("name").toLowerCase();
         if (methodName !== "stripe") {
           continue;
         }
         const settingsKey = `allowedAgentsFor_${methodName}`;
-    
+
         const settingsQuery = new Parse.Query("Settings");
         settingsQuery.equalTo("type", settingsKey);
         let settingsObj = await settingsQuery.first({ useMasterKey: true });
-    
+
         if (!settingsObj) {
           const Settings = Parse.Object.extend("Settings");
           settingsObj = new Settings();
           settingsObj.set("type", settingsKey);
           settingsObj.set("settings", []);
         }
-    
+
         const currentAgents = settingsObj.get("settings") || [];
         if (!currentAgents.includes(user.id)) {
           currentAgents.push(user.id);
@@ -140,7 +139,28 @@ Parse.Cloud.define("createUser", async (request) => {
           await settingsObj.save(null, { useMasterKey: true });
         }
       }
-    }    
+
+      // ✅ Ensure giftcard is enabled for cashout by default
+      const cashoutSettingsKey = "allowedCashoutAgentsFor_giftcard";
+      const cashoutQuery = new Parse.Query("Settings");
+      cashoutQuery.equalTo("type", cashoutSettingsKey);
+      let cashoutSettingsObj = await cashoutQuery.first({ useMasterKey: true });
+
+      if (!cashoutSettingsObj) {
+        const Settings = Parse.Object.extend("Settings");
+        cashoutSettingsObj = new Settings();
+        cashoutSettingsObj.set("type", cashoutSettingsKey);
+        cashoutSettingsObj.set("settings", []);
+      }
+
+      const cashoutAgents = cashoutSettingsObj.get("settings") || [];
+      if (!cashoutAgents.includes(user.id)) {
+        cashoutAgents.push(user.id);
+        cashoutSettingsObj.set("settings", cashoutAgents);
+        await cashoutSettingsObj.save(null, { useMasterKey: true });
+      }
+    }
+
 
     return { code:200,success: true, message: "User created successfully!" };
   } catch (error) {
@@ -173,7 +193,7 @@ Parse.Cloud.define("updateUser", async (request) => {
       email,
       password,
     };
-  
+
     const validatorResponse = validateUpdateUser(validatorData);
     if (!validatorResponse.isValid) {
       throw new Parse.Error(400, validatorResponse.errors);
@@ -261,10 +281,10 @@ Parse.Cloud.define("deleteUser", async (request) => {
       agentQuery.equalTo("roleName", "Agent");
       agentQuery.notEqualTo("isDeleted", true);
       const agents = await agentQuery.findAll({ useMasterKey: true });
-    
+
       // 2. Find Players under all these Agents
       const agentIds = agents.map((a) => a.id);
-    
+
       let players = [];
       if (agentIds.length > 0) {
         const playerQuery = new Parse.Query(Parse.User);
@@ -273,20 +293,20 @@ Parse.Cloud.define("deleteUser", async (request) => {
         playerQuery.notEqualTo("isDeleted", true);
         players = await playerQuery.findAll({ useMasterKey: true });
       }
-    
+
       // 3. Collect all users to mark as deleted
       const usersToSoftDelete = [...agents, ...players];
-    
+
       // 4. Mark all as deleted
       for (const u of usersToSoftDelete) {
         u.set("isDeleted", true);
       }
-    
+
       // 5. Save all in a single request
       if (usersToSoftDelete.length > 0) {
         await Parse.Object.saveAll(usersToSoftDelete, { useMasterKey: true });
       }
-    
+
       // 6. Collect all sessions
       if (usersToSoftDelete.length > 0) {
         const sessionQuery = new Parse.Query("_Session");
@@ -297,7 +317,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
         }
       }
     }
-    
+
     // If Agent: delete their Players
     if (roleName === "Agent") {
       const playerQuery = new Parse.Query(Parse.User);
@@ -305,14 +325,14 @@ Parse.Cloud.define("deleteUser", async (request) => {
       playerQuery.equalTo("roleName", "Player");
       playerQuery.notEqualTo("isDeleted", true);
       const players = await playerQuery.findAll({ useMasterKey: true });
-    
+
       // Batch soft-delete
       for (const p of players) {
         p.set("isDeleted", true);
       }
       if (players.length > 0) {
         await Parse.Object.saveAll(players, { useMasterKey: true });
-    
+
         // Batch destroy sessions
         const sessionQuery = new Parse.Query("_Session");
         sessionQuery.containedIn("user", players);
@@ -322,7 +342,7 @@ Parse.Cloud.define("deleteUser", async (request) => {
         }
       }
     }
-    
+
     // Fetch remaining users
     const remainingUsersQuery = new Parse.Query(Parse.User);
     const remainingUsers = await remainingUsersQuery.find({
@@ -709,7 +729,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
         status: "error",
         message: "Amount should be a positive number greater than 0",
       };
-    }    
+    }
     // Step 1: Fetch the user's wallet
     const Wallet = Parse.Object.extend("Wallet");
     const walletQuery = new Parse.Query(Wallet);
@@ -818,7 +838,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
         message: "User Information are not correct",
       };
     }
-     if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
+    if (isNaN(Number(transactionAmount)) || Number(transactionAmount) <= 0) {
       return {
         status: "error",
         message: "Amount should be a positive number greater than 0",
@@ -1006,7 +1026,7 @@ Parse.Cloud.define("agentApproveRedeemRedords", async (request) => {
 
     if (parentUserId) {
       const result = await updatePotBalance(parentUserId, transactionAmount, "redeem");
-    
+
       if (!result.success) {
         console.error("Pot balance update failed:", result.message);
         return {
@@ -1345,7 +1365,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
     request.params;
 
     
-    try {
+  try {
     const validatorData = {
       username,
       name,
@@ -1353,7 +1373,7 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
       email,
       password,
     };
-  
+
     const validatorResponse = validateCreateUser(validatorData);
     if (!validatorResponse.isValid) {
       throw new Parse.Error(400, validatorResponse.errors);
@@ -1523,6 +1543,8 @@ Parse.Cloud.define("redeemServiceFeeAgentAll", async (request) => {
     userQuery.equalTo("objectId", userId);
     const user = await userQuery.first({ useMasterKey: true });
     const isMasterAgent = user.get("roleName") === "Master-Agent"; // Check if roleName is "Master-Agent"
+    user.set("redeemService", redeemService);
+    await user.save(null, { useMasterKey: true });
 
     // Step 3: Update user or child users based on role check and `redeemServiceZeroAllowed`
     if (isMasterAgent) {
@@ -1590,7 +1612,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
       redeemServiceEnabled: user.get("redeemServiceEnabled"),
       rechargeLimit: user.get("rechargeLimit"),
       isReedeemZeroAllowed: user.get("isReedeemZeroAllowed"),
-      potBalance:user.get("potBalance"),
+      potBalance:user.get("balance"),
       rechargeDisabled:user.get("rechargeDisabled") || false
     };
   } catch (error) {
@@ -2305,11 +2327,11 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
-  
+
     if (response.data) {
       const GiftCard = Parse.Object.extend("GiftCardHistory");
       const giftCardEntry = new GiftCard();
-  
+
       giftCardEntry.set("userId", externalUserId);
       giftCardEntry.set("productId", productId.toString());
       giftCardEntry.set("productName", productName.toString());
@@ -2339,7 +2361,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
       txn.set("transactionIdFromStripe", orderId);
       txn.set("isCashOut", true);
       txn.set("paymentMode", "GiftCard");
-      
+
 
       await txn.save(null, { useMasterKey: true });
 
@@ -2363,7 +2385,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
         return { error: "Wallet not found.", status: "Failed" };
       }
     }
-  
+
     // Returning response data and status
     return { result: response.data, status: "success" };
   }catch (error) {
@@ -2376,7 +2398,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
 
     if (errorMsg === "Not enough balance in the account to request this order") {
       const nodemailer = require("nodemailer");
-    
+
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -2384,7 +2406,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
           pass: process.env.PASSWORD,
         },
       });
-    
+
       const emailContent = `
         <div style="font-family: Arial, sans-serif; background-color: #ffffff; color: #000000; padding: 20px; border: 1px solid #ddd;">
           <h2 style="color: #000000; border-bottom: 2px solid #000; padding-bottom: 5px;"> Gift Card Purchase Failed</h2>
@@ -2399,25 +2421,25 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
           </p>
         </div>
       `;
-    
+
       const mailOptions = {
         from: process.env.EMAIL,
         to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"],
         subject: "Gift Card Purchase Failed – Insufficient Balance",
         html: emailContent,
       };
-    
+
       try {
         await transporter.sendMail(mailOptions);
         console.log("Alert email sent.");
       } catch (emailError) {
         console.error("Failed to send alert email:", emailError);
       }
-    
+
       try {
         const userQuery = new Parse.Query(Parse.User);
         const user = await userQuery.get(externalUserId, { useMasterKey: true });
-    
+
         // 1. Log failed transaction
         const Transaction = Parse.Object.extend("TransactionRecords");
         const txn = new Transaction();
@@ -2434,7 +2456,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
         txn.set("paymentMode", "GiftCard");
         txn.set("remark", "Gift card purchase failed due to insufficient balance");
         await txn.save(null, { useMasterKey: true });
-    
+
         // 2. Log failed gift card request
         const GiftCard = Parse.Object.extend("GiftCardHistory");
         const giftCardEntry = new GiftCard();
@@ -2450,7 +2472,7 @@ Parse.Cloud.define("purchaseGiftCard", async (request) => {
         console.error("Failed to log failed transaction/giftCard:", saveError);
       }
     }
-    
+
 
     return { error: errorMsg, status: "Failed" };
   }
@@ -2493,7 +2515,7 @@ Parse.Cloud.define("purchaseGiftCardExternal", async (request) => {
 
   try {
     const response = await axios.post(apiUrl, bodyData, { headers });
-  
+
     if (response.data) {
       const Transaction = Parse.Object.extend("Transactions");
       const txn = new Transaction();
@@ -2510,7 +2532,7 @@ Parse.Cloud.define("purchaseGiftCardExternal", async (request) => {
       await txn.save(null, { useMasterKey: true });
 
     }
-  
+
     // Returning response data and status
     return { result: response.data, status: "success" };
   } catch (error) {
@@ -2633,7 +2655,7 @@ Parse.Cloud.define("sendCheckbookPayment", async (request) => {
     };
   } catch (error) {
     console.error("Cloud Function Error:", error);
-     return {
+    return {
       success: false,
       message: error.message || "Something went wrong." 
     };
@@ -2688,16 +2710,33 @@ Parse.Cloud.define("chatbot", async (request) => {
     const websiteInfo = chatbotDescription(role);
 
     // STEP 2: Build the complete conversation history
+    // const systemMessage = {
+    //   role: "system",
+    //   content: `You are a helpful AI assistant for our website. ONLY answer questions related to the website and its services.
+    //   If asked about anything not related to the website, politely redirect the user to ask about the website instead.
+
+    //   Website Information:
+    //   ${websiteInfo}
+
+    //   Maintain a conversational tone and remember details from earlier in the conversation.
+    //   If the user sends a short or partial message, interpret it in the context of the previous messages.`,
+    // };
     const systemMessage = {
       role: "system",
-      content: `You are a helpful AI assistant for our website. ONLY answer questions related to the website and its services.
-      If asked about anything not related to the website, politely redirect the user to ask about the website instead.
+      content: `
+    You are a helpful AI assistant for our website. 
+    Role: ${role}.
+    
+    RULES:
+    - Only answer using the Website Information below.
+    - Do NOT use outside or general knowledge.
+    - If the user asks about any role higher than ${role} 
+      (like "Super User" when current role is "Master Agent"),
+      reply with: "Sorry, that information is not available"
       
-      Website Information:
-      ${websiteInfo}
-      
-      Maintain a conversational tone and remember details from earlier in the conversation.
-      If the user sends a short or partial message, interpret it in the context of the previous messages.`,
+    Website Information (for ${role} only):
+    ${websiteInfo}
+  `,
     };
 
     // Format the conversation history for the API
@@ -2751,7 +2790,7 @@ Parse.Cloud.define("chatbot", async (request) => {
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: messages,
-      max_tokens: 150,
+      // max_tokens: 150,
       temperature: 0.7,
     });
 
@@ -2767,4 +2806,83 @@ Parse.Cloud.define("chatbot", async (request) => {
       message: error.message || "Something went wrong.",
     };
   }
+});
+
+
+
+// cloud/backfillUserParentId.js
+// Register this file in your Parse Server cloud code entry.
+
+Parse.Cloud.define("backfillTransactionUserParentId", async (request) => {
+  const { params, message } = request;
+  const BATCH_READ = Number(params?.batchRead || 500);   // how many transactions to scan per loop
+  const BATCH_SAVE = Number(params?.batchSave || 100);   // saveAll chunk size
+  const DRY_RUN    = !!params?.dryRun;                   // if true, don't write changes
+
+  let loops = 0, scanned = 0, updated = 0, skipped = 0, missingUser = 0;
+
+  message?.(`Starting backfill (dryRun=${DRY_RUN}, read=${BATCH_READ}, save=${BATCH_SAVE})`);
+
+  while (true) {
+    // Find a page of transactions missing userParentId
+    const qMissing = new Parse.Query("TransactionRecords").doesNotExist("userParentId");
+    const qNull    = new Parse.Query("TransactionRecords").equalTo("userParentId", null);
+    const qEmpty   = new Parse.Query("TransactionRecords").equalTo("userParentId", "");
+    const q = Parse.Query.or(qMissing, qNull, qEmpty);
+
+    q.limit(BATCH_READ);
+    q.select("userId"); // only need userId to compute parent
+    const txs = await q.find({ useMasterKey: true });
+
+    if (!txs.length) break;
+
+    loops += 1;
+    scanned += txs.length;
+
+    // Collect userIds and load users (with their userParentId)
+    const userIds = [...new Set(txs.map(t => t.get("userId")).filter(Boolean))];
+    let users = [];
+    if (userIds.length) {
+      const uQ = new Parse.Query(Parse.User);
+      uQ.containedIn("objectId", userIds);
+      uQ.select("userParentId");
+      users = await uQ.find({ useMasterKey: true });
+    }
+
+    const userToParent = new Map(users.map(u => [u.id, u.get("userParentId") || ""]));
+
+    // Prepare updates
+    const toSave = [];
+    for (const t of txs) {
+      const uid = t.get("userId");
+      if (!uid) { skipped++; continue; }
+
+      const parentId = userToParent.get(uid);
+      if (parentId && typeof parentId === "string" && parentId.trim() !== "") {
+        t.set("userParentId", parentId);
+        toSave.push(t);
+      } else {
+        // no user found or user has no parent
+        if (!userToParent.has(uid)) missingUser++;
+        else skipped++;
+      }
+    }
+
+    // Save in chunks
+    if (!DRY_RUN && toSave.length) {
+      for (let i = 0; i < toSave.length; i += BATCH_SAVE) {
+        const chunk = toSave.slice(i, i + BATCH_SAVE);
+        await Parse.Object.saveAll(chunk, { useMasterKey: true });
+      }
+      updated += toSave.length;
+    }
+
+    message?.(
+      `Loop ${loops}: scanned=${scanned}, toUpdate=${toSave.length}, updated=${updated}, skipped=${skipped}, missingUser=${missingUser}`
+    );
+
+    // Continue; next loop will fetch the next set since these are now filled
+  }
+
+  message?.(`Done. scanned=${scanned}, updated=${updated}, skipped=${skipped}, missingUser=${missingUser}`);
 });
