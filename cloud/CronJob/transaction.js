@@ -1027,3 +1027,130 @@ Parse.Cloud.define("checkTransactionStatusFiservCheckout", async (request) => {
     };
   }
 });
+
+
+/**
+ * Update CellPay payout statuses and mark as completed when settled
+ */
+Parse.Cloud.define("updateCellPayPayoutStatuses", async (request) => {
+  try {
+    console.log("🔍 Starting CellPay payout status update...");
+    
+    // Get pending cashout transactions from last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    const TransactionRecords = Parse.Object.extend("TransactionRecords");
+    const query = new Parse.Query(TransactionRecords);
+    query.equalTo("isCashOut", true);
+    query.equalTo("status", 11); // pending transactions
+    query.greaterThan("transactionDate", sevenDaysAgo);
+    query.exists("cellpayTransactionId");
+    query.limit(100); // Process in batches
+    
+    const transactions = await query.find({ useMasterKey: true });
+    console.log(`📊 Found ${transactions.length} pending transactions to check`);
+    
+    let completedCount = 0;
+    let failedCount = 0;
+    let updatedCount = 0;
+    
+    for (const transaction of transactions) {
+      try {
+        const cellpayId = transaction.get("cellpayTransactionId");
+        const currentApiStatus = await getPaymentById(cellpayId);
+        
+        // Update our database with current API status
+        transaction.set("cellpayCurrentStatus", currentApiStatus.status);
+        transaction.set("cellpayLastChecked", new Date());
+        
+        // Check for completion
+        if (currentApiStatus.status === "Completed" || currentApiStatus.status === "CLAIM-010") {
+          transaction.set("status", 12); // 12 = completed
+          transaction.set("isSuccessfullyWithdrawn", true);
+          completedCount++;
+          console.log(`✅ Transaction ${transaction.id} marked as completed - Status: ${currentApiStatus.status}`);
+        }
+        // Check for expiry/failure
+        else if (currentApiStatus.status === "CLAIM-007") {
+          // CLAIM-007: Claim Expiry Period Reached - refund needed
+          await processCellPayRefund(transaction, currentApiStatus.status);
+          failedCount++;
+          console.log(`❌ Transaction ${transaction.id} expired - refunded to wallet`);
+        }
+        
+        await transaction.save(null, { useMasterKey: true });
+        updatedCount++;
+        
+      } catch (error) {
+        console.error(`Error checking status for transaction ${transaction.id}:`, error);
+      }
+    }
+    
+    console.log(`✅ CellPay status update completed: ${updatedCount} checked, ${completedCount} completed, ${failedCount} refunded`);
+    
+    return {
+      success: true,
+      checked: transactions.length,
+      updated: updatedCount,
+      completed: completedCount,
+      refunded: failedCount
+    };
+    
+  } catch (error) {
+    console.error("Update CellPay payout statuses error:", error);
+    throw error;
+  }
+});
+
+/**
+ * Process refund for expired CellPay payout
+ */
+async function processCellPayRefund(transaction, cellpayStatus) {
+  try {
+    const userId = transaction.get("userId");
+    if (!userId) {
+      throw new Error(`Missing userId for transaction ${transaction.id}`);
+    }
+    
+    // Get user and wallet
+    const User = Parse.Object.extend("_User");
+    const userQuery = new Parse.Query(User);
+    const user = await userQuery.get(userId, { useMasterKey: true });
+    
+    if (!user) {
+      throw new Error(`User not found for transaction ${transaction.id}`);
+    }
+    
+    const Wallet = Parse.Object.extend("Wallet");
+    const walletQuery = new Parse.Query(Wallet);
+    const wallet = await walletQuery
+      .equalTo("userID", userId)
+      .first({ useMasterKey: true });
+    
+    if (!wallet) {
+      throw new Error(`Wallet not found for user ${userId}`);
+    }
+    
+    // Process the refund
+    const refundAmount = transaction.get("transactionAmount");
+    const currentBalance = wallet.get("balance") || 0;
+    const newBalance = currentBalance + refundAmount;
+    
+    // Update wallet balance
+    wallet.set("balance", newBalance);
+    await wallet.save(null, { useMasterKey: true });
+    
+    // Mark original transaction as failed and refunded
+    transaction.set("status", 9); // 9 = cashout failed
+    transaction.set("isRefunded", true);
+    transaction.set("refundDate", new Date());
+    transaction.set("refundReason", `CellPay expired - Status: ${cellpayStatus}`);
+    transaction.set("cellpayExpiredStatus", cellpayStatus);
+    
+    console.log(`✅ Successfully refunded $${refundAmount} to user ${user.get("username")} - New balance: $${newBalance}`);
+    
+  } catch (error) {
+    console.error(`Error processing CellPay refund for transaction ${transaction.id}:`, error);
+    throw error;
+  }
+}
