@@ -8,7 +8,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // status = 1 => pending
     query.equalTo("portal", "Stripe");
-    query.contains("transactionIdFromStripe", "cs_live");
+    query.contains("transactionIdFromStripe", "cs_");
     query.limit(10000);
     query.descending("updatedAt");
 
