@@ -159,7 +159,6 @@ ParseServer.createLiveQueryServer(httpServer);
 
     // Total Liquor payment status check
     await Parse.Cloud.run("checkTotalLiquorTransactionStatus"); // Checks and updates Total Liquor Stripe payments
-=======
      
     await Parse.Cloud.run("expireOldCLKKTransactions"); 
     await Parse.Cloud.run("checkClkkPayments"); 
