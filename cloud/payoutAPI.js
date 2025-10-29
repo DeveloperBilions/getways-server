@@ -469,11 +469,14 @@ async function searchPayments(startDate, endDate) {
 
 async function getPaymentById(paymentId) {
   try {
+    const token = await getAuthToken();
+    
     const response = await axios.get(
       `${PAYOUT_API_CONFIG.baseURL}/payment/${paymentId}`,
       {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       }
     );
@@ -485,6 +488,33 @@ async function getPaymentById(paymentId) {
       throw new Error(`Get payment by ID failed with status: ${response.status}`);
     }
   } catch (error) {
+    // If authentication error, retry once
+    if (error.response?.status === 401) {
+      console.log('Token might be expired, re-authenticating for getPaymentById...');
+      authToken = null; // Reset token
+      
+      try {
+        const newToken = await getAuthToken();
+        
+        const retryResponse = await axios.get(
+          `${PAYOUT_API_CONFIG.baseURL}/payment/${paymentId}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${newToken}`
+            }
+          }
+        );
+        
+        if (retryResponse.status === 200) {
+          console.log('Get payment by ID successful on retry:', retryResponse.data);
+          return retryResponse.data;
+        }
+      } catch (retryError) {
+        console.error('Get payment by ID retry failed:', retryError.message);
+      }
+    }
+    
     console.error('Get payment by ID error:', error.message);
     console.error('Full error response:', error.response?.data);
     throw new Parse.Error(400, `Get payment by ID failed: ${error.message}`);
