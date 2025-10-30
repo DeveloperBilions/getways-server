@@ -1052,8 +1052,8 @@ async function processCellPayRefund(transaction, cellpayStatus) {
     wallet.set("balance", newBalance);
     await wallet.save(null, { useMasterKey: true });
     
-    // Mark original transaction as failed and refunded
-    transaction.set("status", 9); // 9 = cashout failed
+    // Mark original transaction as refunded
+    transaction.set("status", 14); // 14 = refunded
     transaction.set("isRefunded", true);
     transaction.set("refundDate", new Date());
     transaction.set("refundReason", `CellPay expired - Status: ${cellpayStatus}`);
