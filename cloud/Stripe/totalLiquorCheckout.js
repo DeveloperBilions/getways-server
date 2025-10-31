@@ -99,7 +99,7 @@ Parse.Cloud.define("totalLiquorPaymentRefresh", async (request) => {
     if (OrderId) query.equalTo("orderId", String(OrderId));
     else query.equalTo("transactionId", String(TransactionId));
 
-    const transaction = await query.first({ useMasterKey: true });
+    const transaction = await query.descending('createdAt').first({ useMasterKey: true });
     if (!transaction) {
       throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Transaction not found");
     }
