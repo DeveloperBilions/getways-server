@@ -98,10 +98,10 @@ async function handlePaymentSucceeded(event) {
     return;
   }
 
-  txn.set("status", 2);
+  //txn.set("status", 2);
   txn.set("transactionIdFromStripe", transaction?.id);
   await Parse.Object.saveAll([txn], { useMasterKey: true });
-  await updatePotBalance(txn.get("userParentId"), txn.get("transactionAmount"), "recharge");
+  //await updatePotBalance(txn.get("userParentId"), txn.get("transactionAmount"), "recharge");
   
   console.log(`✅ Transaction ${txn.id} marked as PAID`);
 }
