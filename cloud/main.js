@@ -23,6 +23,7 @@ async function loadModule() {
     await import('./CronJob/email.js')
     await import('./Fiserv.js')
     await import('./FiservCheckout.js')
+    await import('./FiservDigitalDisbursements.js')
     await import('./Triggers/user.js')
     await import('./AuthorizeNet.js')
     await import('./payoutAPI.js')
