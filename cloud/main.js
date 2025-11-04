@@ -28,6 +28,9 @@ async function loadModule() {
     await import('./payoutAPI.js')
     await import('./cellpay.js')
     await import('./CommerceHub.js')
+    await import('./CommerceHubHostedCheckout.js')
+    await import('./AffirmHostedCheckout.js')
+    await import('./PazeHostedCheckout.js')
 }
 
 loadModule();
