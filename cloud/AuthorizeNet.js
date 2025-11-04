@@ -1,6 +1,7 @@
 
 const ApiContracts = require('authorizenet').APIContracts;
 const ApiControllers = require('authorizenet').APIControllers;
+const { logTransactionChange } = require('./TransactionLogs/logs');
 const { getParentUserId, updatePotBalance } = require('./utility/utlis');
 
 // Utility function to generate unique invoice numbers
@@ -245,7 +246,13 @@ Parse.Cloud.define("checkAuthorizeNetPaymentsRecharge", async (request) => {
 
       // Expire transactions older than 45 minutes
       if (diffMins > 45) {
+        const originalTxn = txn.clone();
         txn.set("status", 9); // expired
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: txn,
+          sourceFunction: "checkAuthorizeNetPaymentsRecharge (expired)",
+        });
         await txn.save(null, { useMasterKey: true });
         console.log(`⏰ Expired transaction ${transactionId} due to timeout`);
         continue;
@@ -258,8 +265,14 @@ Parse.Cloud.define("checkAuthorizeNetPaymentsRecharge", async (request) => {
           // Update pot balance and mark as completed
           const parentUserId = await getParentUserId(txn.get("userId"));
           await updatePotBalance(parentUserId, txn.get("transactionAmount"), "recharge");
-          
+          const originalTxn = txn.clone();
+
           txn.set("status", 2); // completed
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: txn,
+            sourceFunction: "checkAuthorizeNetPaymentsRecharge (card-complete)",
+          });
           await txn.save(null, { useMasterKey: true });
           console.log(`✅ Updated charge transaction ${transactionId} to completed with pot balance`);
         }
@@ -281,11 +294,11 @@ Parse.Cloud.define("expireOldAuthorizeNetTransactions", async (request) => {
   // 45 minutes ago
   const now = new Date();
   const fortyFiveMinutesAgo = new Date(now.getTime() - 45 * 60 * 1000);
-  
+
   query.equalTo("portal", "AuthorizeNet");
   query.equalTo("status", 1); // Pending
   query.lessThan("createdAt", fortyFiveMinutesAgo);
-  query.limit(1000); // Max batch size
+  query.limit(1000);
 
   try {
     const results = await query.find({ useMasterKey: true });
@@ -294,18 +307,31 @@ Parse.Cloud.define("expireOldAuthorizeNetTransactions", async (request) => {
       return `No old Authorize.Net transactions to update.`;
     }
 
-    for (const txn of results) {
-      txn.set("status", 9); // Mark as expired/failed
-    }
+    // 🔹 Log and mark each transaction as expired
+    const updatedTxs = await Promise.all(
+      results.map(async (txn) => {
+        const originalTxn = txn.clone();
+        txn.set("status", 9); // Expired
 
-    await Parse.Object.saveAll(results, { useMasterKey: true });
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: txn,
+          sourceFunction: "expireOldAuthorizeNetTransactions (auto-expire)",
+        });
 
-    return `Updated ${results.length} Authorize.Net transactions to status 9.`;
+        return txn;
+      })
+    );
+
+    await Parse.Object.saveAll(updatedTxs, { useMasterKey: true });
+
+    return `Updated ${updatedTxs.length} Authorize.Net transactions to status 9 (expired).`;
   } catch (error) {
     console.error("❌ Error updating expired Authorize.Net transactions:", error);
     throw new Error("Failed to update expired Authorize.Net transactions.");
   }
 });
+
 
 Parse.Cloud.define("checkTransactionStatusAuthorizeNet", async (request) => {
     try {

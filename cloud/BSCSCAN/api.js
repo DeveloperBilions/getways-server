@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
+const { logTransactionChange } = require("../TransactionLogs/logs");
 
 const getLatestUSDCTransaction = async (walletAddress) => {
   const ETHERSCAN_API_KEY = "F7TE3VRA95UZ8RN4V7V3F94RAQD7968B5X";
@@ -113,7 +114,13 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
           const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
           if (txAgeInMinutes > 90) {
+            const originalTxn = tx.clone();
             tx.set("status", 9); // Expired
+            await logTransactionChange({
+              originalTxn,
+              updatedTxn: tx,
+              sourceFunction: "verifyCryptoRecharge (duplicate-expired)"
+            });
             await tx.save(null, { useMasterKey: true });
             console.log(
               `Expired duplicate transaction after timeout: ${tx.id}`
@@ -131,9 +138,16 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         //   timeDiffInMinutes >= 10 &&
         //   timeDiffInMinutes <= 15
         // ) {
+          const originalTxn = tx.clone();
+
         tx.set("transactionAmount", result?.amountUSDC);
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: tx,
+          sourceFunction: "verifyCryptoRecharge (success)"
+        });
         await tx.save(null, { useMasterKey: true });
         const parentUserId = await getParentUserId(userId);
         await updatePotBalance(parentUserId, result?.amountUSDC, "recharge");
@@ -210,7 +224,13 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
           const txAgeInMinutes = (now - txDate) / 60000;
 
           if (txAgeInMinutes > 45) {
-            tx.set("status", 9); // expired
+            const originalTxn = tx.clone();
+            tx.set("status", 9); // Expired
+            await logTransactionChange({
+              originalTxn,
+              updatedTxn: tx,
+              sourceFunction: "verifyCryptoRechargeForCoinBase (duplicate-expired)"
+            });
             await tx.save(null, { useMasterKey: true });
           }
           console.log(`Transaction hash already verified: ${transactionHash}`);
@@ -222,9 +242,17 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
         //   timeDiffInMinutes >= 10 &&
         //   timeDiffInMinutes <= 15
         // ) {
+
+        const originalTxn = tx.clone();
         tx.set("transactionAmount", result?.amountUSDC);
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: tx,
+          sourceFunction: "verifyCryptoRechargeForCoinBase (success)"
+        });
+
         await tx.save(null, { useMasterKey: true });
         const parentUserId = await getParentUserId(userId);
         await updatePotBalance(parentUserId, result?.amountUSDC, "recharge");
@@ -236,7 +264,13 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
         const txAgeInMinutes = (now - txDate) / 60000;
 
         if (txAgeInMinutes > 45) {
-          tx.set("status", 9); // expired
+          const originalTxn = tx.clone();
+            tx.set("status", 9); // Expired
+            await logTransactionChange({
+              originalTxn,
+              updatedTxn: tx,
+              sourceFunction: "verifyCryptoRechargeForCoinBase (expired)"
+            });
           await tx.save(null, { useMasterKey: true });
         }
       }

@@ -22,6 +22,7 @@ async function loadModule() {
     await import('./AuthorizeNet.js')
     await import('./payoutAPI.js')
     await import('./cellpay.js')
+    await import('./WalletProcessing/clkk.js')
 
 }
 

@@ -1,6 +1,7 @@
 const axios = require('axios');
 const qs = require('querystring');
 const { getParentUserId, updatePotBalance } = require('../utility/utlis');
+const { logTransactionChange } = require('../TransactionLogs/logs');
 const https = require('follow-redirects').https;
 
 Parse.Cloud.define("createPayarcOrder", async (request) => {
@@ -64,10 +65,16 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
       const status = res?.data?.data?.status?.toLowerCase();
 
       if (status === "success") {
+        const originalTxn = tx.clone();
         const amount = res?.data?.amount || tx.get("transactionAmount");
 
         tx.set("status", 2); // completed
         tx.set("transactionAmount", amount);
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: tx,
+          sourceFunction: "verifyRechargeForPayarc (success)",
+        });
         await tx.save(null, { useMasterKey: true });
 
         const parentUserId = await getParentUserId(userId);
@@ -78,7 +85,13 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
         const now = new Date();
         const ageMinutes = (now - txDate) / 60000;
         if (ageMinutes > 45) {
+          const originalTxn = tx.clone();
           tx.set("status", 9); // expired
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: tx,
+            sourceFunction: "verifyRechargeForPayarc (expired)",
+          });
           await tx.save(null, { useMasterKey: true });
           expiredCount++;
         }
@@ -88,7 +101,13 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
       const now = new Date();
         const ageMinutes = (now - txDate) / 60000;
         if (ageMinutes > 45) {
+          const originalTxn = tx.clone();
           tx.set("status", 9); // expired
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: tx,
+            sourceFunction: "verifyRechargeForPayarc (error-expired)",
+          });
           await tx.save(null, { useMasterKey: true });
           expiredCount++;
         }

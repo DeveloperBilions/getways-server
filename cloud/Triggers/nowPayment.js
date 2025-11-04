@@ -433,6 +433,7 @@ archive.set("originalUpdatedAt", record.updatedAt);
   
   
 const Stripe = require("stripe");
+const { logTransactionChange } = require("../TransactionLogs/logs");
 
 Parse.Cloud.define("getUsersFromStripeCharges", async (request) => {
   const  chargeIds = ["ch_3QwKqrLlUR10IID50C8EOQws",
@@ -885,6 +886,8 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 
         // Only update if status has changed
         if (txn.get("status") !== newStatus) {
+          const originalTxn = txn.clone();
+
           txn.set("status", newStatus);
           txn.set("transactionDate", new Date(order.updated_at || Date.now()));
           if(newStatus === 10){
@@ -895,6 +898,11 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
             await updatePotBalance(parentUserId, transactionAmount,"recharge");
           
           }
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: txn,
+            sourceFunction: "checkRecentPendingWertTransactions",
+          });
           await txn.save(null, { useMasterKey: true });
 
           results.push({ id: txn.id, updated: true, newStatus, wertStatus });

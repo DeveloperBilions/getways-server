@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const axios = require("axios");
 const moment = require("moment-timezone");
 const { updatePotBalance } = require('./utility/utlis');
+const { logTransactionChange } = require("./TransactionLogs/logs");
 const CLIENT_ID = process.env.CELLPAY_CLIENT_ID
 const SECRET = process.env.CELLPAY_SECRET
 const BASE_URL =
@@ -99,9 +100,14 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
           const status = data?.status?.toLowerCase();
   
           if (status === "complete") {
+            const originalTxn = txn.clone();
             txn.set("status", 2); 
             await updatePotBalance(parentId, amount, "recharge");
-            
+            await logTransactionChange({
+              originalTxn,
+              updatedTxn: txn,
+              sourceFunction: "cellpayBtcTxnStatus (btc-complete)",
+            });
           }
   
           await txn.save(null, { useMasterKey: true });

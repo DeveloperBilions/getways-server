@@ -2,6 +2,7 @@ const stripe = require("stripe")(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 const nodemailer = require("nodemailer");
 const { getParentUserId, updatePotBalance } = require("../utility/utlis");
 const { getPaymentById } = require('../payoutAPI');
+const { logTransactionChange } = require("../TransactionLogs/logs");
 
 Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
   try {
@@ -27,8 +28,14 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       const diffMins = diffMs / (1000 * 60); // convert to minutes
 
       if (diffMins > 45) {
+        const originalTxn = record.clone();
         // Expire the transaction due to timeout
         record.set("status", 9); // 9 = expired
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: record,
+          sourceFunction: "checkTransactionStatusStripe (timeout-expired)",
+        });
         await record.save(null, { useMasterKey: true });
         continue;
       }
@@ -46,8 +53,14 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
         } else {
           newStatus = 10;
         }
-
+        const originalTxn = record.clone();
         record.set("status", newStatus);
+        await logTransactionChange({
+          originalTxn,
+          updatedTxn: record,
+          sourceFunction: "checkTransactionStatusStripe (stripe-status-sync)",
+        });
+
         await record.save(null, { useMasterKey: true });
 
         if (newStatus === 2) {
@@ -970,7 +983,8 @@ Parse.Cloud.define("updateCellPayPayoutStatuses", async (request) => {
       try {
         const cellpayId = transaction.get("cellpayTransactionId");
         const currentApiStatus = await getPaymentById(cellpayId);
-        
+        const originalTxn = transaction.clone(); // Snapshot before any change
+
         // Update our database with current API status
         transaction.set("cellpayCurrentStatus", currentApiStatus.status);
         transaction.set("cellpayLastChecked", new Date());
@@ -979,6 +993,11 @@ Parse.Cloud.define("updateCellPayPayoutStatuses", async (request) => {
         if (currentApiStatus.status === "Completed" || currentApiStatus.status === "CLAIM-010") {
           transaction.set("status", 12); // 12 = completed
           transaction.set("isSuccessfullyWithdrawn", true);
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: transaction,
+            sourceFunction: "updateCellPayPayoutStatuses (completed)",
+          });
           completedCount++;
           console.log(`✅ Transaction ${transaction.id} marked as completed - Status: ${currentApiStatus.status}`);
         }
@@ -986,6 +1005,11 @@ Parse.Cloud.define("updateCellPayPayoutStatuses", async (request) => {
         else if (currentApiStatus.status === "CLAIM-007") {
           // CLAIM-007: Claim Expiry Period Reached - refund needed
           await processCellPayRefund(transaction, currentApiStatus.status);
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: transaction,
+            sourceFunction: "updateCellPayPayoutStatuses (expired-refunded)",
+          });
           failedCount++;
           console.log(`❌ Transaction ${transaction.id} expired - refunded to wallet`);
         }

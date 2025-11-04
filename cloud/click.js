@@ -1,6 +1,7 @@
 // cloud/main.js
 const axios = require("axios");
 const { updatePotBalance } = require("./utility/utlis");
+const { logTransactionChange } = require("./TransactionLogs/logs");
 
 Parse.Cloud.define(
   "createCheckoutSession",
@@ -99,7 +100,13 @@ Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
     }
 
     for (const txn of results) {
+      const originalTxn = txn.clone(); // snapshot before update
       txn.set("status", 9); // Mark as expired/failed
+      await logTransactionChange({
+        originalTxn,
+        updatedTxn: txn,
+        sourceFunction: "expireOldCLKKTransactions (auto-expire)",
+      });
     }
 
     await Parse.Object.saveAll(results, { useMasterKey: true });
@@ -144,7 +151,13 @@ Parse.Cloud.define("checkClkkPaymentsRecharge", async (request) => {
 
         const payment = res.data;
         if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
+          const originalTxn = txn.clone();
           txn.set("status", 2);
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: txn,
+            sourceFunction: "checkClkkPaymentsRecharge (CLKK-recharge-complete)",
+          });
           await txn.save(null, { useMasterKey: true });
           const parentUserId = txn.get("userParentId")
           await updatePotBalance(parentUserId, txn.get("transactionAmount"), "recharge");
@@ -191,7 +204,13 @@ Parse.Cloud.define("checkClkkPayments", async (request) => {
 
         // 2. If completed, update transaction
         if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
+          const originalTxn = txn.clone(); // snapshot
           txn.set("status", 12); // mark as completed
+          await logTransactionChange({
+            originalTxn,
+            updatedTxn: txn,
+            sourceFunction: "checkClkkPayments (CLKK-verify-completed)",
+          });
           await txn.save(null, { useMasterKey: true });
           console.log(`✅ Updated txn ${txn.id} to status 12`);
         }
