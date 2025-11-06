@@ -100,14 +100,14 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
           const status = data?.status?.toLowerCase();
   
           if (status === "complete") {
-            const originalTxn = txn.clone();
+            // const originalTxn = txn.clone();
             txn.set("status", 2); 
             await updatePotBalance(parentId, amount, "recharge");
-            await logTransactionChange({
-              originalTxn,
-              updatedTxn: txn,
-              sourceFunction: "cellpayBtcTxnStatus (btc-complete)",
-            });
+            // await logTransactionChange({
+            //   originalTxn,
+            //   updatedTxn: txn,
+            //   sourceFunction: "cellpayBtcTxnStatus (btc-complete)",
+            // });
           }
   
           await txn.save(null, { useMasterKey: true });
