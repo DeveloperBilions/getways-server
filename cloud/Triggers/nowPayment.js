@@ -886,7 +886,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
 
         // Only update if status has changed
         if (txn.get("status") !== newStatus) {
-          const originalTxn = txn.clone();
+          const originalTxn = txn.toJSON();
 
           txn.set("status", newStatus);
           txn.set("transactionDate", new Date(order.updated_at || Date.now()));

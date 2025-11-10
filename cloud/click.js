@@ -100,7 +100,7 @@ Parse.Cloud.define("expireOldCLKKTransactions", async (request) => {
     }
 
     for (const txn of results) {
-      const originalTxn = txn.clone(); // snapshot before update
+      const originalTxn = txn.toJSON(); // snapshot before update
       txn.set("status", 9); // Mark as expired/failed
       await logTransactionChange({
         originalTxn,
@@ -151,7 +151,7 @@ Parse.Cloud.define("checkClkkPaymentsRecharge", async (request) => {
 
         const payment = res.data;
         if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
-          const originalTxn = txn.clone();
+          const originalTxn = txn.toJSON();
           txn.set("status", 2);
           await logTransactionChange({
             originalTxn,
@@ -204,7 +204,7 @@ Parse.Cloud.define("checkClkkPayments", async (request) => {
 
         // 2. If completed, update transaction
         if (payment.status && payment.status.toUpperCase() === "COMPLETED") {
-          const originalTxn = txn.clone(); // snapshot
+          const originalTxn = txn.toJSON(); // snapshot
           txn.set("status", 12); // mark as completed
           await logTransactionChange({
             originalTxn,

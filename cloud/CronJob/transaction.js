@@ -28,7 +28,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       const diffMins = diffMs / (1000 * 60); // convert to minutes
 
       if (diffMins > 45) {
-        const originalTxn = record.clone();
+        const originalTxn = record.toJSON();
         // Expire the transaction due to timeout
         record.set("status", 9); // 9 = expired
         await logTransactionChange({
@@ -53,7 +53,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
         } else {
           newStatus = 10;
         }
-        const originalTxn = record.clone();
+        const originalTxn = record.toJSON();
         record.set("status", newStatus);
         await logTransactionChange({
           originalTxn,
@@ -983,7 +983,7 @@ Parse.Cloud.define("updateCellPayPayoutStatuses", async (request) => {
       try {
         const cellpayId = transaction.get("cellpayTransactionId");
         const currentApiStatus = await getPaymentById(cellpayId);
-        const originalTxn = transaction.clone(); // Snapshot before any change
+        const originalTxn = transaction.toJSON(); // Snapshot before any change
 
         // Update our database with current API status
         transaction.set("cellpayCurrentStatus", currentApiStatus.status);

@@ -114,7 +114,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
           const txAgeInMinutes = (now.getTime() - txDate.getTime()) / 60000;
 
           if (txAgeInMinutes > 90) {
-            const originalTxn = tx.clone();
+            const originalTxn = tx.toJSON();
             tx.set("status", 9); // Expired
             await logTransactionChange({
               originalTxn,
@@ -138,7 +138,7 @@ Parse.Cloud.define("verifyCryptoRecharge", async (request) => {
         //   timeDiffInMinutes >= 10 &&
         //   timeDiffInMinutes <= 15
         // ) {
-          const originalTxn = tx.clone();
+          const originalTxn = tx.toJSON();
 
         tx.set("transactionAmount", result?.amountUSDC);
         tx.set("status", 2);
@@ -224,7 +224,7 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
           const txAgeInMinutes = (now - txDate) / 60000;
 
           if (txAgeInMinutes > 45) {
-            const originalTxn = tx.clone();
+            const originalTxn = tx.toJSON();
             tx.set("status", 9); // Expired
             await logTransactionChange({
               originalTxn,
@@ -243,7 +243,7 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
         //   timeDiffInMinutes <= 15
         // ) {
 
-        const originalTxn = tx.clone();
+        const originalTxn = tx.toJSON();
         tx.set("transactionAmount", result?.amountUSDC);
         tx.set("status", 2);
         tx.set("transactionHash", transactionHash);
@@ -264,7 +264,7 @@ Parse.Cloud.define("verifyCryptoRechargeForCoinBase", async (request) => {
         const txAgeInMinutes = (now - txDate) / 60000;
 
         if (txAgeInMinutes > 45) {
-          const originalTxn = tx.clone();
+          const originalTxn = tx.toJSON();
             tx.set("status", 9); // Expired
             await logTransactionChange({
               originalTxn,

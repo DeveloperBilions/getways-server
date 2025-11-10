@@ -100,7 +100,7 @@ Parse.Cloud.define("cellpayBtcTxnStatus", async () => {
           const status = data?.status?.toLowerCase();
   
           if (status === "complete") {
-            const originalTxn = txn.clone();
+            const originalTxn = txn.toJSON();
             txn.set("status", 2); 
             await updatePotBalance(parentId, amount, "recharge");
             await logTransactionChange({

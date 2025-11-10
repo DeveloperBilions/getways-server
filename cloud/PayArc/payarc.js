@@ -65,7 +65,7 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
       const status = res?.data?.data?.status?.toLowerCase();
 
       if (status === "success") {
-        const originalTxn = tx.clone();
+        const originalTxn = tx.toJSON();
         const amount = res?.data?.amount || tx.get("transactionAmount");
 
         tx.set("status", 2); // completed
@@ -85,7 +85,7 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
         const now = new Date();
         const ageMinutes = (now - txDate) / 60000;
         if (ageMinutes > 45) {
-          const originalTxn = tx.clone();
+          const originalTxn = tx.toJSON();
           tx.set("status", 9); // expired
           await logTransactionChange({
             originalTxn,
@@ -101,7 +101,7 @@ Parse.Cloud.define("verifyRechargeForPayarc", async (request) => {
       const now = new Date();
         const ageMinutes = (now - txDate) / 60000;
         if (ageMinutes > 45) {
-          const originalTxn = tx.clone();
+          const originalTxn = tx.toJSON();
           tx.set("status", 9); // expired
           await logTransactionChange({
             originalTxn,

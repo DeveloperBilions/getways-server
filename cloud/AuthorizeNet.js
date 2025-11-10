@@ -246,7 +246,7 @@ Parse.Cloud.define("checkAuthorizeNetPaymentsRecharge", async (request) => {
 
       // Expire transactions older than 45 minutes
       if (diffMins > 45) {
-        const originalTxn = txn.clone();
+        const originalTxn = txn.toJSON();
         txn.set("status", 9); // expired
         await logTransactionChange({
           originalTxn,
@@ -265,7 +265,7 @@ Parse.Cloud.define("checkAuthorizeNetPaymentsRecharge", async (request) => {
           // Update pot balance and mark as completed
           const parentUserId = await getParentUserId(txn.get("userId"));
           await updatePotBalance(parentUserId, txn.get("transactionAmount"), "recharge");
-          const originalTxn = txn.clone();
+          const originalTxn = txn.toJSON();
 
           txn.set("status", 2); // completed
           await logTransactionChange({
@@ -310,7 +310,7 @@ Parse.Cloud.define("expireOldAuthorizeNetTransactions", async (request) => {
     // 🔹 Log and mark each transaction as expired
     const updatedTxs = await Promise.all(
       results.map(async (txn) => {
-        const originalTxn = txn.clone();
+        const originalTxn = txn.toJSON();
         txn.set("status", 9); // Expired
 
         await logTransactionChange({
