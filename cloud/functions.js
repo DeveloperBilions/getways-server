@@ -2489,6 +2489,7 @@ Parse.Cloud.define("purchaseGiftCardExternal", async (request) => {
     externalUserFirstName,
     externalUserLastName,
     externalUserEmail,
+    platform
   } = request.params;
 
   const method = "POST";
