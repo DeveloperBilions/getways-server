@@ -28,6 +28,7 @@ async function loadModule() {
     await import('./payoutAPI.js')
     await import('./cellpay.js')
     await import('./CommerceHub.js')
+    await import('./FinixPayment.js')
 }
 
 loadModule();
