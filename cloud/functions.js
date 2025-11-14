@@ -2887,3 +2887,59 @@ Parse.Cloud.define("backfillTransactionUserParentId", async (request) => {
 
   message?.(`Done. scanned=${scanned}, updated=${updated}, skipped=${skipped}, missingUser=${missingUser}`);
 });
+Parse.Cloud.define("createFinixPaymentLink", async (request) => {
+  const { amount } = request.params;
+  const axios = require("axios");
+
+  try {
+    const totalAmount = Math.round(amount * 100); // USD → cents
+
+    const response = await axios.post(
+      "https://finix.sandbox-payments-api.com/payment_links",
+      {
+        merchant_id: "MUeVMGsieX8Dny8dmVbMHTJ9",
+        application_id: "APfoMeGZfdKsWmcmjcLhHjER",
+        payment_frequency: "ONE_TIME",
+        is_multiple_use: false,
+        allowed_payment_methods: ["PAYMENT_CARD", "BANK_ACCOUNT"],
+        amount_details: {
+          amount_type: "FIXED",
+          total_amount: totalAmount,
+          currency: "USD",
+        },
+        additional_details: {
+          terms_of_service_url: "https://mybasketball-leaguexyz.com/terms",
+        },
+        branding: {
+          brand_color: "#111823",
+          accent_color: "#f3eeee",
+          logo:
+            "https://s3.amazonaws.com/customer-uploaded-assets-prod/11-16-2023-04_16_27_2022-04-28-22_56_33-finix-logo-v2.png_0feefc6d-06fe-4c50-a5e4-91dfeb183482",
+          icon:
+            "https://s3.amazonaws.com/customer-uploaded-assets-prod/11-16-2023-04_16_27_2022-04-28-22_56_33-finix-icon-v2.png_0feefc6d-06fe-4c50-a5e4-91dfeb183482",
+          button_font_color: "#111823",
+        },
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Finix-Version": "2022-02-01",
+          "Authorization":
+            "Basic VVNyQkxKb2F1M3FoY2VHdE5QUmVKZ1V5OmFmMTgxMmY0LTJiNzgtNDRiNC04ZDRhLTFhNzFjYWE3YmQzNw==",
+        },
+        timeout: 20000, // Optional: prevent infinite waiting
+      }
+    );
+
+    return {
+      success: true,
+      ...response.data,
+    };
+  } catch (error) {
+    console.error("Finix Axios Error:", error?.response?.data || error.message);
+    return {
+      success: false,
+      message: error?.response?.data || error.message,
+    };
+  }
+});
