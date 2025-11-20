@@ -895,6 +895,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
           }
           if(newStatus === 2){
             const parentUserId = await getParentUserId(userId)
+            txn.set("fail_reason", "");
             await updatePotBalance(parentUserId, transactionAmount,"recharge");
           
           }
