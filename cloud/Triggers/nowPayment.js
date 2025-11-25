@@ -820,7 +820,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
   try {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Only pending records
-    query.notEqualTo("portal", "stripe");
+    query.equalTo("portal", "Wert");
     query.limit(10000);
     query.descending("updatedAt");
 
