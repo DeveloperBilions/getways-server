@@ -831,7 +831,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
       const transactionAmount = txn.get("transactionAmount");
       const updatedAt = txn.get("createdAt");
       const now = new Date();
-      const ageInMinutes = (now - updatedAt) / (1000 * 60);
+      const ageInMinutes = (now.getTime() - updatedAt.getTime()) / 60000;
       
       if (!orderId) {
         results.push({ id: txn.id, skipped: true, reason: "Missing transactionIdFromStripe" });
@@ -873,7 +873,7 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
             break;
           case "failed":
             if (ageInMinutes > 45) {
-              newStatus = 10; // fail only if > 45 mins
+              newStatus = 9; // fail only if > 45 mins
             } else {
               newStatus = 1; // still treat as pending
             }
