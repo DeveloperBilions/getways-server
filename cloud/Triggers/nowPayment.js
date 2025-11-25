@@ -821,17 +821,15 @@ Parse.Cloud.define("checkRecentPendingWertTransactions", async () => {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // Only pending records
     query.equalTo("portal", "Wert");
-    query.limit(10000);
-    query.descending("updatedAt");
 
-    const pendingTransactions = await query.find({ useMasterKey: true });
+    const pendingTransactions = await query.findAll({ useMasterKey: true });
     const results = [];
 
     for (const txn of pendingTransactions) {
       const orderId = txn.get("transactionIdFromStripe");
       const userId = txn.get("userId");
       const transactionAmount = txn.get("transactionAmount");
-      const updatedAt = txn.get("updatedAt");
+      const updatedAt = txn.get("createdAt");
       const now = new Date();
       const ageInMinutes = (now - updatedAt) / (1000 * 60);
       
