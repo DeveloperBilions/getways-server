@@ -18,8 +18,8 @@ const VALID_CATEGORIES = [
   "redeem",
   "recharge",
   "wallet",
-  "giftcard",
   "login",
+  "password",
   "others",
 ];
 

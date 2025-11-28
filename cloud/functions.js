@@ -2975,6 +2975,17 @@ Parse.Cloud.define("createTicket", async (request) => {
       throw new Parse.Error(404, `User with ID ${userId} not found`);
     }
 
+     // Check if user already has 2 or more open tickets (excluding resolved)
+    const Ticket = Parse.Object.extend("Ticket");
+    const ticketQuery = new Parse.Query(Ticket);
+    ticketQuery.equalTo("userId", userId);
+    ticketQuery.notEqualTo("status", "resolved");
+    const openTicketsCount = await ticketQuery.count({ useMasterKey: true });
+
+    if (openTicketsCount >= 2) {
+      throw new Parse.Error(400, "You already have 2 open tickets. Please wait for them to be resolved before creating a new one.");
+    }
+
     // Initialize S3 client
     const s3 = new AWS.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -3049,8 +3060,8 @@ Parse.Cloud.define("createTicket", async (request) => {
     }
 
     // Create ticket
-    const Ticket = Parse.Object.extend("Ticket");
-    const ticket = new Ticket();
+    const newTicket = Parse.Object.extend("Ticket");
+    const ticket = new newTicket();
 
     ticket.set("userId", userId);
     ticket.set("username", user.get("username"));
@@ -3092,89 +3103,6 @@ Parse.Cloud.define("createTicket", async (request) => {
         status: "error",
         code: 500,
         message: error.message || "An unexpected error occurred.",
-      };
-    }
-  }
-});
-
-Parse.Cloud.define("uploadFile", async (request) => {
-
-  const {fileName, fileBase64, fileType } = request.params;
-
-  // === Input validation ===
-  if ( !fileType || !fileName || !fileBase64) {
-    throw new Parse.Error(
-      400,
-      "Missing required parameters: fileType, fileName, fileBase64"
-    );
-  }
-
-  const s3 = new AWS.S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY,
-    secretAccessKey: process.env.AWS_SECRET_KEY,
-    region: process.env.AWS_REGION,
-  });
-
-  const folderName = "Getways/";
-  const fullFileKey = `${folderName}${fileName}`;
-
-  try {
-    // === Step 1: Check if parent folder exists ===
-    const listResult = await s3
-      .listObjectsV2({
-        Bucket: process.env.S3_BUCKET,
-        Prefix: folderName,
-        MaxKeys: 1,
-      })
-      .promise();
-
-    if (!listResult.Contents || listResult.Contents?.length === 0) {
-      throw new Parse.Error(
-        404,
-        `Folder ${folderName} does not exist`
-      );
-    }
-
-    // === Step 2: Decode and upload PDF ===
-    let buffer;
-    try {
-      buffer = Buffer.from(fileBase64, "base64");
-    } catch {
-      throw new Parse.Error(400, "Invalid base64 content");
-    }
-
-    await s3
-      .putObject({
-        Bucket: process.env.S3_BUCKET,
-        Key: fullFileKey,
-        Body: buffer,
-        ContentType: fileType,
-      })
-      .promise();
-
-    return {
-      success: true,
-      message: "File uploaded",
-      folderKey: folderName,
-      fileKey: fullFileKey,
-      fileUrl: `https://s3.${process.env.AWS_REGION}.amazonaws.com/${process.env.S3_BUCKET}/${fullFileKey}`,
-    };
-  } catch (error) {
-    console.error("Upload Error:", error);
-    // Handle different error types
-    if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
-      return {
-        success: false,
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      // Handle any unexpected errors
-      return {
-        success: false,
-        code: 500,
-        message: "An unexpected error occurred.",
       };
     }
   }
