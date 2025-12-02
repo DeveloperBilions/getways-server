@@ -2955,16 +2955,6 @@ Parse.Cloud.define("createTicket", async (request) => {
 
   try {
     // Validate ticket data
-    const validatorData = {
-      category,
-      description,
-      attachments,
-    };
-
-    const validatorResponse = validateTicket(validatorData);
-    if (!validatorResponse.isValid) {
-      throw new Parse.Error(400, validatorResponse.errors);
-    }
 
     // Check if user exists
     const userQuery = new Parse.Query(Parse.User);
@@ -2974,6 +2964,20 @@ Parse.Cloud.define("createTicket", async (request) => {
     if (!user) {
       throw new Parse.Error(404, `User with ID ${userId} not found`);
     }
+
+    const validatorData = {
+      category,
+      description,
+      attachments,  
+      role:user.get("roleName")
+    };
+
+    const validatorResponse = validateTicket(validatorData);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
+
+    
 
      // Check if user already has 2 or more open tickets (excluding resolved)
     const Ticket = Parse.Object.extend("Ticket");
@@ -3065,6 +3069,7 @@ Parse.Cloud.define("createTicket", async (request) => {
 
     ticket.set("userId", userId);
     ticket.set("username", user.get("username"));
+    ticket.set("role", user.get("roleName"));
     ticket.set("category", category);
     ticket.set("description", description);
     ticket.set("status", "new");

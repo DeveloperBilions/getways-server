@@ -14,20 +14,43 @@ const ALLOWED_VIDEO_TYPES = [
   "video/x-msvideo",
   "video/webm",
 ];
-const VALID_CATEGORIES = [
+const VALID_CATEGORIES = {
+  "Player": [
   "redeem",
   "recharge",
   "wallet",
   "login",
   "password",
   "others",
-];
+  ],
+  "Master-Agent": [
+    "user_management",
+    "summary_reports",
+    "recharge_records",
+    "redeem_records",
+    "balance_display",
+    "recharge_limit",
+    "master_accounting",
+    "login",
+    "others",
+  ],
+  "Agent": [
+    "user_management",
+    "summary_reports",
+    "recharge_records",
+    "redeem_records",
+    "balance_display",
+    "recharge_limit",
+    "login",
+    "others",
+  ],
+};
 
 function validateTicket(ticketData) {
   const errors = {};
 
   // Validate category
-  const categoryValidation = validateCategory(ticketData.category);
+  const categoryValidation = validateCategory(ticketData.category,ticketData.role);
   if (!categoryValidation.isValid) {
     errors.category = categoryValidation.error;
   }
@@ -52,15 +75,21 @@ function validateTicket(ticketData) {
   };
 }
 
-function validateCategory(category) {
+function validateCategory(category,role) {
   if (!category) {
     return {
       isValid: false,
       error: "Category is required",
     };
   }
+  if (!role) {
+    return {
+      isValid: false,
+      error: "Role is required",
+    };
+  }
 
-  if (!VALID_CATEGORIES.includes(category.toLowerCase())) {
+  if (!VALID_CATEGORIES[role].includes(category.toLowerCase())) {
     return {
       isValid: false,
       error: "Invalid category selected",
