@@ -30,7 +30,6 @@ const VALID_CATEGORIES = {
     "redeem_records",
     "balance_display",
     "recharge_limit",
-    "master_accounting",
     "login",
     "others",
   ],
