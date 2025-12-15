@@ -51,27 +51,27 @@ Parse.Cloud.define("createUser", async (request) => {
         throw new Parse.Error(400, validatorResponse.errors);
       }
     }
-    const existingUsername = await new Parse.Query(Parse.User)
-      .equalTo("username", username)
-      .first({ useMasterKey: true });
-
-    if (existingUsername) {
-      throw new Parse.Error(400, "Username is already taken.");
-    }
-    const existingEmail = await new Parse.Query(Parse.User)
-      .equalTo("email", email)
-      .first({ useMasterKey: true });
-
-    if (existingEmail) {
-      throw new Parse.Error(400, "Email is already registered.");
-    }
-
+    
+    // Combine duplicate checks into single query with $or operator for better performance
+    const usernameQuery = new Parse.Query(Parse.User).equalTo("username", username);
+    const emailQuery = new Parse.Query(Parse.User).equalTo("email", email);
+    
+    const queries = [usernameQuery, emailQuery];
     if (phoneNumber) {
-      const existingPhone = await new Parse.Query(Parse.User)
-        .equalTo("phoneNumber", phoneNumber)
-        .first({ useMasterKey: true });
+      queries.push(new Parse.Query(Parse.User).equalTo("phoneNumber", phoneNumber));
+    }
+    
+    const combinedQuery = Parse.Query.or(...queries);
+    const existingUser = await combinedQuery.first({ useMasterKey: true });
 
-      if (existingPhone) {
+    if (existingUser) {
+      if (existingUser.get("username") === username) {
+        throw new Parse.Error(400, "Username is already taken.");
+      }
+      if (existingUser.get("email") === email) {
+        throw new Parse.Error(400, "Email is already registered.");
+      }
+      if (phoneNumber && existingUser.get("phoneNumber") === phoneNumber) {
         throw new Parse.Error(400, "Phone number is already in use.");
       }
     }
@@ -600,6 +600,7 @@ Parse.Cloud.define("checkTransactionStatus", async (request) => {
 
     // Sort the results in ascending order of updatedAt
     query.descending("updatedAt");
+    query.limit(100);
     const results = await query.find();
 
     if (results != null && results.length > 0) {

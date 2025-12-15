@@ -8,8 +8,8 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
     const query = new Parse.Query("TransactionRecords");
     query.equalTo("status", 1); // status = 1 => pending
     query.equalTo("portal", "Stripe");
-    query.contains("transactionIdFromStripe", "cs_");
-    query.limit(10000);
+    query.startsWith("transactionIdFromStripe", "cs_");
+    query.limit(100);
     query.descending("updatedAt");
 
     const results = await query.find();
@@ -18,6 +18,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       return;
     }
     const now = new Date();
+    const recordsToUpdate = [];
 
     for (const record of results) {
       const transactionId = record.get("transactionIdFromStripe");
@@ -29,7 +30,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       if (diffMins > 45) {
         // Expire the transaction due to timeout
         record.set("status", 9); // 9 = expired
-        await record.save(null, { useMasterKey: true });
+        recordsToUpdate.push(record);
         continue;
       }
 
@@ -48,7 +49,7 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
         }
 
         record.set("status", newStatus);
-        await record.save(null, { useMasterKey: true });
+        recordsToUpdate.push(record);
 
         if (newStatus === 2) {
           const parentUserId = await getParentUserId(record.get("userId"));
@@ -57,6 +58,11 @@ Parse.Cloud.define("checkTransactionStatusStripe", async (request) => {
       } catch (error) {
         console.error(`Stripe API error for transaction ${transactionId}: ${error.message}`);
       }
+    }
+
+    // Batch save all records at once
+    if (recordsToUpdate.length > 0) {
+      await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
     }
   } catch (error) {
     console.error("Error in checkTransactionStatusStripe:", error.message);
@@ -74,10 +80,12 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
     query.equalTo("status", 1); // Assuming status 1 means 'initiated' or 'pending'
     query.equalTo("portal", "Stripe"); // Filter by status=1
     query.descending("updatedAt");
-    query.limit(10000);
+    query.limit(100);
 
     const results = await query.find();
     console.log(`${results.length} transactions found to check with Stripe.`);
+
+    const recordsToUpdate = [];
 
     for (const record of results) {
       const transactionId = record.get("transactionIdFromStripe");
@@ -103,7 +111,7 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
               newStatus = 10; // Failed or canceled
             }
             record.set("status", newStatus);
-            await record.save();
+            recordsToUpdate.push(record);
             if (newStatus === 2) {
             const parentUserId = await getParentUserId(record.get("userId"));
             await updatePotBalance(
@@ -126,6 +134,11 @@ Parse.Cloud.define("expiredTransactionStripe", async (request) => {
           `No transaction ID found for record ${record.id}, unable to check with Stripe.`
         );
       }
+    }
+
+    // Batch save all records at once
+    if (recordsToUpdate.length > 0) {
+      await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
     }
   } catch (error) {
     if (error instanceof Parse.Error) {
