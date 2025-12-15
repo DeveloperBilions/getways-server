@@ -67,7 +67,7 @@ Parse.Cloud.define("assignRandomWalletAddrIfMissing", async (request) => {
       const sessionQuery = new Parse.Query("_Session");
       sessionQuery.greaterThanOrEqualTo("updatedAt", twoMonthsAgo);
       sessionQuery.include("user");
-      sessionQuery.limit(100000);
+      sessionQuery.limit(1000);
   
       const sessions = await sessionQuery.find({ useMasterKey: true });
   
