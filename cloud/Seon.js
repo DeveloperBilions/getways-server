@@ -1,328 +1,414 @@
 // SEON Fraud Detection API Integration
-const axios = require('axios');
+const axios = require("axios");
 
 const SEON_API_KEY = process.env.SEON_API_KEY;
-const SEON_API_URL = 'https://api.us-east-1-main.seon.io/SeonRestService/fraud-api/v2/';
+const SEON_API_URL =
+  "https://api.us-east-1-main.seon.io/SeonRestService/fraud-api/v2/";
 
-async function checkTransactionFraud(transactionData) {
-  try {
-    console.log("🔍 SEON Fraud Check - Starting...");
-    console.log("📤 Transaction Data:", JSON.stringify(transactionData, null, 2));
-
-    const {
-      email,
-      phone,
-      userName,
-      ip,
-      cardNumber,
-      cardExpiry,
-      cvv,
-      firstName,
-      lastName,
-      address,
-      city,
-      state,
-      zip,
-      country,
-      amount,
-      userId,
-      sessionId,
-      deviceId,
-      paymentProvider,
-      avsResult,
-      status3d,
-      scaMethod
-    } = transactionData;
-
-    // Extract card BIN (first 6 digits)
-    const cardBin = cardNumber ? cardNumber.replace(/\s/g, '').substring(0, 6) : '';
-    const cardLast = cardNumber ? cardNumber.replace(/\s/g, '').slice(-4) : '';
-
-    // Convert card expiry from MM/YY to YYYY-MM format for SEON API
-    let formattedCardExpiry = '';
-    if (cardExpiry) {
-      const parts = cardExpiry.split('/');
-      if (parts.length === 2) {
-        const month = parts[0].padStart(2, '0');
-        const year = parts[1].length === 2 ? `20${parts[1]}` : parts[1];
-        formattedCardExpiry = `${year}-${month}`;
-      }
-    }
-
-    // Build SEON request payload
-    const seonPayload = {
-      config: {
-        ip: {
-          include: "flags,history,id",
-          timeout: 3000,
-          version: "v1"
-        },
-        email: {
-          timeout: 3000,
-          version: "v3"
-        },
-        phone: {
-          timeout: 3000,
-          version: "v2"
-        },
-        bin: {
-          timeout: 3000
-        },
-        ip_api: true,
-        email_api: true,
-        phone_api: true,
-        bin_api: !!cardBin,
-        device_fingerprinting: !!sessionId,
-        ignore_velocity_rules: false,
-        response_fields: "id,state,fraud_score,ip_details,email_details,phone_details,bin_details,device_details,version,applied_rules,calculation_time,seon_id"
-      },
-      action_type: "purchase",
-      ip: ip || "0.0.0.0",
-      email: email || "",
-      phone_number: phone || "",
-      user_id: userId || "",
-      user_name: userName || "",
-      user_fullname: `${firstName || ''} ${lastName || ''}`.trim(),
-      user_firstname: firstName || "",
-      user_lastname: lastName || "",
-      user_country: country || "US",
-      user_city: city || "",
-      user_region: state || "",
-      user_zip: zip || "",
-      transaction_id: `TXN_${Date.now()}`,
-      transaction_type: "deposit",
-      transaction_amount: parseFloat(amount) || 0,
-      transaction_currency: "USD",
-      payment_mode: "credit_card",
-      payment_provider: paymentProvider || "manual_entry",
-      card_bin: cardBin,
-      card_last: cardLast,
-      card_fullname: `${firstName || ''} ${lastName || ''}`.trim(),
-      card_expire: formattedCardExpiry,
-      cvv_result: !!cvv,
-      avs_result: avsResult || "U",
-      status_3d: status3d || "not_attempted",
-      sca_method: scaMethod || "none",
-      billing_street: address || "",
-      billing_city: city || "",
-      billing_region: state || "",
-      billing_zip: zip || "",
-      billing_country: country || "US",
-      session: sessionId || "",
-      device_id: deviceId || "",
-      custom_fields: {
-        is_test_transaction: true,
-        platform: "getways",
-        payment_method: "seon_fraud_test"
-      }
-    };
-
-    console.log("📤 Sending to SEON API...");
-
-    const response = await axios.post(SEON_API_URL, seonPayload, {
-      headers: {
-        'X-API-KEY': SEON_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      timeout: 10000
-    });
-
-    console.log("✅ SEON Response Received");
-    console.log("📥 Fraud Score:", response.data.data.fraud_score);
-    console.log("📥 State:", response.data.data.state);
-
-    const fraudResult = {
-      success: true,
-      fraud_score: response.data.data.fraud_score || 0,
-      state: response.data.data.state || 'UNKNOWN',
-      transaction_id: response.data.data.id,
-      seon_id: response.data.data.seon_id,
-      applied_rules: response.data.data.applied_rules || [],
-      ip_details: response.data.data.ip_details || null,
-      email_details: response.data.data.email_details || null,
-      phone_details: response.data.data.phone_details || null,
-      bin_details: response.data.data.bin_details || null,
-      device_details: response.data.data.device_details || null,
-      calculation_time: response.data.data.calculation_time || 0,
-      recommendation: getRecommendation(response.data.data.fraud_score, response.data.data.state),
-      raw_response: response.data
-    };
-
-    console.log("✅ SEON Fraud Check Complete");
-    console.log("🎯 Recommendation:", fraudResult.recommendation);
-
-    return fraudResult;
-
-  } catch (error) {
-    console.error("❌ SEON Fraud Check Error:");
-    console.error("Error Status:", error.response?.status);
-    console.error("Error Data:", error.response?.data);
-    console.error("Error Message:", error.message);
-
-    return {
-      success: false,
-      error: error.response?.data || error.message,
-      fraud_score: 100, // Max score on error (fail-safe)
-      state: 'ERROR',
-      recommendation: 'DECLINE - API Error'
-    };
-  }
-}
-
-// Get recommendation based on fraud score and state
-function getRecommendation(fraudScore, state) {
-  if (state === 'APPROVE' || fraudScore < 10) {
-    return 'APPROVE - Low Risk';
-  } else if (state === 'REVIEW' || (fraudScore >= 10 && fraudScore < 20)) {
-    return 'REVIEW - Medium Risk';
-  } else if (state === 'DECLINE' || fraudScore >= 20) {
-    return 'DECLINE - High Risk';
-  }
-  return 'UNKNOWN';
-}
-
-// Parse Cloud Function - SEON Fraud Check
+// Parse Cloud Function - SEON Transaction Monitoring (Payment Fraud Detection)
 Parse.Cloud.define("seonFraudCheck", async (request) => {
   const {
+    // User Information
     email,
     phone,
     userName,
-    ip,
-    cardNumber,
-    cardExpiry,
-    cvv,
+    userId,
     firstName,
     lastName,
-    address,
-    city,
-    state,
-    zip,
-    country,
-    amount,
-    userId,
-    remark,
-    sessionId,
-    deviceId,
+    userFullname,
+    userCountry,
+    userCity,
+    userRegion,
+    userZip,
+
+    // Transaction Information
+    transactionId,
+    transactionType,
+    transactionAmount,
+    transactionCurrency,
+
+    // Payment Information
+    paymentMode,
     paymentProvider,
+    cardNumber,
+    cardExpiry,
+    cardFullname,
+    cardHash,
+    cvv,
     avsResult,
     status3d,
-    scaMethod
+    scaMethod,
+
+    // Billing Information
+    billingStreet,
+    billingCity,
+    billingRegion,
+    billingZip,
+    billingCountry,
+
+    // Device & Session
+    ip,
+    sessionId,
+    deviceId,
+
+    // Additional
+    remark,
+    customFields,
   } = request.params;
 
-  console.log("🚀 SEON Fraud Check Cloud Function Called");
+  console.log("🚀 SEON Transaction Monitoring - Starting...");
+
+  let transactionDetails;
 
   try {
     // Get current user
-    const user = request.user || await new Parse.Query(Parse.User).get(userId, { useMasterKey: true });
-    
+    const user =
+      request.user ||
+      (await new Parse.Query(Parse.User).get(userId, { useMasterKey: true }));
+
     if (!user) {
       throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
     }
 
+    // ✅ Get real client IP address (handles proxies, load balancers, CDNs)
+    const clientIp =
+      ip ||
+      request.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      request.headers?.["x-real-ip"] ||
+      request.headers?.["cf-connecting-ip"] || // CloudFlare
+      request.ip ||
+      "0.0.0.0";
+
+    console.log("📍 Detected Client IP Address:", clientIp);
+    console.log(
+      "📍 IP Source:",
+      ip ? "Provided by frontend" : "Auto-detected from request"
+    );
+
     // Create transaction record BEFORE calling SEON
     const TransactionDetails = Parse.Object.extend("TransactionDetails");
-    const transactionDetails = new TransactionDetails();
-    
-    const merchantTransactionId = `SEON_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
+    transactionDetails = new TransactionDetails();
+
+    const merchantTransactionId =
+      transactionId ||
+      `SEON_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
     transactionDetails.set("type", "recharge");
     transactionDetails.set("gameId", "786");
     transactionDetails.set("username", user.get("username") || "");
     transactionDetails.set("userId", user.id);
     transactionDetails.set("transactionDate", new Date());
-    transactionDetails.set("transactionAmount", parseFloat(amount));
+    transactionDetails.set(
+      "transactionAmount",
+      parseFloat(transactionAmount) || 0
+    );
     transactionDetails.set("remark", remark || "SEON Fraud Test");
     transactionDetails.set("useWallet", false);
     transactionDetails.set("userParentId", user.get("userParentId") || "");
     transactionDetails.set("status", 1); // pending
     transactionDetails.set("portal", "SEON");
     transactionDetails.set("merchantTransactionId", merchantTransactionId);
-    transactionDetails.set("paymentMethod", "SEON Fraud Test");
-    transactionDetails.set("seonTesting", true); // Flag as test transaction
+    transactionDetails.set(
+      "paymentMethod",
+      paymentProvider || "SEON Fraud Test"
+    );
+    transactionDetails.set("seonTesting", true);
 
-    // Save initial transaction
     await transactionDetails.save(null, { useMasterKey: true });
     console.log("✅ Transaction record created:", transactionDetails.id);
 
+    // Extract card BIN (first 6 digits) and last 4 digits
+    const cardBin = cardNumber
+      ? cardNumber.replace(/\s/g, "").substring(0, 6)
+      : "";
+    const cardLast = cardNumber ? cardNumber.replace(/\s/g, "").slice(-4) : "";
+
+    // Convert card expiry from MM/YY to YYYY-MM format for SEON API
+    let formattedCardExpiry = "";
+    if (cardExpiry) {
+      const parts = cardExpiry.split("/");
+      if (parts.length === 2) {
+        const month = parts[0].padStart(2, "0");
+        const year = parts[1].length === 2 ? `20${parts[1]}` : parts[1];
+        formattedCardExpiry = `${year}-${month}`;
+      }
+    }
+
+    // Build SEON Transaction Monitoring payload (matching exact API spec)
+    const seonPayload = {
+      config: {
+        ip: {
+          include: "flags,history,id",
+          timeout: 3000,
+          version: "v1",
+        },
+        bin: {
+          timeout: 3000,
+        },
+        ip_api: true,
+        bin_api: !!cardBin,
+        device_fingerprinting: !!sessionId,
+        ignore_velocity_rules: false,
+        response_fields:
+          "id,state,fraud_score,ip_details,bin_details,device_details,version,applied_rules,calculation_time,seon_id",
+      },
+      // Action type for transaction monitoring
+      action_type: "purchase",
+
+      // Network & Device (using detected client IP)
+      ip: clientIp,
+      session: sessionId || "",
+      device_id: deviceId || "",
+
+      // User Information
+      user_id: userId || user.id,
+      user_name: userName || user.get("username") || "",
+      email: email || user.get("email") || "",
+      phone_number: phone || user.get("phoneNumber") || "",
+      user_fullname:
+        userFullname ||
+        `${firstName || ""} ${lastName || ""}`.trim() ||
+        user.get("name") ||
+        "",
+      user_country: userCountry || billingCountry || "US",
+      user_city: userCity || billingCity || "",
+      user_region: userRegion || billingRegion || "",
+      user_zip: userZip || billingZip || "",
+
+      // Transaction Information
+      transaction_id: merchantTransactionId,
+      transaction_type: transactionType || "deposit",
+      transaction_amount: parseFloat(transactionAmount) || 0,
+      transaction_currency: transactionCurrency || "USD",
+
+      // Payment Information
+      payment_mode: paymentMode || "credit_card",
+      payment_provider: paymentProvider || "manual_entry",
+      card_bin: cardBin,
+      card_last: cardLast,
+      card_hash: cardHash || "",
+      card_fullname:
+        cardFullname || `${firstName || ""} ${lastName || ""}`.trim(),
+      card_expire: formattedCardExpiry,
+      cvv_result: cvv ? true : false,
+      avs_result: avsResult || "U",
+      status_3d: status3d || "not_attempted",
+      sca_method: scaMethod || "none",
+
+      // Billing Address
+      billing_street: billingStreet || "",
+      billing_city: billingCity || "",
+      billing_region: billingRegion || "",
+      billing_zip: billingZip || "",
+      billing_country: billingCountry || "US",
+
+      // Custom Fields
+      custom_fields: customFields || {
+        platform: "getways",
+        is_test_transaction: true,
+        payment_method: "seon_fraud_check",
+      },
+    };
+
+    console.log("📤 Sending to SEON Transaction Monitoring API...");
+
     // Call SEON API
-    const result = await checkTransactionFraud({
-      email,
-      phone,
-      userName,
-      ip: ip || request.ip, // Use request IP if not provided
-      cardNumber,
-      cardExpiry,
-      cvv,
-      firstName,
-      lastName,
-      address,
-      city,
-      state,
-      zip,
-      country,
-      amount,
-      userId: userId || user.id,
-      sessionId,
-      deviceId,
-      paymentProvider,
-      avsResult,
-      status3d,
-      scaMethod
+    const response = await axios.post(SEON_API_URL, seonPayload, {
+      headers: {
+        "X-API-KEY": SEON_API_KEY,
+        "Content-Type": "application/json",
+      },
+      timeout: 10000,
     });
 
+    console.log("✅ SEON Response Received");
+    console.log("📥 Fraud Score:", response.data.data.fraud_score);
+    console.log("📥 State:", response.data.data.state);
+
+    // Extract fraud detection results
+    const fraudScore = response.data.data.fraud_score || 0;
+    const state = response.data.data.state || "UNKNOWN";
+    const appliedRules = response.data.data.applied_rules || [];
+
+    // Get recommendation
+    let recommendation = "UNKNOWN";
+    if (state === "APPROVE" || fraudScore < 10) {
+      recommendation = "APPROVE - Low Risk";
+    } else if (state === "REVIEW" || (fraudScore >= 10 && fraudScore < 20)) {
+      recommendation = "REVIEW - Medium Risk";
+    } else if (state === "DECLINE" || fraudScore >= 20) {
+      recommendation = "DECLINE - High Risk";
+    }
+
     // Update transaction with SEON results
-    transactionDetails.set("seonFraudScore", result.fraud_score);
-    transactionDetails.set("seonState", result.state);
-    transactionDetails.set("seonTransactionId", result.transaction_id);
-    transactionDetails.set("seonId", result.seon_id);
-    transactionDetails.set("seonRecommendation", result.recommendation);
-    transactionDetails.set("transactionIdFromStripe", result.transaction_id || merchantTransactionId);
-    
+    transactionDetails.set("seonFraudScore", fraudScore);
+    transactionDetails.set("seonState", state);
+    transactionDetails.set("seonTransactionId", response.data.data.id);
+    transactionDetails.set("seonId", response.data.data.seon_id);
+    transactionDetails.set("seonRecommendation", recommendation);
+    transactionDetails.set(
+      "transactionIdFromStripe",
+      response.data.data.id || merchantTransactionId
+    );
+
     // Set final status based on SEON result
-    if (result.state === "APPROVE" || result.fraud_score < 10) {
-      transactionDetails.set("status", 2); // approved (for testing - would be 2 for real transactions)
-      transactionDetails.set("responseMessage", "SEON: Low Risk - Transaction Approved");
-    } else if (result.state === "REVIEW" || (result.fraud_score >= 10 && result.fraud_score < 20)) {
+    if (state === "APPROVE" || fraudScore < 10) {
+      transactionDetails.set("status", 2); // approved
+      transactionDetails.set(
+        "responseMessage",
+        `SEON: Low Risk - Transaction Approved (Score: ${fraudScore})`
+      );
+    } else if (state === "REVIEW" || (fraudScore >= 10 && fraudScore < 20)) {
       transactionDetails.set("status", 1); // pending review
-      transactionDetails.set("responseMessage", "SEON: Medium Risk - Requires Review");
+      transactionDetails.set(
+        "responseMessage",
+        `SEON: Medium Risk - Requires Review (Score: ${fraudScore})`
+      );
     } else {
       transactionDetails.set("status", 10); // declined
-      transactionDetails.set("responseMessage", "SEON: High Risk - Transaction Declined");
+      transactionDetails.set(
+        "responseMessage",
+        `SEON: High Risk - Transaction Declined (Score: ${fraudScore})`
+      );
     }
 
     // Save applied rules as JSON string
-    if (result.applied_rules && result.applied_rules.length > 0) {
-      transactionDetails.set("seonAppliedRules", JSON.stringify(result.applied_rules));
+    if (appliedRules.length > 0) {
+      transactionDetails.set("seonAppliedRules", JSON.stringify(appliedRules));
     }
 
-    // Save updated transaction
     await transactionDetails.save(null, { useMasterKey: true });
     console.log("✅ Transaction updated with SEON results");
 
-    // Add transaction ID to response
-    result.transactionRecordId = transactionDetails.id;
-    result.merchantTransactionId = merchantTransactionId;
+    console.log("✅ SEON Transaction Monitoring Complete");
+    console.log("🎯 Fraud Score:", fraudScore);
+    console.log("🎯 State:", state);
+    console.log("🎯 Recommendation:", recommendation);
 
-    return result;
+    // Return pure SEON API response
+    return response.data;
   } catch (error) {
-    console.error("❌ Cloud Function Error:", error);
-    
+    console.error("❌ SEON Transaction Monitoring Error:");
+    console.error("Error Status:", error.response?.status);
+    console.error("Error Data:", error.response?.data);
+    console.error("Error Message:", error.message);
+
     // Try to update transaction as failed
     try {
       if (transactionDetails && transactionDetails.id) {
         transactionDetails.set("status", 10); // failed
-        transactionDetails.set("responseMessage", `SEON Error: ${error.message}`);
+        transactionDetails.set(
+          "responseMessage",
+          `SEON Error: ${error.message}`
+        );
+        transactionDetails.set("seonFraudScore", 100); // Max score on error
+        transactionDetails.set("seonState", "ERROR");
         await transactionDetails.save(null, { useMasterKey: true });
       }
     } catch (updateError) {
       console.error("❌ Failed to update transaction:", updateError);
     }
-    
-    throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, `SEON fraud check failed: ${error.message}`);
+
+    throw new Parse.Error(
+      Parse.Error.INTERNAL_SERVER_ERROR,
+      `SEON transaction monitoring failed: ${error.message}`
+    );
   }
 });
 
-module.exports = {
-  checkTransactionFraud,
-  getRecommendation
-};
+// ============================================
+// SEON ID VERIFICATION (IDV) - Document Scanning
+// ============================================
+
+// Create IDV session for document verification
+Parse.Cloud.define("createIDVSession", async (request) => {
+  const { userId, email, name } = request.params;
+
+  try {
+    const user = request.user || await new Parse.Query(Parse.User).get(userId, { useMasterKey: true });
+    
+    if (!user) {
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
+    }
+
+    console.log("🆔 Creating SEON IDV Session for:", user.get("email"));
+
+    // Generate unique reference ID for v2.0.0 SDK
+    const referenceId = `user_${userId}_${Date.now()}`;
+
+    // Save session to database
+    const IDVSession = Parse.Object.extend("IDVSession");
+    const sessionRecord = new IDVSession();
+    sessionRecord.set("userId", user.id);
+    sessionRecord.set("referenceId", referenceId);
+    sessionRecord.set("email", email);
+    sessionRecord.set("name", name);
+    sessionRecord.set("status", "created");
+    sessionRecord.set("createdAt", new Date());
+    await sessionRecord.save(null, { useMasterKey: true });
+
+    console.log("✅ IDV Session Created with referenceId:", referenceId);
+
+    return {
+      referenceId: referenceId,
+      baseUrl: 'https://idv-us.seon.io',
+      status: "created",
+    };
+
+  } catch (error) {
+    console.error("❌ IDV Session Creation Error:", error.message);
+    throw new Parse.Error(
+      Parse.Error.INTERNAL_SERVER_ERROR,
+      `Failed to create IDV session: ${error.message}`
+    );
+  }
+});
+
+// Complete IDV session after verification
+Parse.Cloud.define("completeIDVSession", async (request) => {
+  const { referenceId, status } = request.params;
+  const user = request.user;
+
+  try {
+    console.log("🆔 Completing IDV Session:", referenceId);
+    console.log("📊 Verification Status:", status);
+
+    // Find session record
+    const IDVSession = Parse.Object.extend("IDVSession");
+    const query = new Parse.Query(IDVSession);
+    query.equalTo("referenceId", referenceId);
+    const sessionRecord = await query.first({ useMasterKey: true });
+
+    if (!sessionRecord) {
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "IDV session not found");
+    }
+
+    // Update session with results
+    sessionRecord.set("status", status);
+    sessionRecord.set("completedAt", new Date());
+    await sessionRecord.save(null, { useMasterKey: true });
+
+    // Update user verification status
+    if (status === "success") {
+      user.set("idVerified", true);
+      user.set("idVerificationDate", new Date());
+      user.set("idVerificationReferenceId", referenceId);
+      await user.save(null, { useMasterKey: true });
+      console.log("✅ User ID Verified");
+    }
+
+    return {
+      success: true,
+      status: status,
+      verified: status === "success",
+      referenceId: referenceId,
+    };
+
+  } catch (error) {
+    console.error("❌ IDV Completion Error:", error.message);
+    throw new Parse.Error(
+      Parse.Error.INTERNAL_SERVER_ERROR,
+      `Failed to complete IDV session: ${error.message}`
+    );
+  }
+});
