@@ -30,11 +30,11 @@ const generateFiservHeaders = (body = '') => {
 };
 
 Parse.Cloud.define("fiservCreateCheckout", async (request) => {
-  const { amount, remark, customerInfo } = request.params || {};
+  const { amount, remark, customerInfo, type = "Getways", userId: paramUserId } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
 
   if (!amount) {
     throw new Parse.Error(Parse.Error.INVALID_JSON, "Amount is required.");
@@ -133,19 +133,25 @@ Parse.Cloud.define("fiservCreateCheckout", async (request) => {
 
     const fiservResponse = await response.json();
     
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    // Save transaction record - use Transactions table if type is AOG, otherwise TransactionRecords
+    const isAOG = type === "AOG";
+    const TableName = isAOG ? "Transactions" : "TransactionRecords";
+    const TransactionDetails = Parse.Object.extend(TableName);
     const transactionDetails = new TransactionDetails();
-    const user = await request.user.fetch({ useMasterKey: true });
+    const user = request.user ? await request.user.fetch({ useMasterKey: true }) : null;
+    
+    // Use paramUserId if provided (for AOG), otherwise use user.id
+    const finalUserId = paramUserId || user?.id || "";
 
     transactionDetails.set("type", "recharge");
     transactionDetails.set("gameId", "786");
-    transactionDetails.set("username", user.get("username") || "");
-    transactionDetails.set("userId", user.id);
+    transactionDetails.set("username", user?.get("username") || "");
+    transactionDetails.set("userId", finalUserId);
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parsedAmount);
     transactionDetails.set("remark", remark);
     transactionDetails.set("useWallet", false);
-    transactionDetails.set("userParentId", user.get("userParentId") || "");
+    transactionDetails.set("userParentId", user?.get("userParentId") || "");
     transactionDetails.set("status", 1);
     transactionDetails.set("portal", "FiservCheckout");
     transactionDetails.set("referralLink", fiservResponse.checkout?.redirectionUrl || "");
@@ -153,6 +159,11 @@ Parse.Cloud.define("fiservCreateCheckout", async (request) => {
     transactionDetails.set("merchantTransactionId", merchantTransactionId);
     transactionDetails.set("fiservOrderId", orderId);
     transactionDetails.set("fiservStoreId", process.env.FISERV_STORE_ID);
+    
+    // Add platform field for AOG transactions
+    if (isAOG) {
+      transactionDetails.set("platform", "AOGCOINCLUB");
+    }
 
     await transactionDetails.save(null, { useMasterKey: true });
 
@@ -173,9 +184,9 @@ Parse.Cloud.define("fiservCreateCheckout", async (request) => {
 Parse.Cloud.define("fiservGetCheckoutDetails", async (request) => {
   const { checkoutId } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
 
   if (!checkoutId) {
     throw new Parse.Error(Parse.Error.INVALID_JSON, "Checkout ID is required.");
