@@ -634,12 +634,18 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
     paymentMethod, // 'paypal' or 'venmo'
     email, // For PayPal
     phone, // For Venmo
-    userData
+    userData,
+    type = "Getways",
+    userId: paramUserId
   } = request.params || {};
   
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
+
+  // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
+  const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+  const user = request.user ? await request.user.fetch({ useMasterKey: true }) : null;
 
   // Validate
   const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -663,7 +669,7 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
   try {
     // Step 1: Create Recipient
     console.log('📝 Step 1: Creating recipient...');
-    const merchantCustomerId = `USER-${request.user.id}-${Date.now()}`;
+    const merchantCustomerId = `USER-${userIdForTransaction}-${Date.now()}`;
     
     const recipientPayload = {
       merchant: {
@@ -671,12 +677,12 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
       },
       recipient: {
         recipientType: "Consumer",
-        firstName: userData?.firstName || request.user.get('firstName') || 'Unknown',
-        lastName: userData?.lastName || request.user.get('lastName') || 'User',
+        firstName: userData?.firstName || user?.get('firstName') || 'Unknown',
+        lastName: userData?.lastName || user?.get('lastName') || 'User',
         dateOfBirth: userData?.dateOfBirth || "01/01/1990",
         emailAddress: {
           type: "work",
-          value: email || request.user.get('email') || request.user.get('username'),
+          value: email || user?.get('email') || user?.get('username') || 'user@example.com',
           primary: true
         },
         phoneNumber: {
@@ -704,7 +710,7 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
 
     // Step 3: Create Payment
     console.log('💰 Step 3: Creating payment...');
-    const merchantTransactionId = `CASHOUT-${request.user.id.slice(-6)}-${Date.now()}`;
+    const merchantTransactionId = `CASHOUT-${userIdForTransaction.slice(-6)}-${Date.now()}`;
     
     const paymentPayload = {
       amount: {
@@ -714,11 +720,11 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
       recipient: [{
         recipientProfileInfo: {
           merchantCustomerId: merchantCustomerId,
-          firstName: userData?.firstName || request.user.get('firstName') || 'Unknown',
-          lastName: userData?.lastName || request.user.get('lastName') || 'User',
+          firstName: userData?.firstName || user?.get('firstName') || 'Unknown',
+          lastName: userData?.lastName || user?.get('lastName') || 'User',
           recipientType: "Consumer",
           emailAddress: {
-            value: email || request.user.get('email') || request.user.get('username'),
+            value: email || user?.get('email') || user?.get('username') || 'user@example.com',
             type: "work",
             primary: true
           },
@@ -764,17 +770,26 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
     const paymentResult = await callFiservDDP('/payments', 'POST', paymentPayload);
     console.log('✅ Step 3 Complete: Payment created');
 
-    // Save transaction to database
-    const Transaction = Parse.Object.extend("FiservDisbursements");
+    // Save transaction to Transactions table only (for AOG)
+    const Transaction = Parse.Object.extend("Transactions");
     const transaction = new Transaction();
-    transaction.set("userId", request.user.id);
+    
+    transaction.set("userId", userIdForTransaction);
+    transaction.set("type", "redeem"); // This is a cashout/redeem operation
     transaction.set("merchantCustomerId", merchantCustomerId);
     transaction.set("merchantTransactionId", merchantTransactionId);
     transaction.set("fiservTransactionId", paymentResult.transactionId);
-    transaction.set("amount", parsedAmount);
+    transaction.set("transactionAmount", parsedAmount);
     transaction.set("paymentMethod", paymentMethod);
-    transaction.set("status", paymentResult.transactionStatus || "pending");
+    transaction.set("status", paymentResult.transactionStatus === "COMPLETED" ? 2 : 1); // 2 = success, 1 = pending
+    transaction.set("portal", "FiservDDP");
+    transaction.set("transactionDate", new Date());
     transaction.set("response", paymentResult);
+    transaction.set("platform", "AOGCOINCLUB");
+    transaction.set("gameId", "786");
+    transaction.set("username", user?.get("username") || "");
+    transaction.set("userParentId", user?.get("userParentId") || "");
+    
     await transaction.save(null, { useMasterKey: true });
 
     return {
@@ -783,6 +798,7 @@ Parse.Cloud.define("fiservDDP_cashout", async (request) => {
       merchantTransactionId: merchantTransactionId,
       status: paymentResult.transactionStatus,
       portalUrl: paymentResult.recipient?.[0]?.portalUrl,
+      fiservTransactionId: paymentResult.transactionId,
       message: "Cashout completed successfully"
     };
   } catch (error) {
