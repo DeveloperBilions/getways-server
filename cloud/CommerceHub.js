@@ -44,15 +44,17 @@ Parse.Cloud.define("commerceHubGetCredentials", async (request) => {
     amount, 
     remark,
     orderId,
-    customerInfo
+    customerInfo,
+    type = "Getways",
+    userId: paramUserId
   } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(
-      Parse.Error.SESSION_MISSING,
-      "Authentication required."
-    );
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(
+  //     Parse.Error.SESSION_MISSING,
+  //     "Authentication required."
+  //   );
+  // }
 
   // Validate required fields
   if (!amount) {
@@ -71,7 +73,9 @@ Parse.Cloud.define("commerceHubGetCredentials", async (request) => {
   }
 
   try {
-    const merchantTransactionId = generateMerchantTransactionId(request.user.id);
+    // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
+    const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+    const merchantTransactionId = generateMerchantTransactionId(userIdForTransaction);
     const finalOrderId = orderId || `ORDER-${Date.now()}`;
     
     // Validate required environment variables
@@ -122,26 +126,36 @@ Parse.Cloud.define("commerceHubGetCredentials", async (request) => {
 
       const credentialsData = response.data;
       
-      // Save transaction record
-      const TransactionDetails = Parse.Object.extend("TransactionRecords");
+      // Save transaction record - use Transactions table if type is AOG, otherwise TransactionRecords
+      const isAOG = type === "AOG";
+      const TableName = isAOG ? "Transactions" : "TransactionRecords";
+      const TransactionDetails = Parse.Object.extend(TableName);
       const transactionDetails = new TransactionDetails();
-      const user = await request.user.fetch({ useMasterKey: true });
+      const user = request.user ? await request.user.fetch({ useMasterKey: true }) : null;
+      
+      // Use paramUserId if provided (for AOG), otherwise use user.id
+      const finalUserId = paramUserId || user?.id || "";
 
       transactionDetails.set("type", "recharge");
       transactionDetails.set("gameId", "786");
-      transactionDetails.set("username", user.get("username") || "");
-      transactionDetails.set("userId", user.id);
+      transactionDetails.set("username", user?.get("username") || "");
+      transactionDetails.set("userId", finalUserId);
       transactionDetails.set("transactionDate", new Date());
       transactionDetails.set("transactionAmount", parsedAmount);
       transactionDetails.set("remark", remark);
       transactionDetails.set("useWallet", false);
-      transactionDetails.set("userParentId", user.get("userParentId") || "");
+      transactionDetails.set("userParentId", user?.get("userParentId") || "");
       transactionDetails.set("status", 1); // pending
       transactionDetails.set("portal", "CommerceHub");
       transactionDetails.set("merchantTransactionId", merchantTransactionId);
       transactionDetails.set("commerceHubOrderId", finalOrderId);
       transactionDetails.set("commerceHubSessionId", credentialsData.sessionId || "");
       transactionDetails.set("commerceHubAccessToken", credentialsData.accessToken || "");
+      
+      // Add platform field for AOG transactions
+      if (isAOG) {
+        transactionDetails.set("platform", "AOGCOINCLUB");
+      }
 
       await transactionDetails.save(null, { useMasterKey: true });
 
@@ -204,12 +218,12 @@ Parse.Cloud.define("commerceHubProcessPayment", async (request) => {
     transactionId
   } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(
-      Parse.Error.SESSION_MISSING,
-      "Authentication required."
-    );
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(
+  //     Parse.Error.SESSION_MISSING,
+  //     "Authentication required."
+  //   );
+  // }
 
   if (!sessionId) {
     throw new Parse.Error(
