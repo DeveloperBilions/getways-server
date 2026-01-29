@@ -175,7 +175,7 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
     transactionDetails.set("remark", remark);
     transactionDetails.set("useWallet", false);
     transactionDetails.set("userParentId", user?.get("userParentId") || "");
-    transactionDetails.set("status", 1); // pending
+    transactionDetails.set("status", 2); // pending
     transactionDetails.set("portal", "Fiserv");
     transactionDetails.set("referralLink", fiservResponse.paymentLink?.paymentLinkUrl || "");
     transactionDetails.set("transactionIdFromStripe", fiservResponse.paymentLink?.paymentLinkId || "");
