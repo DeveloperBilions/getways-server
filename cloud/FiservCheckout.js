@@ -46,7 +46,9 @@ Parse.Cloud.define("fiservCreateCheckout", async (request) => {
   }
 
   try {
-    const merchantTransactionId = generateMerchantTransactionId(request.user.id);
+    // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
+    const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+    const merchantTransactionId = generateMerchantTransactionId(userIdForTransaction);
     const orderId = `ORDER-${Date.now()}`;
     
     const requiredEnvVars = ['FISERV_STORE_ID', 'FISERV_API_KEY', 'FISERV_SECRET_KEY', 'FISERV_API_URL', 'FRONTEND_URL'];

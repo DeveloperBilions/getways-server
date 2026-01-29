@@ -70,7 +70,9 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
   }
 
   try {
-    const merchantTransactionId = generateMerchantTransactionId(request.user.id);
+    // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
+    const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+    const merchantTransactionId = generateMerchantTransactionId(userIdForTransaction);
     const finalOrderId = orderId || `ORDER-${Date.now()}`;
     
     // Calculate expiry date
