@@ -216,11 +216,11 @@ Parse.Cloud.define("affirmCreateCredentials", async (request) => {
 
 // Initialize recharge with Affirm BNPL
 Parse.Cloud.define("affirmInitRecharge", async (request) => {
-  const { amount, remark, customerInfo, billingAddress, shippingAddress, orderData } = request.params || {};
+  const { amount, remark, customerInfo, billingAddress, shippingAddress, orderData, type = "Getways", userId: paramUserId } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
 
   if (!amount) {
     throw new Parse.Error(Parse.Error.INVALID_JSON, "Amount is required.");
@@ -232,8 +232,10 @@ Parse.Cloud.define("affirmInitRecharge", async (request) => {
   }
 
   try {
-    const user = await request.user.fetch({ useMasterKey: true });
-    const merchantTransactionId = generateMerchantTransactionId(user.id);
+    // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
+    const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+    const user = request.user ? await request.user.fetch({ useMasterKey: true }) : null;
+    const merchantTransactionId = generateMerchantTransactionId(userIdForTransaction);
 
     // Get security credentials for Affirm - call without sessionToken since it's an internal call
     const credentialsResponse = await Parse.Cloud.run(
@@ -248,23 +250,30 @@ Parse.Cloud.define("affirmInitRecharge", async (request) => {
       { useMasterKey: true }
     );
 
-    // Create transaction record
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    // Create transaction record - use Transactions table if type is AOG, otherwise TransactionRecords
+    const isAOG = type === "AOG";
+    const TableName = isAOG ? "Transactions" : "TransactionRecords";
+    const TransactionDetails = Parse.Object.extend(TableName);
     const transactionDetails = new TransactionDetails();
 
     transactionDetails.set("type", "recharge");
     transactionDetails.set("gameId", "786");
-    transactionDetails.set("username", user.get("username") || "");
-    transactionDetails.set("userId", user.id);
+    transactionDetails.set("username", user?.get("username") || "");
+    transactionDetails.set("userId", userIdForTransaction);
     transactionDetails.set("transactionDate", new Date());
     transactionDetails.set("transactionAmount", parsedAmount);
     transactionDetails.set("remark", remark || "Affirm BNPL Recharge");
     transactionDetails.set("useWallet", false);
-    transactionDetails.set("userParentId", user.get("userParentId") || "");
+    transactionDetails.set("userParentId", user?.get("userParentId") || "");
     transactionDetails.set("status", 1); // Pending
     transactionDetails.set("portal", "Affirm");
     transactionDetails.set("merchantTransactionId", merchantTransactionId);
     transactionDetails.set("sessionId", credentialsResponse.sessionId);
+    
+    // Add platform field for AOG transactions
+    if (isAOG) {
+      transactionDetails.set("platform", "AOGCOINCLUB");
+    }
 
     await transactionDetails.save(null, { useMasterKey: true });
 
@@ -288,11 +297,11 @@ Parse.Cloud.define("affirmInitRecharge", async (request) => {
 
 // STEP 5: Submit a Checkouts Orders request
 Parse.Cloud.define("affirmCreateOrder", async (request) => {
-  const { transactionId, affirmOrderId, affirmTransactionId } = request.params || {};
+  const { transactionId, affirmOrderId, affirmTransactionId, type = "Getways" } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
 
   if (!transactionId || !affirmOrderId) {
     throw new Parse.Error(
@@ -302,8 +311,10 @@ Parse.Cloud.define("affirmCreateOrder", async (request) => {
   }
 
   try {
-    // Get transaction record
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    // Get transaction record - check both tables
+    const isAOG = type === "AOG";
+    const TableName = isAOG ? "Transactions" : "TransactionRecords";
+    const TransactionDetails = Parse.Object.extend(TableName);
     const query = new Parse.Query(TransactionDetails);
     query.equalTo("objectId", transactionId);
     
@@ -385,19 +396,21 @@ Parse.Cloud.define("affirmCreateOrder", async (request) => {
 
 // STEP 6: Authorize the Affirm Order
 Parse.Cloud.define("affirmAuthorizeOrder", async (request) => {
-  const { transactionId } = request.params || {};
+  const { transactionId, type = "Getways" } = request.params || {};
 
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  // if (!request.user) {
+  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+  // }
 
   if (!transactionId) {
     throw new Parse.Error(Parse.Error.INVALID_JSON, "Transaction ID is required.");
   }
 
   try {
-    // Get transaction record
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    // Get transaction record - check both tables
+    const isAOG = type === "AOG";
+    const TableName = isAOG ? "Transactions" : "TransactionRecords";
+    const TransactionDetails = Parse.Object.extend(TableName);
     const query = new Parse.Query(TransactionDetails);
     query.equalTo("objectId", transactionId);
     
@@ -494,7 +507,9 @@ Parse.Cloud.define("affirmAuthorizeOrder", async (request) => {
     
     // Try to update transaction status
     try {
-      const TransactionDetails = Parse.Object.extend("TransactionRecords");
+      const isAOG = type === "AOG";
+      const TableName = isAOG ? "Transactions" : "TransactionRecords";
+      const TransactionDetails = Parse.Object.extend(TableName);
       const query = new Parse.Query(TransactionDetails);
       query.equalTo("objectId", transactionId);
       const transaction = await query.first({ useMasterKey: true });
