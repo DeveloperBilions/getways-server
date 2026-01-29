@@ -43,7 +43,9 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
     customerInfo,
     expiryHours = 24, 
     type = "Getways",
-    userId: paramUserId
+    userId: paramUserId,
+    gc_coins,
+    sc_coins
   } = request.params || {};
 
   // if (!request.user) {
@@ -180,7 +182,9 @@ Parse.Cloud.define("fiservCreatePaymentLink", async (request) => {
     transactionDetails.set("merchantTransactionId", merchantTransactionId);
     transactionDetails.set("fiservOrderId", finalOrderId);
     transactionDetails.set("fiservCheckoutId", fiservResponse.paymentLink?.checkoutId || "");
-    
+    transactionDetails.set("sc_coins", Number(sc_coins) || 0);
+    transactionDetails.set("gc_coins", Number(gc_coins) || 0);
+
     // Add platform field for AOG transactions
     if (isAOG) {
       transactionDetails.set("platform", "AOGCOINCLUB");

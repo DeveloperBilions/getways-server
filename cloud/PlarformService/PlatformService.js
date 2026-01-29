@@ -193,8 +193,12 @@ Parse.Cloud.afterSave("Transactions", async (request) => {
     transactionIdFromStripe: tx.get("transactionIdFromStripe"),
     createdAt: tx.createdAt,
     updatedAt: tx.updatedAt,
-    sc_coins:tx.get("sc_coins"),
-    gc_coins: tx.get("gc_coins")
+    gc_coins: tx.get("gc_coins"),
+    sc_coins: tx.get("sc_coins"),
+    portal: tx.get("portal"), // Portal information (optional)
+    transactionDate: tx.get("transactionDate"), // Transaction date (optional)
+    createdAt: tx.createdAt, // Parse object creation date
+    updatedAt: tx.updatedAt,
   };
 
   // 4️⃣  Optional: sign the body with HMAC-SHA256 so the receiver can verify
