@@ -267,98 +267,126 @@ Parse.Cloud.define("checkFiservPaymentsRecharge", async (request) => {
   try {
     console.log("🔄 Starting Fiserv payment status check...");
 
-    // Find all pending Fiserv transactions
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
-    const query = new Parse.Query(TransactionDetails);
-    query.equalTo("portal", "Fiserv");
-    query.equalTo("status", 1); // pending
-    query.limit(100);
+    // Helper function to process transactions from a specific table
+    const processTransactionsFromTable = async (tableName) => {
+      const TransactionDetails = Parse.Object.extend(tableName);
+      const query = new Parse.Query(TransactionDetails);
+      query.equalTo("portal", "Fiserv");
+      query.equalTo("status", 1); // pending
+      query.limit(100);
 
-    const pendingTransactions = await query.find({ useMasterKey: true });
-    console.log(`📊 Found ${pendingTransactions.length} pending Fiserv transactions`);
+      const pendingTransactions = await query.find({ useMasterKey: true });
+      console.log(`📊 Found ${pendingTransactions.length} pending Fiserv transactions in ${tableName}`);
 
-    let processedCount = 0;
-    let successCount = 0;
-    let failedCount = 0;
+      let processedCount = 0;
+      let successCount = 0;
+      let failedCount = 0;
 
-    for (const transaction of pendingTransactions) {
-      try {
-        const paymentLinkId = transaction.get("transactionIdFromStripe");
-        if (!paymentLinkId) {
-          console.log(`⚠️ No payment link ID for transaction ${transaction.id}`);
-          continue;
-        }
+      for (const transaction of pendingTransactions) {
+        try {
+          const paymentLinkId = transaction.get("transactionIdFromStripe");
+          if (!paymentLinkId) {
+            console.log(`⚠️ No payment link ID for transaction ${transaction.id} in ${tableName}`);
+            continue;
+          }
 
-        // Get payment link details from Fiserv
-        const headers = generateFiservHeaders();
-        const response = await fetch(`${process.env.FISERV_API_URL}/payment-links/${paymentLinkId}`, {
-          method: 'GET',
-          headers: headers
-        });
+          // Get payment link details from Fiserv
+          const headers = generateFiservHeaders();
+          const response = await fetch(`${process.env.FISERV_API_URL}/payment-links/${paymentLinkId}`, {
+            method: 'GET',
+            headers: headers
+          });
 
-        if (!response.ok) {
-          console.log(`❌ Fiserv API error for transaction ${transaction.id}: ${response.status}`);
-          continue;
-        }
+          if (!response.ok) {
+            console.log(`❌ Fiserv API error for transaction ${transaction.id} in ${tableName}: ${response.status}`);
+            continue;
+          }
 
-        const fiservData = await response.json();
-        
-        // Check both transactionStatus and ipgTransactionDetails.transactionStatus
-        const transactionStatus = fiservData.transactionStatus;
-        const ipgTransactionStatus = fiservData.ipgTransactionDetails?.transactionStatus;
-        const approvalCode = fiservData.ipgTransactionDetails?.approvalCode;
-        
-        console.log(`📋 Transaction ${transaction.id} - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}, Approval: ${approvalCode}`);
-
-        // Check if payment is approved (both main status and IPG status should be APPROVED)
-        if (transactionStatus === "APPROVED" && ipgTransactionStatus === "APPROVED") {
-          // Payment successful - update balance and transaction status
-          const userId = transaction.get("userId");
-          const amount = transaction.get("transactionAmount");
-
-          // Update pot balance using the correct pattern
-          const parentUserId = await getParentUserId(userId);
-          await updatePotBalance(parentUserId, amount, "recharge");
+          const fiservData = await response.json();
           
-          transaction.set("status", 2); // completed
-          transaction.set("fiservTransactionStatus", transactionStatus);
-          transaction.set("fiservIpgStatus", ipgTransactionStatus);
-          transaction.set("fiservApprovalCode", approvalCode);
-          transaction.set("completedAt", new Date());
-          await transaction.save(null, { useMasterKey: true });
+          // Check both transactionStatus and ipgTransactionDetails.transactionStatus
+          const transactionStatus = fiservData.transactionStatus;
+          const ipgTransactionStatus = fiservData.ipgTransactionDetails?.transactionStatus;
+          const approvalCode = fiservData.ipgTransactionDetails?.approvalCode;
           
-          console.log(`✅ Transaction ${transaction.id} completed successfully with approval code: ${approvalCode}`);
-          successCount++;
-        } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
-                   ["FAILED", "DECLINED", "FRAUD"].includes(ipgTransactionStatus)) {
-          // Payment failed
-          transaction.set("status", 9); // failed
-          transaction.set("fiservTransactionStatus", transactionStatus);
-          transaction.set("fiservIpgStatus", ipgTransactionStatus);
-          transaction.set("failedAt", new Date());
-          await transaction.save(null, { useMasterKey: true });
-          
-          console.log(`❌ Transaction ${transaction.id} failed - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
+          console.log(`📋 Transaction ${transaction.id} (${tableName}) - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}, Approval: ${approvalCode}`);
+
+          // Check if payment is approved (both main status and IPG status should be APPROVED)
+          if (transactionStatus === "APPROVED" && ipgTransactionStatus === "APPROVED") {
+            // Payment successful - update transaction status
+            transaction.set("status", 2); // completed
+            
+            // Only update pot balance and Fiserv fields for TransactionRecords table
+            if (tableName === "TransactionRecords") {
+              const userId = transaction.get("userId");
+              const amount = transaction.get("transactionAmount");
+
+              // Update pot balance using the correct pattern
+              const parentUserId = await getParentUserId(userId);
+              await updatePotBalance(parentUserId, amount, "recharge");
+              
+              transaction.set("fiservTransactionStatus", transactionStatus);
+              transaction.set("fiservIpgStatus", ipgTransactionStatus);
+              transaction.set("fiservApprovalCode", approvalCode);
+              transaction.set("completedAt", new Date());
+            }
+            
+            await transaction.save(null, { useMasterKey: true });
+            
+            console.log(`✅ Transaction ${transaction.id} (${tableName}) completed successfully with approval code: ${approvalCode}`);
+            successCount++;
+          } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
+                     ["FAILED", "DECLINED", "FRAUD"].includes(ipgTransactionStatus)) {
+            // Payment failed
+            transaction.set("status", 9); // failed
+            
+            // Only set Fiserv fields for TransactionRecords table
+            if (tableName === "TransactionRecords") {
+              transaction.set("fiservTransactionStatus", transactionStatus);
+              transaction.set("fiservIpgStatus", ipgTransactionStatus);
+              transaction.set("failedAt", new Date());
+            }
+            
+            await transaction.save(null, { useMasterKey: true });
+            
+            console.log(`❌ Transaction ${transaction.id} (${tableName}) failed - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
+            failedCount++;
+          } else {
+            // Payment still in progress (INITIATED, WAITING, etc.)
+            console.log(`⏳ Transaction ${transaction.id} (${tableName}) still in progress - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
+          }
+
+          processedCount++;
+        } catch (error) {
+          console.error(`Error processing transaction ${transaction.id} in ${tableName}:`, error);
           failedCount++;
-        } else {
-          // Payment still in progress (INITIATED, WAITING, etc.)
-          console.log(`⏳ Transaction ${transaction.id} still in progress - Status: ${transactionStatus}, IPG Status: ${ipgTransactionStatus}`);
         }
-
-        processedCount++;
-      } catch (error) {
-        console.error(`Error processing transaction ${transaction.id}:`, error);
-        failedCount++;
       }
-    }
 
-    console.log(`🏁 Fiserv payment check completed: ${processedCount} processed, ${successCount} successful, ${failedCount} failed`);
+      return { processedCount, successCount, failedCount };
+    };
+
+    // Process transactions from both tables
+    const transactionRecordsResults = await processTransactionsFromTable("TransactionRecords");
+    const transactionsResults = await processTransactionsFromTable("Transactions");
+
+    const totalProcessed = transactionRecordsResults.processedCount + transactionsResults.processedCount;
+    const totalSuccessful = transactionRecordsResults.successCount + transactionsResults.successCount;
+    const totalFailed = transactionRecordsResults.failedCount + transactionsResults.failedCount;
+
+    console.log(`🏁 Fiserv payment check completed: ${totalProcessed} processed, ${totalSuccessful} successful, ${totalFailed} failed`);
+    console.log(`📊 TransactionRecords: ${transactionRecordsResults.processedCount} processed, ${transactionRecordsResults.successCount} successful, ${transactionRecordsResults.failedCount} failed`);
+    console.log(`📊 Transactions: ${transactionsResults.processedCount} processed, ${transactionsResults.successCount} successful, ${transactionsResults.failedCount} failed`);
     
     return {
       success: true,
-      processed: processedCount,
-      successful: successCount,
-      failed: failedCount
+      processed: totalProcessed,
+      successful: totalSuccessful,
+      failed: totalFailed,
+      details: {
+        transactionRecords: transactionRecordsResults,
+        transactions: transactionsResults
+      }
     };
 
   } catch (error) {
@@ -378,35 +406,57 @@ Parse.Cloud.define("expireOldFiservTransactions", async (request) => {
     const cutoffTime = new Date();
     cutoffTime.setMinutes(cutoffTime.getMinutes() - 45); // 45 minutes ago
 
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
-    const query = new Parse.Query(TransactionDetails);
-    query.equalTo("portal", "Fiserv");
-    query.equalTo("status", 1); // pending
-    query.lessThan("createdAt", cutoffTime);
-    query.limit(100);
+    // Helper function to expire transactions from a specific table
+    const expireTransactionsFromTable = async (tableName) => {
+      const TransactionDetails = Parse.Object.extend(tableName);
+      const query = new Parse.Query(TransactionDetails);
+      query.equalTo("portal", "Fiserv");
+      query.equalTo("status", 1); // pending
+      query.lessThan("createdAt", cutoffTime);
+      query.limit(100);
 
-    const expiredTransactions = await query.find({ useMasterKey: true });
-    console.log(`📊 Found ${expiredTransactions.length} expired Fiserv transactions`);
+      const expiredTransactions = await query.find({ useMasterKey: true });
+      console.log(`📊 Found ${expiredTransactions.length} expired Fiserv transactions in ${tableName}`);
 
-    let expiredCount = 0;
+      let expiredCount = 0;
 
-    for (const transaction of expiredTransactions) {
-      try {
-        transaction.set("status", 9); // expired
-        transaction.set("expiredAt", new Date());
-        await transaction.save(null, { useMasterKey: true });
-        expiredCount++;
-        console.log(`⏰ Expired transaction ${transaction.id}`);
-      } catch (error) {
-        console.error(`Error expiring transaction ${transaction.id}:`, error);
+      for (const transaction of expiredTransactions) {
+        try {
+          transaction.set("status", 9); // expired
+          
+          // Only set expiredAt timestamp for TransactionRecords table
+          if (tableName === "TransactionRecords") {
+            transaction.set("expiredAt", new Date());
+          }
+          
+          await transaction.save(null, { useMasterKey: true });
+          expiredCount++;
+          console.log(`⏰ Expired transaction ${transaction.id} in ${tableName}`);
+        } catch (error) {
+          console.error(`Error expiring transaction ${transaction.id} in ${tableName}:`, error);
+        }
       }
-    }
 
-    console.log(`🏁 Fiserv expiration completed: ${expiredCount} transactions expired`);
+      return expiredCount;
+    };
+
+    // Expire transactions from both tables
+    const transactionRecordsExpired = await expireTransactionsFromTable("TransactionRecords");
+    const transactionsExpired = await expireTransactionsFromTable("Transactions");
+
+    const totalExpired = transactionRecordsExpired + transactionsExpired;
+
+    console.log(`🏁 Fiserv expiration completed: ${totalExpired} transactions expired`);
+    console.log(`📊 TransactionRecords: ${transactionRecordsExpired} expired`);
+    console.log(`📊 Transactions: ${transactionsExpired} expired`);
     
     return {
       success: true,
-      expired: expiredCount
+      expired: totalExpired,
+      details: {
+        transactionRecords: transactionRecordsExpired,
+        transactions: transactionsExpired
+      }
     };
 
   } catch (error) {
@@ -439,20 +489,31 @@ Parse.Cloud.define("fiservWebhookHandler", async (request) => {
       approvedAmount 
     } = webhookData;
 
-    // Find the transaction record
-    const TransactionRecords = Parse.Object.extend("TransactionRecords");
-    const query = new Parse.Query(TransactionRecords);
-    query.equalTo("transactionIdFromStripe", paymentLinkId);
-    query.equalTo("portal", "Fiserv");
-    
-    const transaction = await query.first({ useMasterKey: true });
+    // Helper function to find transaction in a specific table
+    const findTransactionInTable = async (tableName) => {
+      const TransactionTable = Parse.Object.extend(tableName);
+      const query = new Parse.Query(TransactionTable);
+      query.equalTo("transactionIdFromStripe", paymentLinkId);
+      query.equalTo("portal", "Fiserv");
+      
+      return await query.first({ useMasterKey: true });
+    };
+
+    // Try to find the transaction in both tables
+    let transaction = await findTransactionInTable("TransactionRecords");
+    let tableName = "TransactionRecords";
     
     if (!transaction) {
-      console.warn(`⚠️ No transaction found for payment link: ${paymentLinkId}`);
+      transaction = await findTransactionInTable("Transactions");
+      tableName = "Transactions";
+    }
+    
+    if (!transaction) {
+      console.warn(`⚠️ No transaction found for payment link: ${paymentLinkId} in either table`);
       return { success: false, error: "Transaction not found" };
     }
 
-    console.log(`🔄 Processing webhook for transaction ${transaction.id}`);
+    console.log(`🔄 Processing webhook for transaction ${transaction.id} in ${tableName}`);
 
     // Check if payment is successful
     const ipgStatus = ipgTransactionDetails?.transactionStatus;
@@ -460,51 +521,64 @@ Parse.Cloud.define("fiservWebhookHandler", async (request) => {
     
     if (transactionStatus === "APPROVED" && ipgStatus === "APPROVED") {
       // Payment successful
-      const userId = transaction.get("userId");
-      const amount = transaction.get("transactionAmount");
-
-      // Update pot balance
-      const parentUserId = await getParentUserId(userId);
-      await updatePotBalance(parentUserId, amount, "recharge");
-      
       transaction.set("status", 2); // completed
-      transaction.set("fiservTransactionStatus", transactionStatus);
-      transaction.set("fiservIpgStatus", ipgStatus);
-      transaction.set("fiservApprovalCode", approvalCode);
-      transaction.set("webhookProcessedAt", new Date());
+      
+      // Only update pot balance and Fiserv fields for TransactionRecords table
+      if (tableName === "TransactionRecords") {
+        const userId = transaction.get("userId");
+        const amount = transaction.get("transactionAmount");
+
+        // Update pot balance
+        const parentUserId = await getParentUserId(userId);
+        await updatePotBalance(parentUserId, amount, "recharge");
+        
+        transaction.set("fiservTransactionStatus", transactionStatus);
+        transaction.set("fiservIpgStatus", ipgStatus);
+        transaction.set("fiservApprovalCode", approvalCode);
+        transaction.set("webhookProcessedAt", new Date());
+      }
+      
       await transaction.save(null, { useMasterKey: true });
       
-      console.log(`✅ Webhook processed: Transaction ${transaction.id} completed successfully`);
+      console.log(`✅ Webhook processed: Transaction ${transaction.id} (${tableName}) completed successfully`);
       
       return { 
         success: true, 
         message: "Payment processed successfully",
-        transactionId: transaction.id
+        transactionId: transaction.id,
+        tableName: tableName
       };
     } else if (["FAILED", "DECLINED", "FRAUD"].includes(transactionStatus) || 
                ["FAILED", "DECLINED", "FRAUD"].includes(ipgStatus)) {
       // Payment failed
       transaction.set("status", 9); // failed
-      transaction.set("fiservTransactionStatus", transactionStatus);
-      transaction.set("fiservIpgStatus", ipgStatus);
-      transaction.set("webhookProcessedAt", new Date());
+      
+      // Only set Fiserv fields for TransactionRecords table
+      if (tableName === "TransactionRecords") {
+        transaction.set("fiservTransactionStatus", transactionStatus);
+        transaction.set("fiservIpgStatus", ipgStatus);
+        transaction.set("webhookProcessedAt", new Date());
+      }
+      
       await transaction.save(null, { useMasterKey: true });
       
-      console.log(`❌ Webhook processed: Transaction ${transaction.id} failed`);
+      console.log(`❌ Webhook processed: Transaction ${transaction.id} (${tableName}) failed`);
       
       return { 
         success: true, 
         message: "Payment failure processed",
-        transactionId: transaction.id
+        transactionId: transaction.id,
+        tableName: tableName
       };
     } else {
       // Payment still in progress
-      console.log(`⏳ Webhook processed: Transaction ${transaction.id} still in progress`);
+      console.log(`⏳ Webhook processed: Transaction ${transaction.id} (${tableName}) still in progress`);
       
       return { 
         success: true, 
         message: "Payment status updated",
-        transactionId: transaction.id
+        transactionId: transaction.id,
+        tableName: tableName
       };
     }
 
