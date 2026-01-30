@@ -32,6 +32,7 @@ async function loadModule() {
     await import('./CommerceHubHostedCheckout.js')
     await import('./AffirmHostedCheckout.js')
     await import('./PazeHostedCheckout.js')
+    await import('./Seon.js')
 }
 
 loadModule();

@@ -412,3 +412,36 @@ Parse.Cloud.define("completeIDVSession", async (request) => {
     );
   }
 });
+
+// Check user's ID verification status (for Fiserv mid-layer)
+Parse.Cloud.define("checkIDVerificationStatus", async (request) => {
+  const { userId } = request.params;
+  
+  try {
+    const query = new Parse.Query(Parse.User);
+    query.equalTo("objectId", userId);
+    const user = await query.first({ useMasterKey: true });
+
+    if (!user) {
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
+    }
+
+    const verified = user.get("idVerified") === true;
+    const verificationDate = user.get("idVerificationDate");
+    const referenceId = user.get("idVerificationReferenceId");
+
+    return {
+      verified: verified,
+      verificationDate: verificationDate,
+      referenceId: referenceId,
+      message: verified ? "User is ID verified" : "User needs ID verification",
+    };
+
+  } catch (error) {
+    console.error("❌ Check IDV Status Error:", error.message);
+    throw new Parse.Error(
+      Parse.Error.INTERNAL_SERVER_ERROR,
+      `Failed to check ID verification status: ${error.message}`
+    );
+  }
+});
