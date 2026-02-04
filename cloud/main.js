@@ -30,6 +30,7 @@ async function loadModule() {
     await import('./cellpay.js')
     await import('./CommerceHub.js')
     await import('./CommerceHubHostedCheckout.js')
+    await import('./CommerceHubHostedFields.js')
     await import('./AffirmHostedCheckout.js')
     await import('./PazeHostedCheckout.js')
     await import('./Seon.js')
