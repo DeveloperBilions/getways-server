@@ -1,10 +1,8 @@
 const crypto = require('crypto');
 const axios = require('axios');
-const { getParentUserId, updatePotBalance } = require('./utility/utlis');
+const { getParentUserId, updatePotBalance } = require('../../utility/utlis');
 
 console.log('🔄 Loading AffirmHostedCheckout.js file...');
-
-
 
 const generateCommerceHubSignature = (apiKey, apiSecret, requestBody, timestamp, clientRequestId) => {
   const rawSignature = `${apiKey}${clientRequestId}${timestamp}${requestBody}`;

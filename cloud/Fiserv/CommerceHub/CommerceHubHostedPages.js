@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const axios = require('axios');
-const { getParentUserId, updatePotBalance } = require('./utility/utlis');
+const { getParentUserId, updatePotBalance } = require('../../utility/utlis');
 
 console.log('🔄 Loading CommerceHub.js file...');
 

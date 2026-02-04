@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const fetch = require('node-fetch');
-const { getParentUserId, updatePotBalance } = require('./utility/utlis');
+const { getParentUserId, updatePotBalance } = require('../utility/utlis');
 
 console.log('🔄 Loading FiservCheckout.js file...');
 
