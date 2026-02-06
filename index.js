@@ -133,52 +133,52 @@ ParseServer.createLiveQueryServer(httpServer);
   // callReadExcelFile();
 
   // Runs every 30 seconds to perform rapid checks and updates on transactions:
-  // setInterval(async () => {
-  //   try {
-  //    // console.log("Running cloud function every 30 seconds...");
+  setInterval(async () => {
+    try {
+     // console.log("Running cloud function every 30 seconds...");
       
-  //     // Run all cron jobs in parallel using Promise.allSettled for better performance
-  //     const cronJobs = [
-  //       Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"),
-  //       Parse.Cloud.run("checkRecentPendingWertTransactions"),
-  //       Parse.Cloud.run("verifyCryptoRecharge"),
-  //       Parse.Cloud.run("verifyCryptoRechargeForCoinBase"),
-  //       Parse.Cloud.run("verifyRechargeForPayarc"),
-  //       Parse.Cloud.run("checkTransactionStatusStripe"),
-  //       Parse.Cloud.run("checkTransactionStatusFinix"),
-  //       Parse.Cloud.run("expireOldCLKKTransactions"),
-  //       Parse.Cloud.run("checkClkkPayments"),
-  //       Parse.Cloud.run("expireOldAuthorizeNetTransactions"),
-  //       Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge"),
-  //       Parse.Cloud.run("expireOldFiservTransactions"),
-  //       Parse.Cloud.run("checkFiservPaymentsRecharge"),
-  //       Parse.Cloud.run("expireOldFiservCheckoutTransactions"),
-  //       Parse.Cloud.run("checkFiservCheckoutRecharge"),
-  //       Parse.Cloud.run("checkTotalLiquorTransactionStatus"),
-  //       Parse.Cloud.run("checkClkkPaymentsRecharge"),
-  //       Parse.Cloud.run("cellpayBtcTxnStatus"),
-  //       Parse.Cloud.run("updateCellPayPayoutStatuses")
-  //     ];
+      // Run all cron jobs in parallel using Promise.allSettled for better performance
+      const cronJobs = [
+        Parse.Cloud.run("checkRecentPendingWertTransactionsAOG"),
+        Parse.Cloud.run("checkRecentPendingWertTransactions"),
+        Parse.Cloud.run("verifyCryptoRecharge"),
+        Parse.Cloud.run("verifyCryptoRechargeForCoinBase"),
+        Parse.Cloud.run("verifyRechargeForPayarc"),
+        Parse.Cloud.run("checkTransactionStatusStripe"),
+        Parse.Cloud.run("checkTransactionStatusFinix"),
+        Parse.Cloud.run("expireOldCLKKTransactions"),
+        Parse.Cloud.run("checkClkkPayments"),
+        Parse.Cloud.run("expireOldAuthorizeNetTransactions"),
+        Parse.Cloud.run("checkAuthorizeNetPaymentsRecharge"),
+        Parse.Cloud.run("expireOldFiservTransactions"),
+        Parse.Cloud.run("checkFiservPaymentsRecharge"),
+        Parse.Cloud.run("expireOldFiservCheckoutTransactions"),
+        Parse.Cloud.run("checkFiservCheckoutRecharge"),
+        Parse.Cloud.run("checkTotalLiquorTransactionStatus"),
+        Parse.Cloud.run("checkClkkPaymentsRecharge"),
+        Parse.Cloud.run("cellpayBtcTxnStatus"),
+        Parse.Cloud.run("updateCellPayPayoutStatuses")
+      ];
 
-  //     const results = await Promise.allSettled(cronJobs);
+      const results = await Promise.allSettled(cronJobs);
       
-  //     // Log any failures
-  //     results.forEach((result, index) => {
-  //       if (result.status === 'rejected') {
-  //         console.error(`Cron job ${index} failed:`, result.reason);
-  //       }
-  //     });
+      // Log any failures
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Cron job ${index} failed:`, result.reason);
+        }
+      });
 
-  //    //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
+     //     await Parse.Cloud.run("verifyCoinbaseTransactionByPartnerRef"); // Checks and updates transaction statuses from Stripe.
 
 
-  //   //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
-  //   //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
-  //   //  await Parse.Cloud.run("expireOldTransfiTransactions")
-  //   } catch (error) {
-  //     console.error("Error running cloud function:", error);
-  //   }
-  // }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
+    //   await Parse.Cloud.run("checkKycStatusTransfi"); // Checks and updates transaction statuses from Stripe.
+    //   await Parse.Cloud.run("expireTransfiKycAfterOneHour")
+    //  await Parse.Cloud.run("expireOldTransfiTransactions")
+    } catch (error) {
+      console.error("Error running cloud function:", error);
+    }
+  }, process.env.checkTransactionStatusStripe); // 30 seconds interval.
 
   // Runs every 10 minutes to handle potentially expired transactions:
   setInterval(async () => {
