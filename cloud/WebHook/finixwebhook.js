@@ -1,12 +1,21 @@
 const express = require('express');
 const Parse = require('parse/node');
-const { updatePotBalance } = require('../utility/utlis');
+const { getParentUserId, updatePotBalance } = require('../utility/utlis');
 
 const router = express.Router();
 
 Parse.initialize(process.env.APP_ID, process.env.MASTER_KEY);
 Parse.masterKey = process.env.MASTER_KEY;
 Parse.serverURL = process.env.SERVER_URL;
+
+// Helper: search for a Finix transaction in a given table
+const findTransactionInTable = async (tableName, transferId) => {
+  const Table = Parse.Object.extend(tableName);
+  const query = new Parse.Query(Table);
+  query.equalTo('finixTransferId', transferId);
+  query.equalTo('portal', 'Finix');
+  return await query.first({ useMasterKey: true });
+};
 
 router.post('/', express.json(), async (req, res) => {
   try {
@@ -25,35 +34,42 @@ router.post('/', express.json(), async (req, res) => {
       const transferData = _embedded.transfers[0];
       console.log(`📦 Processing transfer ${transferData.id}, state: ${transferData.state}`);
 
-      const query = new Parse.Query('TransactionRecords');
-      query.equalTo('finixTransferId', transferData.id);
-      const transaction = await query.first({ useMasterKey: true });
+      // Search both tables (TransactionRecords first, then Transactions for AOG)
+      let transaction = await findTransactionInTable('TransactionRecords', transferData.id);
+      let tableName = 'TransactionRecords';
+
+      if (!transaction) {
+        transaction = await findTransactionInTable('Transactions', transferData.id);
+        tableName = 'Transactions';
+      }
 
       if (transaction) {
         if (transferData.state === 'SUCCEEDED') {
           transaction.set('status', 2);
           await transaction.save(null, { useMasterKey: true });
 
-          // Credit coins after successful payment
-          const parentUserId = transaction.get('userParentId');
-          const amount = transaction.get('transactionAmount');
-          await updatePotBalance(parentUserId, amount, 'recharge');
+          // Credit coins only for TransactionRecords (Getways) — AOG handles its own wallet
+          if (tableName === 'TransactionRecords') {
+            const parentUserId = await getParentUserId(transaction.get('userId'));
+            const amount = transaction.get('transactionAmount');
+            await updatePotBalance(parentUserId, amount, 'recharge');
+          }
 
-          console.log(`✅ Transaction ${transaction.id} completed, coins credited`);
-          return res.status(200).json({ success: true, message: 'Webhook processed, coins credited' });
+          console.log(`✅ Transaction ${transaction.id} (${tableName}) completed, status=2`);
+          return res.status(200).json({ success: true, message: 'Webhook processed, transaction completed' });
         } else if (transferData.state === 'FAILED' || transferData.state === 'CANCELED') {
           transaction.set('status', 10);
           await transaction.save(null, { useMasterKey: true });
 
-          console.log(`❌ Transaction ${transaction.id} failed/canceled`);
+          console.log(`❌ Transaction ${transaction.id} (${tableName}) failed/canceled`);
           return res.status(200).json({ success: true, message: 'Webhook processed, transaction failed' });
         }
 
         // For PENDING state, just acknowledge
-        console.log(`⏳ Transaction ${transaction.id} still pending`);
+        console.log(`⏳ Transaction ${transaction.id} (${tableName}) still pending`);
         return res.status(200).json({ success: true, message: 'Webhook received, transaction pending' });
       } else {
-        console.warn('⚠️ Transaction not found for transfer:', transferData.id);
+        console.warn('⚠️ Transaction not found in either table for transfer:', transferData.id);
         return res.status(200).json({ success: true, message: 'Transaction not found' });
       }
     }

@@ -107,27 +107,48 @@ async function createTransfer(paymentInstrumentId, amount, currency = "USD", met
   }
 }
 
-// Process Finix Recharge — main cloud function
+// Process Finix Recharge — main cloud function (supports Getways + AOG)
 Parse.Cloud.define("processFinixRecharge", async (request) => {
-  const { token, amount, username, remark = "", userId, userParentId, instrumentType = "PAYMENT_CARD" } = request.params;
+  const {
+    token, amount, username, remark = "", userId, userParentId,
+    instrumentType = "PAYMENT_CARD",
+    type = "Getways",   // "Getways" or "AOG"
+    gc_coins,
+    sc_coins
+  } = request.params;
 
   if (!token || !amount || !userId) {
     throw new Parse.Error(400, "Missing required parameters: token, amount, or userId");
   }
 
-  try {
-    // Fetch user details
-    const userQuery = new Parse.Query(Parse.User);
-    const user = await userQuery.get(userId, { useMasterKey: true });
+  const isAOG = type === "AOG";
+  const TableName = isAOG ? "Transactions" : "TransactionRecords";
 
-    const userInfo = {
+  try {
+    // Fetch user details (graceful — AOG users may not exist in _User table)
+    let userInfo = {
       userId,
-      username: user.get("username") || username,
-      email: user.get("email"),
-      firstName: user.get("name") || username,
+      username: username || userId,
+      email: `${username || userId}@getways.com`,
+      firstName: username || userId,
       lastName: "User",
-      phone: user.get("phoneNumber") || "",
+      phone: "",
     };
+
+    try {
+      const userQuery = new Parse.Query(Parse.User);
+      const user = await userQuery.get(userId, { useMasterKey: true });
+      userInfo = {
+        userId,
+        username: user.get("username") || username,
+        email: user.get("email") || userInfo.email,
+        firstName: user.get("name") || username,
+        lastName: "User",
+        phone: user.get("phoneNumber") || "",
+      };
+    } catch (userErr) {
+      console.log(`User lookup skipped for ${userId} (${type}):`, userErr.message);
+    }
 
     // Create buyer identity
     const identityResult = await createBuyerIdentity(userInfo);
@@ -152,8 +173,8 @@ Parse.Cloud.define("processFinixRecharge", async (request) => {
       throw new Parse.Error(500, `Failed to create transfer: ${JSON.stringify(transferResult.error)}`);
     }
 
-    // Save transaction record
-    const TransactionDetails = Parse.Object.extend("TransactionRecords");
+    // Save transaction record (Getways → TransactionRecords, AOG → Transactions)
+    const TransactionDetails = Parse.Object.extend(TableName);
     const transaction = new TransactionDetails();
     transaction.set("type", "recharge");
     transaction.set("gameId", "786");
@@ -169,6 +190,13 @@ Parse.Cloud.define("processFinixRecharge", async (request) => {
     transaction.set("finixPaymentInstrumentId", paymentInstrumentResult.paymentInstrumentId);
     transaction.set("finixIdentityId", identityResult.identityId);
     transaction.set("transactionIdFromStripe", transferResult.transferId); // compatibility
+
+    // AOG-specific fields
+    transaction.set("sc_coins", Number(sc_coins) || 0);
+    transaction.set("gc_coins", Number(gc_coins) || 0);
+    if (isAOG) {
+      transaction.set("platform", "AOGCOINCLUB");
+    }
 
     // Set status 1 (pending) for cron job to verify, or 10 if immediately failed
     if (transferResult.state === "FAILED") {
@@ -257,76 +285,81 @@ Parse.Cloud.define("finixWebhook", async (request) => {
   requireUser: false // Allow public access without authentication
 });
 
-// Finix Transaction Status Checker
+// Finix Transaction Status Checker (processes both TransactionRecords + Transactions)
 Parse.Cloud.define("checkTransactionStatusFinix", async (request) => {
-  try {
-    const query = new Parse.Query("TransactionRecords");
-    query.equalTo("status", 1); // pending
-    query.equalTo("portal", "Finix");
-    query.exists("finixTransferId");
-    query.limit(100);
-    query.descending("updatedAt");
+  const processTransactionsFromTable = async (tableName) => {
+    try {
+      const query = new Parse.Query(tableName);
+      query.equalTo("status", 1); // pending
+      query.equalTo("portal", "Finix");
+      query.exists("finixTransferId");
+      query.limit(100);
+      query.descending("updatedAt");
 
-    const results = await query.find({ useMasterKey: true });
-    if (!results || results.length === 0) return;
+      const results = await query.find({ useMasterKey: true });
+      if (!results || results.length === 0) return;
 
-    const now = new Date();
-    const recordsToUpdate = [];
+      const now = new Date();
+      const recordsToUpdate = [];
 
-    for (const record of results) {
-      const transferId = record.get("finixTransferId");
-      const createdAt = record.get("createdAt");
+      for (const record of results) {
+        const transferId = record.get("finixTransferId");
+        const createdAt = record.get("createdAt");
 
-      const diffMs = now - createdAt;
-      const diffMins = diffMs / (1000 * 60);
+        const diffMs = now - createdAt;
+        const diffMins = diffMs / (1000 * 60);
 
-      // Expire after 45 minutes
-      if (diffMins > 45) {
-        record.set("status", 9);
-        recordsToUpdate.push(record);
-        continue;
-      }
-
-      try {
-        // Check Finix transfer status via API
-        const response = await axios.get(`${FINIX_API_URL}/transfers/${transferId}`, {
-          auth: { username: FINIX_USERNAME, password: FINIX_PASSWORD },
-          headers: { 'Finix-Version': '2022-02-01' }
-        });
-
-        const transferState = response.data.state;
-        let newStatus;
-
-        if (transferState === "SUCCEEDED") {
-          newStatus = 2;
-        } else if (transferState === "PENDING") {
-          newStatus = 1;
-        } else if (transferState === "FAILED" || transferState === "CANCELED") {
-          newStatus = 10;
-        } else {
-          newStatus = 10;
+        // Expire after 45 minutes
+        if (diffMins > 45) {
+          record.set("status", 9);
+          recordsToUpdate.push(record);
+          continue;
         }
 
-        record.set("status", newStatus);
-        recordsToUpdate.push(record);
+        try {
+          // Check Finix transfer status via API
+          const response = await axios.get(`${FINIX_API_URL}/transfers/${transferId}`, {
+            auth: { username: FINIX_USERNAME, password: FINIX_PASSWORD },
+            headers: { 'Finix-Version': '2022-02-01' }
+          });
 
-        // Credit coins only after confirming success
-        if (newStatus === 2) {
-          const parentUserId = await getParentUserId(record.get("userId"));
-          await updatePotBalance(parentUserId, record.get("transactionAmount"), "recharge");
+          const transferState = response.data.state;
+          let newStatus;
+
+          if (transferState === "SUCCEEDED") {
+            newStatus = 2;
+          } else if (transferState === "PENDING") {
+            newStatus = 1;
+          } else if (transferState === "FAILED" || transferState === "CANCELED") {
+            newStatus = 10;
+          } else {
+            newStatus = 10;
+          }
+
+          record.set("status", newStatus);
+          recordsToUpdate.push(record);
+
+          // Credit coins only for TransactionRecords (Getways) — AOG handles its own wallet
+          if (newStatus === 2 && tableName === "TransactionRecords") {
+            const parentUserId = await getParentUserId(record.get("userId"));
+            await updatePotBalance(parentUserId, record.get("transactionAmount"), "recharge");
+          }
+        } catch (error) {
+          console.error(`Finix API error for transfer ${transferId} (${tableName}):`, error.response?.status, error.message);
         }
-      } catch (error) {
-        console.error(`Finix API error for transfer ${transferId}:`, error.response?.status, error.message);
       }
-    }
 
-    if (recordsToUpdate.length > 0) {
-      await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
+      if (recordsToUpdate.length > 0) {
+        await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
+      }
+    } catch (error) {
+      console.error(`Error processing ${tableName} in checkTransactionStatusFinix:`, error.message);
     }
-  } catch (error) {
-    console.error("Error in checkTransactionStatusFinix:", error.message);
-    return { status: "error", code: error.code || 500, message: error.message };
-  }
+  };
+
+  // Process transactions from both tables
+  await processTransactionsFromTable("TransactionRecords");
+  await processTransactionsFromTable("Transactions");
 });
 
 module.exports = {
