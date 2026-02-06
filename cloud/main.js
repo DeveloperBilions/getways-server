@@ -34,6 +34,7 @@ async function loadModule() {
     await import('./Fiserv/CommerceHub/AffirmHostedCheckout.js')
     await import('./Fiserv/CommerceHub/PazeHostedCheckout.js')
     await import('./Seon.js')
+    await import('./FinixPayment.js')
 }
 
 loadModule();
