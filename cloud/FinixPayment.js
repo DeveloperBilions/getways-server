@@ -1,5 +1,6 @@
 // Finix Payment Integration for Recharge Flow
 const axios = require('axios');
+const crypto = require('crypto');
 const { getParentUserId, updatePotBalance } = require('./utility/utlis');
 
 // Finix API config (values from .env)
@@ -45,6 +46,7 @@ async function createPaymentInstrument(token, identityId, instrumentType) {
       payload.attempt_bank_account_validation_check = true;
     }
     const response = await finixAPI.post('/payment_instruments', payload);
+    console.log('[Finix] API /payment_instruments response:', JSON.stringify(response.data, null, 2));
     return { success: true, paymentInstrumentId: response.data.id, data: response.data };
   } catch (error) {
     console.error("Error creating payment instrument:", error.response?.status, error.response?.data);
@@ -52,17 +54,31 @@ async function createPaymentInstrument(token, identityId, instrumentType) {
   }
 }
 
-// Create authorization (hold funds)
-async function createAuthorization(paymentInstrumentId, amount, currency = "USD", metadata = {}) {
+// Create authorization (hold funds) with fraud detection + idempotency
+async function createAuthorization(paymentInstrumentId, amount, currency = "USD", metadata = {}, fraudSessionId = null, idempotencyId = null) {
   const amountInCents = Math.round(amount * 100);
   try {
-    const response = await finixAPI.post('/authorizations', {
+    const payload = {
       merchant: FINIX_MERCHANT_ID,
       source: paymentInstrumentId,
       amount: amountInCents,
       currency,
       tags: metadata,
-    });
+    };
+
+    // Fraud Detection: include fraud_session_id from Finix.Auth
+    if (fraudSessionId) {
+      payload.fraud_session_id = fraudSessionId;
+      console.log(`[Finix] Including fraud_session_id in authorization: ${fraudSessionId}`);
+    }
+
+    // Idempotency: prevent duplicate authorizations
+    if (idempotencyId) {
+      payload.idempotency_id = idempotencyId;
+      console.log(`[Finix] Including idempotency_id in authorization: ${idempotencyId}`);
+    }
+
+    const response = await finixAPI.post('/authorizations', payload);
     return { success: true, authorizationId: response.data.id, state: response.data.state, data: response.data };
   } catch (error) {
     console.error("Error creating authorization:", error.response?.status, error.response?.data);
@@ -82,17 +98,32 @@ async function captureAuthorization(authorizationId, amount = null) {
   }
 }
 
-// Create direct transfer (single-step payment)
-async function createTransfer(paymentInstrumentId, amount, currency = "USD", metadata = {}) {
+// Create direct transfer (single-step payment) with fraud detection + idempotency
+async function createTransfer(paymentInstrumentId, amount, currency = "USD", metadata = {}, fraudSessionId = null, idempotencyId = null) {
   const amountInCents = Math.round(amount * 100);
   try {
-    const response = await finixAPI.post('/transfers', {
+    const payload = {
       merchant: FINIX_MERCHANT_ID,
       source: paymentInstrumentId,
       amount: amountInCents,
       currency,
       tags: metadata,
-    });
+    };
+
+    // Fraud Detection: include fraud_session_id from Finix.Auth
+    if (fraudSessionId) {
+      payload.fraud_session_id = fraudSessionId;
+      console.log(`[Finix] Including fraud_session_id in transfer: ${fraudSessionId}`);
+    }
+
+    // Idempotency: prevent duplicate transfers
+    if (idempotencyId) {
+      payload.idempotency_id = idempotencyId;
+      console.log(`[Finix] Including idempotency_id in transfer: ${idempotencyId}`);
+    }
+
+    const response = await finixAPI.post('/transfers', payload);
+    console.log('[Finix] API /transfers response:', JSON.stringify(response.data, null, 2));
     return {
       success: true,
       transferId: response.data.id,
@@ -114,12 +145,17 @@ Parse.Cloud.define("processFinixRecharge", async (request) => {
     instrumentType = "PAYMENT_CARD",
     type = "Getways",   // "Getways" or "AOG"
     gc_coins,
-    sc_coins
+    sc_coins,
+    fraud_session_id  // Finix fraud detection session ID from frontend
   } = request.params;
 
   if (!token || !amount || !userId) {
     throw new Parse.Error(400, "Missing required parameters: token, amount, or userId");
   }
+
+  // Generate idempotency ID to prevent duplicate transfers
+  const idempotencyId = crypto.randomUUID();
+  console.log(`[Finix] Processing ${type} recharge - Idempotency ID: ${idempotencyId}, Fraud Session: ${fraud_session_id || 'Not provided'}`);
 
   const isAOG = type === "AOG";
   const TableName = isAOG ? "Transactions" : "TransactionRecords";
@@ -162,12 +198,14 @@ Parse.Cloud.define("processFinixRecharge", async (request) => {
       throw new Parse.Error(500, `Failed to create payment instrument: ${JSON.stringify(paymentInstrumentResult.error)}`);
     }
 
-    // Create transfer (direct payment)
+    // Create transfer (direct payment) with fraud detection + idempotency
     const transferResult = await createTransfer(
       paymentInstrumentResult.paymentInstrumentId,
       amount,
       "USD",
-      { username, user_id: userId, remark, type: "recharge" }
+      { username, user_id: userId, remark, type: "recharge" },
+      fraud_session_id || null,
+      idempotencyId
     );
     if (!transferResult.success) {
       throw new Parse.Error(500, `Failed to create transfer: ${JSON.stringify(transferResult.error)}`);
@@ -190,6 +228,10 @@ Parse.Cloud.define("processFinixRecharge", async (request) => {
     transaction.set("finixPaymentInstrumentId", paymentInstrumentResult.paymentInstrumentId);
     transaction.set("finixIdentityId", identityResult.identityId);
     transaction.set("transactionIdFromStripe", transferResult.transferId); // compatibility
+    transaction.set("finixIdempotencyId", idempotencyId);
+    if (fraud_session_id) {
+      transaction.set("finixFraudSessionId", fraud_session_id);
+    }
 
     // AOG-specific fields
     transaction.set("sc_coins", Number(sc_coins) || 0);
