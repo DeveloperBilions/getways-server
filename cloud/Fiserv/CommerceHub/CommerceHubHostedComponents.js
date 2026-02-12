@@ -110,8 +110,14 @@ Parse.Cloud.define("commerceHubCreateCredentials", async (request) => {
       }
     }
     
-    // Build credentials request with optional 3DS data
+    // Build credentials request
+    // Per docs: "If the amount is not provided, it must be included in the Charges API request."
+    // We always include it so it displays on the checkout page
     const requestBody = {
+      amount: {
+        total: parsedAmount,
+        currency: "USD"
+      },
       merchantDetails: {
         merchantId: process.env.COMMERCE_HUB_MERCHANT_ID,
         terminalId: process.env.COMMERCE_HUB_TERMINAL_ID || "10000001"
@@ -123,10 +129,6 @@ Parse.Cloud.define("commerceHubCreateCredentials", async (request) => {
     // "The example below contains the recommended parameters for a successful Security Credentials 
     // API request with relevant 3DS customer transaction data to create a sessionId."
     if (use3DS) {
-      requestBody.amount = {
-        total: parsedAmount,
-        currency: "USD"
-      };
 
       if (customerInfo) {
         requestBody.customer = {
@@ -323,11 +325,8 @@ Parse.Cloud.define("commerceHubCompleteRecharge", async (request) => {
 
     // STEP 6: Submit charges API request to Commerce Hub
     // From Documentation: "Submit a charges, tokenization, or account verification request"
+    // Minimum required fields per docs example
     const requestBody = {
-      amount: {
-        total: amount,
-        currency: "USD"
-      },
       source: {
         sourceType: "PaymentSession",
         sessionId: sessionId
@@ -335,6 +334,11 @@ Parse.Cloud.define("commerceHubCompleteRecharge", async (request) => {
       transactionDetails: {
         captureFlag: true,
         merchantTransactionId: transaction.get("merchantTransactionId")
+      },
+      transactionInteraction: {
+        origin: "ECOM",
+        eciIndicator: "CHANNEL_ENCRYPTED",
+        posConditionCode: "CARD_NOT_PRESENT_ECOM"
       },
       merchantDetails: {
         merchantId: process.env.COMMERCE_HUB_MERCHANT_ID,
