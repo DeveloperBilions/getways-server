@@ -116,6 +116,15 @@ Parse.Cloud.define("commerceHubHostedFieldsGetCredentials", async (request) => {
       }
 
       const credentialsData = response.data;
+
+      console.log('📦 Full Credentials API Response:', JSON.stringify(credentialsData, null, 2));
+      console.log('🔑 accessToken:', credentialsData.accessToken ? credentialsData.accessToken.substring(0, 20) + '...' : 'MISSING');
+      console.log('🔑 sessionId:', credentialsData.sessionId || 'MISSING');
+      console.log('🔑 publicKey:', credentialsData.publicKey ? credentialsData.publicKey.substring(0, 30) + '...' : 'MISSING');
+      console.log('🔑 keyId:', credentialsData.keyId || 'MISSING');
+      console.log('🔑 symmetricEncryptionAlgorithm:', credentialsData.symmetricEncryptionAlgorithm || 'MISSING');
+      console.log('🔑 accessTokenIssuedTime:', credentialsData.accessTokenIssuedTime || 'MISSING');
+      console.log('🔑 accessTokenTimeToLive:', credentialsData.accessTokenTimeToLive || 'MISSING');
       
       // Save transaction record
       const isAOG = type === "AOG";
