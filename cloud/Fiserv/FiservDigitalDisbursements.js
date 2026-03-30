@@ -1,817 +1,690 @@
-/**
- * Fiserv Digital Disbursements (DDP) Integration
- * 
- * Implementation of Fiserv Digital Disbursements API for cashout functionality
- * Documentation Reference: Digital Disbursements API v1
- * 
- * Flow Steps:
- * Step 1: Create Recipient (POST /ddp/v1/recipients)
- * Step 2a: Create Public Token (POST /uCom/v1/tokens) - For card vaulting only
- * Step 2b: Create Nonce Token (POST /uCom/v1/account-tokens) - For card vaulting only
- * Step 2c: Vault Payment Method (POST /ddp/v1/recipients/{merchantCustomerId}/accounts) - For card vaulting only
- * Step 3: Create Payment/Disbursement (POST /ddp/v1/payments)
- * Step 3a: Cancel Payment (PATCH /ddp/v1/payments/{merchantTransactionId}/cancel) - Optional
- * Step 3b: Get Transaction Status (GET /ddp/v1/transactions/recipients/{merchantCustomerId}) - Optional
- */
+// Fiserv Digital Disbursements (DDP) Integration
+// Supports: PayPal, Venmo, Debit Card, ACH, RTP, Coinbase, Visa+, eCheck
 
 const crypto = require('crypto');
 const fetch = require('node-fetch');
 const { v4: uuidv4 } = require('uuid');
 
-console.log('🔄 Loading FiservDigitalDisbursements.js file...');
+// Status codes for transaction records
+const STATUS_PENDING = 1;
+const STATUS_SUCCESS = 2;
+const STATUS_FAILED = 9;
+const GAME_ID = '786';
+const AOG_PLATFORM = 'AOGCOINCLUB';
+const MAX_CASHOUT_AMOUNT = 10000;
+const MIN_CASHOUT_AMOUNT = 0.01;
 
-// CONFIGURATION
-const FISERV_DDP_CONFIG = {
-  baseUrl: process.env.FISERV_DDP_BASE_URL || 'https://int.api.firstdata.com/ddp',
-  ddpBasePath: '/v1',
-  ucomBasePath: process.env.FISERV_UCOM_BASE_URL || 'https://int.api.firstdata.com/ucom',
-  apiKey: process.env.COMMERCE_HUB_API_KEY || '',
-  clientKey: process.env.FISERV_DDP_API_KEY || '', // Using API_KEY as client key (as per env)
+const CONFIG = {
+  ddpBaseUrl: process.env.FISERV_DDP_BASE_URL || 'https://int.api.firstdata.com/ddp',
+  ucomBaseUrl: process.env.FISERV_UCOM_BASE_URL || 'https://int.api.firstdata.com/ucom',
+  clientId: process.env.FISERV_DDP_API_KEY || '',
   clientSecret: process.env.FISERV_DDP_API_SECRET || '',
-  paymentType: process.env.FISERV_DDP_PAYMENT_TYPE || 'Gaming', // Gaming, Claims, Wages, Rewards
+  paymentType: process.env.FISERV_DDP_PAYMENT_TYPE || 'Gaming',
 };
 
-// UTILITY FUNCTIONS
-function generateHMACSignature(method, requestBody = null) {
-  // Step 1: Get and save the current time (in milliseconds)
-  const time = new Date().getTime();
-  
-  // Step 2: Identify and save the request method
-  const httpMethod = method.toUpperCase();
-  
-  console.log('🔐 Generating HMAC Signature:');
-  console.log('   - Method:', httpMethod);
-  console.log('   - Timestamp:', time);
-  console.log('   - Client Key:', FISERV_DDP_CONFIG.clientKey ? '***' + FISERV_DDP_CONFIG.clientKey.slice(-4) : 'MISSING');
-  console.log('   - Client Secret:', FISERV_DDP_CONFIG.clientSecret ? '***' + FISERV_DDP_CONFIG.clientSecret.slice(-4) : 'MISSING');
-  
-  // Step 3 & 4: Create raw signature (key:time)
-  let rawSignature = FISERV_DDP_CONFIG.clientKey + ":" + time;
-  
-  // Step 5 & 6: Get payload and check if method is POST/PATCH/PUT
-  if (httpMethod !== 'GET' && httpMethod !== 'DELETE' && requestBody) {
-    // Convert request body to string (important!)
-    const requestBodyString = typeof requestBody === 'string' 
-      ? requestBody 
-      : JSON.stringify(requestBody);
-    
-    // Step 7: Encrypt the request payload using SHA256
-    const payload_digest = crypto.createHash('sha256').update(requestBodyString).digest();
-    
-    // Step 8: Take encrypted payload and convert to Base64 string
-    const b64BodyContent = payload_digest.toString('base64');
-    
-    console.log('   - Request Body Length:', requestBodyString.length);
-    console.log('   - Payload Hash (Base64):', b64BodyContent.slice(0, 20) + '...');
-    
-    // Step 9: Append Base64 encrypted payload to raw signature
-    rawSignature = rawSignature + ":" + b64BodyContent;
-  }
-  
-  console.log('   - Raw Signature:', rawSignature.slice(0, 50) + '...');
-  
-  // Step 10: HMAC encrypt raw signature using SHA256 against the environment secret
-  const signature = crypto.createHmac('sha256', FISERV_DDP_CONFIG.clientSecret)
-    .update(rawSignature)
-    .digest();
-  
-  // Step 11: Convert encrypted raw signature to Base64 to produce final signature
-  const hmacSignature = signature.toString('base64');
-  
-  console.log('   - Final HMAC Signature:', hmacSignature.slice(0, 20) + '...');
-  
-  return {
-    signature: hmacSignature,
-    timestamp: time
-  };
+// Validate required env variables on load
+if (!CONFIG.clientId || !CONFIG.clientSecret) {
+  console.error('[DDP] WARNING: FISERV_DDP_API_KEY or FISERV_DDP_API_SECRET not set');
 }
 
-/**
- * Generate standard headers for Fiserv DDP API calls
- */
-function generateDDPHeaders(method, requestBody = null, accessToken = null) {
-  const { signature, timestamp } = generateHMACSignature(method, requestBody);
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'Api-Key': FISERV_DDP_CONFIG.apiKey,
-    'Timestamp': timestamp.toString(),
-    'Authorization': `HMAC ${signature}`,
-    'Client-Request-Id': uuidv4()
-  };
+function createHmacSignature(method, bodyString) {
+  const timestamp = Date.now();
+  let raw = `${CONFIG.clientId}:${timestamp}`;
 
-  // Add access_token for vaulting operations (Step 2c)
-  if (accessToken) {
-    headers['access_token'] = accessToken;
+  if (method !== 'GET' && method !== 'DELETE' && bodyString) {
+    const payloadHash = crypto.createHash('sha256').update(bodyString).digest('base64');
+    raw += `:${payloadHash}`;
   }
 
-  console.log('📤 Request Headers:');
-  console.log('   - Api-Key:', headers['Api-Key'] ? '***' + headers['Api-Key'].slice(-4) : 'MISSING');
-  console.log('   - Timestamp:', headers['Timestamp']);
-  console.log('   - Authorization:', headers['Authorization'].slice(0, 30) + '...');
-  console.log('   - Client-Request-Id:', headers['Client-Request-Id']);
+  const signature = crypto.createHmac('sha256', CONFIG.clientSecret).update(raw).digest('base64');
+  return { signature, timestamp };
+}
 
+function buildHeaders(method, bodyString, accessToken) {
+  const { signature, timestamp } = createHmacSignature(method, bodyString);
+  const headers = {
+    'Content-Type': 'application/json',
+    'Api-Key': CONFIG.clientId,
+    'Timestamp': timestamp.toString(),
+    'Authorization': `HMAC ${signature}`,
+    'Client-Request-Id': uuidv4(),
+  };
+  if (accessToken) headers['access_token'] = accessToken;
   return headers;
 }
 
-/**
- * Make API call to Fiserv DDP
- */
-async function callFiservDDP(endpoint, method = 'GET', body = null, service = 'ddp', accessToken = null) {
-  let url;
-  if (service === 'ucom') {
-    // For uCom: base already has /ucom, add /v1 + endpoint
-    url = `${FISERV_DDP_CONFIG.ucomBasePath}/v1${endpoint}`;
-  } else {
-    // For DDP: base already has /ddp, add /v1 + endpoint
-    url = `${FISERV_DDP_CONFIG.baseUrl}/v1${endpoint}`;
+// Extract a user-friendly error message from Fiserv error responses
+function parseFiservError(data, statusCode) {
+  if (data?.developerInfo?.fieldError?.length) {
+    const fieldErr = data.developerInfo.fieldError[0];
+    return fieldErr.message || data.message || 'Payment processing failed.';
   }
-  
-  // Convert body to string for signature generation (important!)
-  const bodyString = body ? JSON.stringify(body) : null;
-  
-  const headers = generateDDPHeaders(method, bodyString, accessToken);
-  
-  const options = {
-    method,
-    headers
-  };
-  
-  if (bodyString && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
-    options.body = bodyString;
+  if (data?.developerInfo?.developerMessage) {
+    return data.developerInfo.developerMessage;
   }
-  
-  console.log(`📡 Calling Fiserv DDP API: ${method} ${url}`);
-  
-  try {
-    const response = await fetch(url, options);
-    const responseData = await response.json().catch(() => ({}));
-    
-    if (!response.ok) {
-      console.error('❌ Fiserv DDP API Error:', responseData);
-      console.error('❌ Response Status:', response.status);
-      console.error('❌ Response Headers:', response.headers);
-      throw new Error(responseData.message || `API Error: ${response.status} - ${JSON.stringify(responseData)}`);
-    }
-    
-    console.log('✅ Fiserv DDP API Success');
-    return responseData;
-  } catch (error) {
-    console.error('❌ Fiserv DDP API Call Failed:', error);
-    throw error;
-  }
+  if (data?.message) return data.message;
+  return `Payment processing failed (code: ${statusCode}).`;
 }
 
-// ==================== STEP 1: CREATE RECIPIENT ====================
+async function callDDP(endpoint, method, body, service = 'ddp', accessToken) {
+  const base = service === 'ucom' ? CONFIG.ucomBaseUrl : CONFIG.ddpBaseUrl;
+  const url = `${base}/v1${endpoint}`;
+  const bodyString = body ? JSON.stringify(body) : null;
+  const headers = buildHeaders(method, bodyString, accessToken);
 
-/**
- * Step 1: Create a Recipient
- * 
- * Create a recipient for card vaulting or payment purposes.
- * This is always the first step for any transactions.
- * 
- * POST /ddp/v1/recipients
- */
-Parse.Cloud.define("fiservDDP_createRecipient", async (request) => {
+  const options = { method, headers };
+  if (bodyString && method !== 'GET' && method !== 'DELETE') {
+    options.body = bodyString;
+  }
+
+  console.log(`[DDP] ${method} ${url}`);
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    console.error('[DDP] Error:', JSON.stringify(data, null, 2));
+    throw new Error(parseFiservError(data, response.status));
+  }
+
+  return data;
+}
+
+const PaymentBuilders = {
+  paypal(params) {
+    if (!params.email) throw new Error('Email is required for PayPal.');
+    return {
+      source: 'PAYPAL',
+      paypal: { email: { value: params.email } },
+    };
+  },
+
+  venmo(params) {
+    if (!params.phone) throw new Error('Phone number is required for Venmo.');
+    return {
+      source: 'VENMO',
+      venmo: { phone: { value: params.phone } },
+    };
+  },
+
+  debit(params) {
+    if (!params.evToken) throw new Error('EV token is required for Debit Card.');
+    return {
+      source: 'DEBIT',
+      card: { token: { tokenId: params.evToken, tokenProvider: 'ENROLMENT_VAULT' } },
+    };
+  },
+
+  ach(params) {
+    if (!params.evToken) throw new Error('EV token is required for ACH.');
+    return {
+      source: 'ACH',
+      ach: { token: { tokenId: params.evToken, tokenProvider: 'ENROLMENT_VAULT' } },
+    };
+  },
+
+  rtp(params) {
+    if (!params.evToken) throw new Error('EV token is required for RTP.');
+    return {
+      source: 'RTP',
+      ach: { token: { tokenId: params.evToken, tokenProvider: 'ENROLMENT_VAULT' } },
+    };
+  },
+
+  coinbase(params) {
+    if (!params.evToken) throw new Error('EV token is required for Coinbase.');
+    return {
+      source: 'COINBASE',
+      coinbase: { token: { tokenId: params.evToken, tokenProvider: 'ENROLMENT_VAULT' } },
+    };
+  },
+
+  visaplus(params) {
+    if (!params.payName) throw new Error('PayName is required for Visa+.');
+    if (!params.payName.startsWith('+')) throw new Error('PayName must start with + (e.g. +username.gpay).');
+    return {
+      source: 'VISAPLUS',
+      visaPlus: { payName: params.payName },
+    };
+  },
+
+  echeck() {
+    return { source: 'ECHECK' };
+  },
+};
+
+function buildRecipientPayment(method, params) {
+  const builder = PaymentBuilders[method];
+  if (!builder) throw new Error(`Unsupported payment method: ${method}`);
+  return builder(params);
+}
+
+function encryptWithPublicKey(publicKey, data) {
+  const pem = '-----BEGIN PUBLIC KEY-----\n' + publicKey.match(/.{1,64}/g).join('\n') + '\n-----END PUBLIC KEY-----';
+  const encrypted = crypto.publicEncrypt(
+    { key: pem, padding: crypto.constants.RSA_PKCS1_PADDING },
+    Buffer.from(data.toString())
+  );
+  return `ENC_[${encrypted.toString('base64')}]`;
+}
+
+// Require authentication on a request
+function requireAuth(request) {
+  if (!request.user) throw new Parse.Error(Parse.Error.SESSION_MISSING, 'Authentication required.');
+}
+
+// Create Recipient
+Parse.Cloud.define('fiservDDP_createRecipient', async (request) => {
+  requireAuth(request);
   const { userData } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
 
-  try {
-    // Generate unique merchantCustomerId (should be merchant's unique identifier)
-    const merchantCustomerId = `USER-${request.user.id}-${Date.now()}`;
-    
-    const recipientPayload = {
-      merchant: {
-        merchantCustomerId: merchantCustomerId
+  const merchantCustomerId = `USER-${request.user.id}-${Date.now()}`;
+
+  const payload = {
+    merchant: { merchantCustomerId },
+    recipient: {
+      recipientType: 'Consumer',
+      firstName: userData?.firstName || request.user.get('firstName') || 'Unknown',
+      lastName: userData?.lastName || request.user.get('lastName') || 'User',
+      emailAddress: {
+        value: userData?.email || request.user.get('email') || request.user.get('username'),
       },
-      recipient: {
-        recipientType: "Consumer",
-        firstName: userData?.firstName || request.user.get('firstName') || 'Unknown',
-        lastName: userData?.lastName || request.user.get('lastName') || 'User',
-        dateOfBirth: userData?.dateOfBirth || "01/01/1990",
-        emailAddress: {
-          type: "work",
-          value: userData?.email || request.user.get('email') || request.user.get('username'),
-          primary: true
-        },
-        phoneNumber: {
-          countryCode: "USA",
-          value: userData?.phone || "000-000-0000",
-          type: "home",
-          extension: "0000"
-        },
-        guest: true,
-        address: {
-          type: "work",
-          street: userData?.address?.street || "123 Main Street",
-          city: userData?.address?.city || "New York",
-          stateOrProvince: userData?.address?.state || "NY",
-          postalCode: userData?.address?.postalCode || "10001",
-          country: "USA",
-          formatted: userData?.address?.formatted || "123 Main Street, New York, NY 10001 US",
-          primary: true
-        }
-      }
-    };
+      address: {
+        type: 'work',
+        street: userData?.address?.street || '123 Main Street',
+        city: userData?.address?.city || 'New York',
+        stateOrProvince: userData?.address?.state || 'NY',
+        postalCode: userData?.address?.postalCode || '10001',
+        country: 'USA',
+      },
+    },
+  };
 
-    const result = await callFiservDDP('/recipients', 'POST', recipientPayload);
-    
-    return {
-      success: true,
-      recipientId: result.recipientId,
-      merchantCustomerId: merchantCustomerId,
-      status: result.status,
-      message: "Recipient created successfully (Step 1 Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 1 - Create Recipient Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to create recipient: ${error.message}`);
-  }
+  const result = await callDDP('/recipients', 'POST', payload);
+  return { success: true, merchantCustomerId, recipientId: result.recipientId };
 });
 
-// ==================== STEP 2a: CREATE PUBLIC TOKEN (For Vaulting) ====================
+// Update Recipient
+Parse.Cloud.define('fiservDDP_updateRecipient', async (request) => {
+  requireAuth(request);
+  const { merchantCustomerId, userData } = request.params || {};
+  if (!merchantCustomerId) throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId is required.');
 
-/**
- * Step 2a: Create a Public Token
- * 
- * Generate a public key for encrypting PCI data and tokenId for subsequent calls.
- * Valid for 20 minutes.
- * Required for: Debit, ACH, Coinbase, MoneyNetwork
- * 
- * POST /uCom/v1/tokens
- */
-Parse.Cloud.define("fiservDDP_createPublicToken", async (request) => {
+  const payload = { recipient: {} };
+  if (userData?.firstName) payload.recipient.firstName = userData.firstName;
+  if (userData?.lastName) payload.recipient.lastName = userData.lastName;
+  if (userData?.email) payload.recipient.emailAddress = { value: userData.email };
+  if (userData?.address) {
+    payload.recipient.address = {
+      type: 'work',
+      street: userData.address.street,
+      city: userData.address.city,
+      stateOrProvince: userData.address.state,
+      postalCode: userData.address.postalCode,
+      country: userData.address.country || 'USA',
+    };
+  }
+
+  const result = await callDDP(`/recipients/${merchantCustomerId}`, 'PATCH', payload);
+  return { success: true, recipientId: result.recipientId };
+});
+
+// Get Recipient
+Parse.Cloud.define('fiservDDP_getRecipient', async (request) => {
+  requireAuth(request);
   const { merchantCustomerId } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  if (!merchantCustomerId) throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId is required.');
 
-  if (!merchantCustomerId) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "merchantCustomerId is required.");
-  }
-
-  try {
-    const tokenPayload = {
-      fdCustomerId: merchantCustomerId, // Use same as merchantCustomerId for simplicity
-      publicKeyRequired: true,
-      anonymous: false
-    };
-
-    const result = await callFiservDDP('/tokens', 'POST', tokenPayload, 'ucom');
-    
-    return {
-      success: true,
-      tokenId: result.tokenId,
-      publicKey: result.publicKey,
-      expiresInSeconds: result.expiresInSeconds,
-      algorithm: result.algorithm,
-      message: "Public token created successfully (Step 2a Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 2a - Create Public Token Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to create public token: ${error.message}`);
-  }
+  const result = await callDDP(`/recipients/${merchantCustomerId}`, 'GET');
+  return { success: true, recipient: result };
 });
 
-// ==================== STEP 2c: VAULT PAYMENT METHOD ====================
+// Get Public Token (encryption key - valid 20 min)
+Parse.Cloud.define('fiservDDP_getPublicToken', async (request) => {
+  requireAuth(request);
+  const { merchantCustomerId } = request.params || {};
+  if (!merchantCustomerId) throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId is required.');
 
-/**
- * Step 2c: Vault a Payment Method
- * 
- * Vault the payment method with EV (Enrollment Vault) token.
- * Requires tokenId from Step 2b in the access_token header.
- * 
- * POST /ddp/v1/recipients/{merchantCustomerId}/accounts
- */
-Parse.Cloud.define("fiservDDP_vaultPaymentMethod", async (request) => {
-  const { merchantCustomerId, nonceTokenId, tokenId } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  const result = await callDDP('/tokens', 'POST', {
+    token: { fdCustomerId: merchantCustomerId },
+    publicKeyRequired: true,
+  }, 'ucom');
 
-  if (!merchantCustomerId || !nonceTokenId || !tokenId) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, 
-      "merchantCustomerId, nonceTokenId, and tokenId are required.");
-  }
-
-  try {
-    const vaultPayload = {
-      accounts: {
-        token: {
-          tokenId: nonceTokenId,
-          tokenProvider: "UCOM"
-        }
-      }
-    };
-
-    // Call with tokenId in access_token header
-    const result = await callFiservDDP(
-      `/recipients/${merchantCustomerId}/accounts`, 
-      'POST', 
-      vaultPayload,
-      'ddp',
-      tokenId // This goes in access_token header
-    );
-    
-    return {
-      success: true,
-      evToken: result.token || nonceTokenId,
-      message: "Payment method vaulted successfully (Step 2c Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 2c - Vault Payment Method Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to vault payment method: ${error.message}`);
-  }
+  return {
+    success: true,
+    tokenId: result.tokenId,
+    publicKey: result.publicKey,
+    expiresInSeconds: result.expiresInSeconds,
+  };
 });
 
-// ==================== STEP 3: CREATE PAYMENT (DISBURSEMENT) ====================
-
-/**
- * Step 3: Create a Payment/Disbursement
- * 
- * Main disbursement function supporting multiple payment methods:
- * - PayPal (email only - no vaulting required)
- * - Venmo (phone number only - no vaulting required)
- * - Debit Card (vaulting required)
- * - ACH (vaulting required)
- * - eCheck (no vaulting required)
- * 
- * POST /ddp/v1/payments
- */
-Parse.Cloud.define("fiservDDP_createPayment", async (request) => {
-  const { 
-    merchantCustomerId,
-    amount,
-    paymentMethod, // 'paypal', 'venmo', 'card', 'ach', 'eCheck', etc.
-    recipientData,
-    evToken, // Enrollment Vault token (for vaulted methods)
-    paymentDetails // Payment-specific details (email for PayPal, phone for Venmo, etc.)
+// Encrypt + Create Nonce + Vault (combined)
+Parse.Cloud.define('fiservDDP_encryptAndVault', async (request) => {
+  requireAuth(request);
+  const {
+    merchantCustomerId, tokenId, publicKey,
+    cardNumber, expiryMonth, expiryYear,
+    routingNumber, accountNumber,
+    accountType,
+    bankAccountType,
   } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
+
+  if (!merchantCustomerId || !tokenId || !publicKey) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId, tokenId, and publicKey are required.');
   }
 
-  // Validate required parameters
+  let noncePayload;
+  if (accountType === 'card') {
+    if (!cardNumber || !expiryMonth || !expiryYear) {
+      throw new Parse.Error(Parse.Error.INVALID_JSON, 'Card number, expiry month, and year are required.');
+    }
+    noncePayload = {
+      account: {
+        type: 'CREDIT',
+        credit: {
+          cardNumber: encryptWithPublicKey(publicKey, cardNumber),
+          expiryDate: {
+            month: encryptWithPublicKey(publicKey, expiryMonth),
+            year: encryptWithPublicKey(publicKey, expiryYear),
+          },
+        },
+      },
+      referenceToken: { tokenType: 'CLAIM_CHECK_NONCE' },
+      fdCustomerId: merchantCustomerId,
+    };
+  } else {
+    if (!accountNumber) {
+      throw new Parse.Error(Parse.Error.INVALID_JSON, 'Account number is required.');
+    }
+    noncePayload = {
+      account: {
+        type: 'ACH',
+        ach: {
+          routingNumber: routingNumber || '',
+          accountNumber: encryptWithPublicKey(publicKey, accountNumber),
+          type: bankAccountType || 'Checking',
+        },
+      },
+      referenceToken: { tokenType: 'CLAIM_CHECK_NONCE' },
+      fdCustomerId: merchantCustomerId,
+    };
+  }
+
+  // Nonce token uses Bearer auth, not HMAC
+  const bodyString = JSON.stringify(noncePayload);
+  const { timestamp } = createHmacSignature('POST', bodyString);
+
+  const nonceResponse = await fetch(`${CONFIG.ucomBaseUrl}/v1/account-tokens`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Api-Key': CONFIG.clientId,
+      'Timestamp': timestamp.toString(),
+      'Authorization': `Bearer ${tokenId}`,
+      'Client-Request-Id': uuidv4(),
+    },
+    body: bodyString,
+  });
+
+  const nonceData = await nonceResponse.json().catch(() => ({}));
+  if (!nonceResponse.ok) {
+    console.error('[DDP] Nonce token error:', JSON.stringify(nonceData, null, 2));
+    throw new Error(parseFiservError(nonceData, nonceResponse.status));
+  }
+
+  const nonceTokenId = nonceData.token?.tokenId;
+  if (!nonceTokenId) throw new Error('No nonce token received.');
+
+  // Vault the payment method
+  const vaultResult = await callDDP(
+    `/recipients/${merchantCustomerId}/accounts`,
+    'POST',
+    { accounts: { token: { tokenId: nonceTokenId, tokenProvider: 'SINGLE_USE_TOKEN' } } },
+    'ddp',
+    tokenId
+  );
+
+  const evToken = vaultResult.accounts?.[0]?.token?.tokenId || nonceTokenId;
+  return { success: true, evToken };
+});
+
+// Create Payment (standalone)
+Parse.Cloud.define('fiservDDP_createPayment', async (request) => {
+  requireAuth(request);
+  const { merchantCustomerId, amount, paymentMethod, evToken, paymentDetails } = request.params || {};
+
   if (!merchantCustomerId || !amount || !paymentMethod) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, 
-      "merchantCustomerId, amount, and paymentMethod are required.");
+    throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId, amount, and paymentMethod are required.');
   }
 
-  const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "Invalid amount.");
+  const parsedAmount = parseFloat(amount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount < MIN_CASHOUT_AMOUNT) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, 'Invalid amount.');
+  }
+  if (parsedAmount > MAX_CASHOUT_AMOUNT) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, `Amount cannot exceed $${MAX_CASHOUT_AMOUNT}.`);
   }
 
-  try {
-    // Generate unique merchant transaction ID
-    const merchantTransactionId = `CASHOUT-${request.user.id.slice(-6)}-${Date.now()}`;
-    
-    // Base payment payload
-    const paymentPayload = {
-      amount: {
-        total: parsedAmount,
-        currency: "USD"
-      },
-      recipient: [{
-        recipientProfileInfo: {
-          merchantCustomerId: merchantCustomerId,
-          firstName: recipientData?.firstName || request.user.get('firstName') || 'Unknown',
-          lastName: recipientData?.lastName || request.user.get('lastName') || 'User',
-          recipientType: "Consumer",
-          emailAddress: {
-            value: recipientData?.email || request.user.get('email') || request.user.get('username'),
-            type: "work",
-            primary: true
-          },
-          phoneNumber: {
-            code: 1,
-            value: recipientData?.phone || "000-000-0000",
-            type: "billing",
-            extension: ""
-          },
-          address: {
-            type: "work",
-            street: recipientData?.address?.street || "123 Main Street",
-            city: recipientData?.address?.city || "New York",
-            stateOrProvince: recipientData?.address?.state || "NY",
-            postalCode: recipientData?.address?.postalCode || "10001",
-            country: "USA",
-            formatted: recipientData?.address?.formatted || "123 Main Street, New York, NY 10001 US",
-            primary: true
-          }
-        },
-        payments: {
-          amount: {
-            total: parsedAmount,
-            currency: "USD"
-          },
-          paymentType: FISERV_DDP_CONFIG.paymentType
-        }
-      }],
-      merchantTransactionId: merchantTransactionId,
-      batchNumber: `BATCH-${Date.now()}`,
-      customFields: []
-    };
+  const method = paymentMethod.toLowerCase();
+  const merchantTransactionId = `CASHOUT-${Date.now()}`;
 
-    // Add payment method specific details
-    switch (paymentMethod.toLowerCase()) {
-      case 'paypal':
-        // PayPal: email only, no vaulting required
-        paymentPayload.recipient[0].payments.paypal = {
-          emailAddress: paymentDetails?.email || recipientData?.email || request.user.get('email')
-        };
-        break;
+  const methodFields = buildRecipientPayment(method, {
+    email: paymentDetails?.email,
+    phone: paymentDetails?.phone,
+    payName: paymentDetails?.payName,
+    evToken,
+  });
 
-      case 'venmo':
-        // Venmo: phone number only, no vaulting required
-        paymentPayload.recipient[0].payments.venmo = {
-          phoneNumber: paymentDetails?.phone || recipientData?.phone || "000-000-0000"
-        };
-        break;
+  const payload = {
+    amount: { total: parsedAmount, currency: 'USD' },
+    merchantTransactionId,
+    recipient: [{
+      recipientProfileInfo: { merchantCustomerId },
+      payments: { paymentType: CONFIG.paymentType },
+      description: 'Sending Transaction',
+      ...methodFields,
+    }],
+  };
 
-      case 'card':
-      case 'debit':
-        // Debit Card: requires vaulting (EV token)
-        if (!evToken) {
-          throw new Parse.Error(Parse.Error.INVALID_JSON, 
-            "EV token is required for card payments. Please vault the card first.");
-        }
-        paymentPayload.recipient[0].payments.enrollmentVault = {
-          token: evToken
-        };
-        break;
-
-      case 'ach':
-        // ACH: requires vaulting (EV token)
-        if (!evToken) {
-          throw new Parse.Error(Parse.Error.INVALID_JSON, 
-            "EV token is required for ACH payments. Please vault the account first.");
-        }
-        paymentPayload.recipient[0].payments.enrollmentVault = {
-          token: evToken
-        };
-        break;
-
-      case 'echeck':
-        // eCheck: account details in payment request, no vaulting required
-        if (!paymentDetails?.routingNumber || !paymentDetails?.accountNumber) {
-          throw new Parse.Error(Parse.Error.INVALID_JSON, 
-            "Routing number and account number are required for eCheck.");
-        }
-        paymentPayload.recipient[0].payments.eCheck = {
-          routingNumber: paymentDetails.routingNumber,
-          accountNumber: paymentDetails.accountNumber,
-          accountType: paymentDetails.accountType || "CHECKING"
-        };
-        break;
-
-      default:
-        throw new Parse.Error(Parse.Error.INVALID_JSON, 
-          `Unsupported payment method: ${paymentMethod}`);
-    }
-
-    const result = await callFiservDDP('/payments', 'POST', paymentPayload);
-    
-    // Save transaction record to Parse
-    const Transaction = Parse.Object.extend("FiservDisbursements");
-    const transaction = new Transaction();
-    transaction.set("userId", request.user.id);
-    transaction.set("merchantTransactionId", merchantTransactionId);
-    transaction.set("fiservTransactionId", result.transactionId);
-    transaction.set("amount", parsedAmount);
-    transaction.set("paymentMethod", paymentMethod);
-    transaction.set("status", result.transactionStatus || "pending");
-    transaction.set("response", result);
-    await transaction.save(null, { useMasterKey: true });
-    
-    return {
-      success: true,
-      transactionId: result.transactionId,
-      merchantTransactionId: merchantTransactionId,
-      status: result.transactionStatus,
-      portalUrl: result.recipient?.[0]?.portalUrl,
-      message: "Payment created successfully (Step 3 Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 3 - Create Payment Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to create payment: ${error.message}`);
-  }
+  const result = await callDDP('/payments', 'POST', payload);
+  return {
+    success: true,
+    transactionId: result.transactionId,
+    merchantTransactionId,
+    status: result.transactionStatus,
+    portalUrl: result.recipient?.[0]?.portalUrl,
+  };
 });
 
-// ==================== STEP 3a: CANCEL PAYMENT (Optional) ====================
+// Cancel Payment - supports both merchantTransactionId and transactionId (TID)
+Parse.Cloud.define('fiservDDP_cancelPayment', async (request) => {
+  requireAuth(request);
+  const { merchantTransactionId, transactionId, reason } = request.params || {};
 
-/**
- * Step 3a: Cancel a Payment
- * 
- * Cancel a payment transaction in progress or waiting for settlement.
- * Applicable for ACH, Coinbase, Venmo (unclaimed), PayPal (unclaimed).
- * 
- * PATCH /ddp/v1/payments/{merchantTransactionId}/cancel
- */
-Parse.Cloud.define("fiservDDP_cancelPayment", async (request) => {
-  const { merchantTransactionId, reason } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  const cancelId = transactionId || merchantTransactionId;
+  if (!cancelId) throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantTransactionId or transactionId is required.');
 
-  if (!merchantTransactionId) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "merchantTransactionId is required.");
-  }
+  const result = await callDDP(`/payments/${cancelId}/cancel`, 'PATCH', {
+    description: reason || 'Cancel transaction due to customer request',
+  });
 
-  try {
-    const cancelPayload = {
-      paymentStatus: "CANCELLED",
-      reversalReason: reason || "Customer requested cancellation"
-    };
-
-    const result = await callFiservDDP(
-      `/payments/${merchantTransactionId}/cancel`, 
-      'PATCH', 
-      cancelPayload
-    );
-    
-    // Update transaction record
-    const query = new Parse.Query("FiservDisbursements");
-    query.equalTo("merchantTransactionId", merchantTransactionId);
-    const transaction = await query.first({ useMasterKey: true });
-    
-    if (transaction) {
-      transaction.set("status", "cancelled");
-      transaction.set("cancelledAt", new Date());
-      transaction.set("cancellationReason", reason);
-      await transaction.save(null, { useMasterKey: true });
-    }
-    
-    return {
-      success: true,
-      message: "Payment cancelled successfully (Step 3a Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 3a - Cancel Payment Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to cancel payment: ${error.message}`);
-  }
+  return {
+    success: true,
+    transactionId: result.transactionId,
+    transactionStatus: result.transactionStatus,
+    paymentStatus: result.paymentStatus,
+  };
 });
 
-// ==================== STEP 3b: GET TRANSACTION STATUS (Optional) ====================
-
-/**
- * Step 3b: Get Transaction Status
- * 
- * Retrieve transaction details by merchantCustomerId or merchantTransactionId.
- * 
- * GET /ddp/v1/transactions/recipients/{merchantCustomerId}
- */
-Parse.Cloud.define("fiservDDP_getTransactionStatus", async (request) => {
+// Transaction Status
+Parse.Cloud.define('fiservDDP_getTransactionStatus', async (request) => {
+  requireAuth(request);
   const { merchantCustomerId } = request.params || {};
-  
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
+  if (!merchantCustomerId) throw new Parse.Error(Parse.Error.INVALID_JSON, 'merchantCustomerId is required.');
 
-  if (!merchantCustomerId) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "merchantCustomerId is required.");
-  }
-
-  try {
-    const result = await callFiservDDP(`/transactions/recipients/${merchantCustomerId}`, 'GET');
-    
-    return {
-      success: true,
-      transactions: result,
-      message: "Transaction status retrieved successfully (Step 3b Complete)"
-    };
-  } catch (error) {
-    console.error('❌ Step 3b - Get Transaction Status Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to get transaction status: ${error.message}`);
-  }
+  const result = await callDDP(`/transactions/recipients/${merchantCustomerId}`, 'GET');
+  return { success: true, transactions: result };
 });
 
-// ==================== GET MERCHANT INFO (Optional) ====================
-
-/**
- * Step 4: Get Merchant Info
- * 
- * Get merchant details including ledger balance, available balance, etc.
- * 
- * GET /ddp/v1/merchantInfo
- */
-Parse.Cloud.define("fiservDDP_getMerchantInfo", async (request) => {
-  if (!request.user) {
-    throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  }
-
-  try {
-    const result = await callFiservDDP('/merchantInfo', 'GET');
-    
-    return {
-      success: true,
-      merchantInfo: result,
-      message: "Merchant info retrieved successfully"
-    };
-  } catch (error) {
-    console.error('❌ Get Merchant Info Failed:', error);
-    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to get merchant info: ${error.message}`);
-  }
+// Merchant Info
+Parse.Cloud.define('fiservDDP_getMerchantInfo', async (request) => {
+  requireAuth(request);
+  const result = await callDDP('/merchantInfo', 'GET');
+  return { success: true, merchantInfo: result };
 });
 
-// ==================== COMBINED CASHOUT FLOW ====================
+// Get Cashout Methods from CashoutMethod database class
+Parse.Cloud.define('getCashoutMethods', async (request) => {
+  const q = new Parse.Query('CashoutMethod');
+  q.equalTo('enabled', true);
+  q.ascending('key');
+  q.limit(100);
+  const results = await q.find({ useMasterKey: true });
 
-/**
- * Complete Cashout Flow for PayPal/Venmo (No Vaulting Required)
- * 
- * This combines Step 1 and Step 3 for payment methods that don't require vaulting.
- */
-Parse.Cloud.define("fiservDDP_cashout", async (request) => {
-  const { 
-    amount,
-    paymentMethod, // 'paypal' or 'venmo'
-    email, // For PayPal
-    phone, // For Venmo
-    userData,
-    type = "Getways",
-    userId: paramUserId
+  return results.map((r) => ({
+    key: r.get('key'),
+    label: r.get('label'),
+    provider: r.get('provider'),
+    minAmount: r.get('minAmount') || 0,
+    maxAmount: r.get('maxAmount') || 10000,
+    fiservKey: r.get('fiservKey') || null,
+  }));
+});
+
+// Main Cashout Flow
+Parse.Cloud.define('fiservDDP_cashout', async (request) => {
+  const {
+    amount, paymentMethod,
+    email, phone, paymentDetails,
+    cardNumber, expiryMonth, expiryYear,
+    routingNumber, accountNumber, accountType,
+    description,
+    userData, type = 'Getways',
+    userId: paramUserId,
   } = request.params || {};
-  
-  // if (!request.user) {
-  //   throw new Parse.Error(Parse.Error.SESSION_MISSING, "Authentication required.");
-  // }
 
-  // Use paramUserId if provided, otherwise try request.user.id, fallback to timestamp
-  const userIdForTransaction = paramUserId || request.user?.id || `USER-${Date.now()}`;
+  const userId = paramUserId || request.user?.id || `USER-${Date.now()}`;
   const user = request.user ? await request.user.fetch({ useMasterKey: true }) : null;
 
-  // Validate
-  const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (!parsedAmount || parsedAmount <= 0) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "Valid amount is required.");
+  // Validate amount
+  const parsedAmount = parseFloat(amount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount < MIN_CASHOUT_AMOUNT) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, 'Valid amount is required.');
+  }
+  if (parsedAmount > MAX_CASHOUT_AMOUNT) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, `Amount cannot exceed $${MAX_CASHOUT_AMOUNT}.`);
   }
 
-  if (!paymentMethod || !['paypal', 'venmo'].includes(paymentMethod.toLowerCase())) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, 
-      "Payment method must be 'paypal' or 'venmo'.");
+  // Validate method
+  const method = (paymentMethod || '').toLowerCase();
+  const validMethods = Object.keys(PaymentBuilders);
+  if (!validMethods.includes(method)) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, `Supported methods: ${validMethods.join(', ')}`);
   }
 
-  if (paymentMethod.toLowerCase() === 'paypal' && !email) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "Email is required for PayPal.");
+  // Idempotency check: prevent duplicate cashouts within 60 seconds
+  const isAOG = type === 'AOG';
+  const TableName = isAOG ? 'Transactions' : 'TransactionRecords';
+  const dupeQuery = new Parse.Query(TableName);
+  dupeQuery.equalTo('userId', userId);
+  dupeQuery.equalTo('paymentMethod', method);
+  dupeQuery.equalTo('transactionAmount', parsedAmount);
+  dupeQuery.equalTo('portal', 'FiservDDP');
+  dupeQuery.greaterThan('transactionDate', new Date(Date.now() - 60000));
+  const recentDupe = await dupeQuery.first({ useMasterKey: true });
+  if (recentDupe) {
+    throw new Parse.Error(Parse.Error.SCRIPT_FAILED, 'A similar cashout was just submitted. Please wait before trying again.');
   }
 
-  if (paymentMethod.toLowerCase() === 'venmo' && !phone) {
-    throw new Parse.Error(Parse.Error.INVALID_JSON, "Phone number is required for Venmo.");
-  }
+  const VAULTING_METHODS = ['debit', 'ach', 'rtp', 'coinbase'];
 
   try {
     // Step 1: Create Recipient
-    console.log('📝 Step 1: Creating recipient...');
-    const merchantCustomerId = `USER-${userIdForTransaction}-${Date.now()}`;
-    
-    const recipientPayload = {
-      merchant: {
-        merchantCustomerId: merchantCustomerId
-      },
+    const merchantCustomerId = `USER-${userId}-${Date.now()}`;
+    console.log(`[Cashout] Creating recipient: ${merchantCustomerId}`);
+
+    await callDDP('/recipients', 'POST', {
+      merchant: { merchantCustomerId },
       recipient: {
-        recipientType: "Consumer",
+        recipientType: 'Consumer',
         firstName: userData?.firstName || user?.get('firstName') || 'Unknown',
         lastName: userData?.lastName || user?.get('lastName') || 'User',
-        dateOfBirth: userData?.dateOfBirth || "01/01/1990",
         emailAddress: {
-          type: "work",
           value: email || user?.get('email') || user?.get('username') || 'user@example.com',
-          primary: true
         },
-        phoneNumber: {
-          countryCode: "USA",
-          value: phone || "000-000-0000",
-          type: "home",
-          extension: "0000"
-        },
-        guest: true,
         address: {
-          type: "work",
-          street: userData?.address?.street || "123 Main Street",
-          city: userData?.address?.city || "New York",
-          stateOrProvince: userData?.address?.state || "NY",
-          postalCode: userData?.address?.postalCode || "10001",
-          country: "USA",
-          formatted: userData?.address?.formatted || "123 Main Street, New York, NY 10001 US",
-          primary: true
-        }
-      }
-    };
-
-    await callFiservDDP('/recipients', 'POST', recipientPayload);
-    console.log('✅ Step 1 Complete: Recipient created');
-
-    // Step 3: Create Payment
-    console.log('💰 Step 3: Creating payment...');
-    const merchantTransactionId = `CASHOUT-${userIdForTransaction.slice(-6)}-${Date.now()}`;
-    
-    const paymentPayload = {
-      amount: {
-        total: parsedAmount,
-        currency: "USD"
-      },
-      recipient: [{
-        recipientProfileInfo: {
-          merchantCustomerId: merchantCustomerId,
-          firstName: userData?.firstName || user?.get('firstName') || 'Unknown',
-          lastName: userData?.lastName || user?.get('lastName') || 'User',
-          recipientType: "Consumer",
-          emailAddress: {
-            value: email || user?.get('email') || user?.get('username') || 'user@example.com',
-            type: "work",
-            primary: true
-          },
-          phoneNumber: {
-            code: 1,
-            value: phone || "000-000-0000",
-            type: "billing"
-          },
-          address: {
-            type: "work",
-            street: userData?.address?.street || "123 Main Street",
-            city: userData?.address?.city || "New York",
-            stateOrProvince: userData?.address?.state || "NY",
-            postalCode: userData?.address?.postalCode || "10001",
-            country: "USA",
-            formatted: userData?.address?.formatted || "123 Main Street, New York, NY 10001 US",
-            primary: true
-          }
+          type: 'work',
+          street: userData?.address?.street || '123 Main Street',
+          city: userData?.address?.city || 'New York',
+          stateOrProvince: userData?.address?.state || 'NY',
+          postalCode: userData?.address?.postalCode || '10001',
+          country: 'USA',
         },
-        payments: {
-          amount: {
-            total: parsedAmount,
-            currency: "USD"
-          },
-          paymentType: FISERV_DDP_CONFIG.paymentType
-        }
-      }],
-      merchantTransactionId: merchantTransactionId,
-      batchNumber: `BATCH-${Date.now()}`
-    };
+      },
+    });
 
-    // Add payment method specific details
-    if (paymentMethod.toLowerCase() === 'paypal') {
-      paymentPayload.recipient[0].payments.paypal = {
-        emailAddress: email
-      };
-    } else if (paymentMethod.toLowerCase() === 'venmo') {
-      paymentPayload.recipient[0].payments.venmo = {
-        phoneNumber: phone
-      };
+    // Step 2: Vault if needed (debit/ach/rtp/coinbase)
+    let evToken = null;
+    if (VAULTING_METHODS.includes(method)) {
+      console.log(`[Cashout] Getting public token for ${merchantCustomerId}`);
+      const pubTokenResult = await callDDP('/tokens', 'POST', {
+        token: { fdCustomerId: merchantCustomerId },
+        publicKeyRequired: true,
+      }, 'ucom');
+
+      const publicKey = pubTokenResult.publicKey;
+      const tokenId = pubTokenResult.tokenId;
+
+      console.log(`[Cashout] Encrypting & creating nonce token`);
+      let noncePayload;
+      if (method === 'debit') {
+        noncePayload = {
+          account: {
+            type: 'CREDIT',
+            credit: {
+              cardNumber: encryptWithPublicKey(publicKey, cardNumber),
+              expiryDate: {
+                month: encryptWithPublicKey(publicKey, expiryMonth),
+                year: encryptWithPublicKey(publicKey, expiryYear),
+              },
+            },
+          },
+          referenceToken: { tokenType: 'CLAIM_CHECK_NONCE' },
+          fdCustomerId: merchantCustomerId,
+        };
+      } else {
+        noncePayload = {
+          account: {
+            type: 'ACH',
+            ach: {
+              routingNumber: routingNumber || '',
+              accountNumber: encryptWithPublicKey(publicKey, accountNumber),
+              type: accountType || 'Checking',
+            },
+          },
+          referenceToken: { tokenType: 'CLAIM_CHECK_NONCE' },
+          fdCustomerId: merchantCustomerId,
+        };
+      }
+
+      // Nonce token uses Bearer auth
+      const nonceBodyString = JSON.stringify(noncePayload);
+      const { timestamp } = createHmacSignature('POST', nonceBodyString);
+      const nonceResponse = await fetch(`${CONFIG.ucomBaseUrl}/v1/account-tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Key': CONFIG.clientId,
+          'Timestamp': timestamp.toString(),
+          'Authorization': `Bearer ${tokenId}`,
+          'Client-Request-Id': uuidv4(),
+        },
+        body: nonceBodyString,
+      });
+
+      const nonceData = await nonceResponse.json().catch(() => ({}));
+      if (!nonceResponse.ok) {
+        console.error('[Cashout] Nonce error:', JSON.stringify(nonceData, null, 2));
+        throw new Error(parseFiservError(nonceData, nonceResponse.status));
+      }
+
+      const nonceTokenId = nonceData.token?.tokenId;
+      if (!nonceTokenId) throw new Error('No nonce token received.');
+
+      console.log(`[Cashout] Vaulting payment method`);
+      const vaultResult = await callDDP(
+        `/recipients/${merchantCustomerId}/accounts`, 'POST',
+        { accounts: { token: { tokenId: nonceTokenId, tokenProvider: 'SINGLE_USE_TOKEN' } } },
+        'ddp', tokenId
+      );
+
+      evToken = vaultResult.accounts?.[0]?.token?.tokenId || nonceTokenId;
+      console.log(`[Cashout] Vaulted. EV Token obtained.`);
     }
 
-    const paymentResult = await callFiservDDP('/payments', 'POST', paymentPayload);
-    console.log('✅ Step 3 Complete: Payment created');
+    // Step 3: Build and send payment
+    const merchantTransactionId = `CASHOUT-${userId.slice(-6)}-${Date.now()}`;
+    console.log(`[Cashout] Creating ${method} payment: ${merchantTransactionId}`);
 
-    // Save transaction to Transactions table only (for AOG)
-    const Transaction = Parse.Object.extend("Transactions");
-    const transaction = new Transaction();
-    
-    transaction.set("userId", userIdForTransaction);
-    transaction.set("type", "redeem"); // This is a cashout/redeem operation
-    transaction.set("merchantCustomerId", merchantCustomerId);
-    transaction.set("merchantTransactionId", merchantTransactionId);
-    transaction.set("fiservTransactionId", paymentResult.transactionId);
-    transaction.set("transactionAmount", parsedAmount);
-    transaction.set("paymentMethod", paymentMethod);
-    transaction.set("status", paymentResult.transactionStatus === "COMPLETED" ? 2 : 1); // 2 = success, 1 = pending
-    transaction.set("portal", "FiservDDP");
-    transaction.set("transactionDate", new Date());
-    transaction.set("response", paymentResult);
-    transaction.set("platform", "AOGCOINCLUB");
-    transaction.set("gameId", "786");
-    transaction.set("username", user?.get("username") || "");
-    transaction.set("userParentId", user?.get("userParentId") || "");
-    
-    await transaction.save(null, { useMasterKey: true });
+    const methodFields = buildRecipientPayment(method, {
+      email, phone, evToken,
+      payName: paymentDetails?.payName,
+    });
+
+    const paymentPayload = {
+      amount: { total: parsedAmount, currency: 'USD' },
+      merchantTransactionId,
+      recipient: [{
+        recipientProfileInfo: { merchantCustomerId },
+        payments: { paymentType: CONFIG.paymentType },
+        description: description || 'Sending Transaction',
+        ...methodFields,
+      }],
+    };
+
+    const paymentResult = await callDDP('/payments', 'POST', paymentPayload);
+    console.log(`[Cashout] Payment created: ${paymentResult.transactionId}`);
+
+    // Save transaction record
+    const Record = Parse.Object.extend(TableName);
+    const record = new Record();
+
+    const txStatus = paymentResult.transactionStatus;
+    const paymentStatus = paymentResult.recipient?.[0]?.payments?.paymentStatus;
+
+    record.set('userId', userId);
+    record.set('type', 'redeem');
+    record.set('merchantCustomerId', merchantCustomerId);
+    record.set('merchantTransactionId', merchantTransactionId);
+    record.set('fiservTransactionId', paymentResult.transactionId);
+    record.set('transactionAmount', parsedAmount);
+    record.set('paymentMethod', method);
+    record.set('status', (txStatus === 'TC' || paymentStatus === 'DI') ? STATUS_SUCCESS : STATUS_PENDING);
+    record.set('fiservTransactionStatus', txStatus);
+    record.set('fiservPaymentStatus', paymentStatus);
+    record.set('portal', 'FiservDDP');
+    record.set('transactionDate', new Date());
+    record.set('username', user?.get('username') || '');
+    record.set('userParentId', user?.get('userParentId') || '');
+    record.set('gameId', GAME_ID);
+    if (isAOG) record.set('platform', AOG_PLATFORM);
+
+    await record.save(null, { useMasterKey: true });
 
     return {
       success: true,
       transactionId: paymentResult.transactionId,
-      merchantTransactionId: merchantTransactionId,
+      merchantTransactionId,
       status: paymentResult.transactionStatus,
       portalUrl: paymentResult.recipient?.[0]?.portalUrl,
       fiservTransactionId: paymentResult.transactionId,
-      message: "Cashout completed successfully"
     };
   } catch (error) {
-    console.error('❌ Cashout Failed:', error);
+    console.error('[Cashout] Failed:', error.message);
+
+    // Save failed transaction record for audit
+    try {
+      const Record = Parse.Object.extend(TableName);
+      const failRecord = new Record();
+      failRecord.set('userId', userId);
+      failRecord.set('type', 'redeem');
+      failRecord.set('transactionAmount', parsedAmount);
+      failRecord.set('paymentMethod', method);
+      failRecord.set('status', STATUS_FAILED);
+      failRecord.set('portal', 'FiservDDP');
+      failRecord.set('transactionDate', new Date());
+      failRecord.set('username', user?.get('username') || '');
+      failRecord.set('userParentId', user?.get('userParentId') || '');
+      failRecord.set('gameId', GAME_ID);
+      if (isAOG) failRecord.set('platform', AOG_PLATFORM);
+      await failRecord.save(null, { useMasterKey: true });
+    } catch (saveErr) {
+      console.error('[Cashout] Failed to save error record:', saveErr.message);
+    }
+
     throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Cashout failed: ${error.message}`);
   }
 });
 
-console.log('✅ FiservDigitalDisbursements.js loaded successfully');
+console.log('FiservDigitalDisbursements.js loaded');
 
-module.exports = {
-  generateHMACSignature,
-  generateDDPHeaders,
-  callFiservDDP,
-  FISERV_DDP_CONFIG
-};
+module.exports = { createHmacSignature, buildHeaders, callDDP, CONFIG };
